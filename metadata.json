@@ -1,0 +1,6 @@
+{
+  "name": "KidsTube - Kids Streaming & Parental Control App",
+  "description": "A safe, playful kids video streaming app with profile picker, interactive video playback, emoji reactions, search & categories, math parental gate, and parent dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
