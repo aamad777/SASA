@@ -56,23 +56,28 @@ function getAccountRoleFromToken(token: string | null): "parent" | "admin" {
   }
 }
 
+function getStorageItem(key: string): string | null {
+  if (typeof window !== "undefined" && typeof window.localStorage?.getItem === "function") {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 function SasaApp() {
   const [parentToken, setParentToken] = useState<string | null>(() =>
-    typeof localStorage !== "undefined"
-      ? localStorage.getItem("sasa-parent-token")
-      : null
+    getStorageItem("sasa-parent-token")
   );
 
   const [guestMode, setGuestMode] = useState(() =>
-    typeof localStorage !== "undefined"
-      ? localStorage.getItem("sasa-account-mode") === "guest"
-      : false
+    getStorageItem("sasa-account-mode") === "guest"
   );
 
   const [parentName, setParentName] = useState(() =>
-    typeof localStorage !== "undefined"
-      ? localStorage.getItem("sasa-parent-name") || "Parent"
-      : "Parent"
+    getStorageItem("sasa-parent-name") || "Parent"
   );
 
   const [databaseChildren, setDatabaseChildren] = useState<DatabaseChild[]>([]);
@@ -116,10 +121,7 @@ function SasaApp() {
 
   const [customProfiles, setCustomProfiles] = useState<CreatedProfile[]>(() => {
     try {
-      const saved =
-        typeof localStorage !== "undefined"
-          ? localStorage.getItem("sasa-custom-profiles")
-          : null;
+      const saved = getStorageItem("sasa-custom-profiles");
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -128,10 +130,7 @@ function SasaApp() {
 
   const [parentControls, setParentControls] = useState<ParentControlSettings>(() => {
     try {
-      const saved =
-        typeof localStorage !== "undefined"
-          ? localStorage.getItem("sasa-parent-controls")
-          : null;
+      const saved = getStorageItem("sasa-parent-controls");
       if (!saved) return defaultParentControlSettings;
       return { ...defaultParentControlSettings, ...JSON.parse(saved) };
     } catch {

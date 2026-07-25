@@ -46,12 +46,24 @@ export async function registerParent(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        name,
+        display_name: name,
         email,
         password,
       }),
     },
   );
+
+  const contentType =
+    response.headers.get('content-type') || '';
+
+  if (!contentType.includes('application/json')) {
+    const body = await response.text();
+
+    throw new Error(
+      `Registration API returned invalid content ` +
+      `(${response.status}): ${body.slice(0, 100)}`,
+    );
+  }
 
   const data = await response.json();
 
@@ -61,7 +73,7 @@ export async function registerParent(
     );
   }
 
-  return data;
+  return loginParent(email, password);
 }
 
 export async function loginParent(
