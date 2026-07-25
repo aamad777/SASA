@@ -5223,3 +5223,30 @@ button {
     align-items: flex-start;
   }
 }
+
+.parent-account-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 5px;
+  border-radius: 15px;
+  background: #e2e8f0;
+}
+
+.parent-account-tabs button {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: #64748b;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.parent-account-tabs button.active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.12);
+}

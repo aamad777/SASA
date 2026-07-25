@@ -213,4 +213,46 @@ export async function getAdminChildren(
   return Array.isArray(data) ? data : [];
 }
 
+
+export async function signupParent(
+  displayName: string,
+  email: string,
+  password: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/auth/signup`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        display_name: displayName,
+        email,
+        password,
+      }),
+    },
+  );
+
+  const contentType =
+    response.headers.get('content-type') || '';
+
+  if (!contentType.includes('application/json')) {
+    const body = await response.text();
+
+    throw new Error(
+      `Registration API returned invalid content ` +
+      `(${response.status}): ${body.slice(0, 100)}`,
+    );
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || 'Account registration failed.',
+    );
+  }
+}
+
 export { API_BASE_URL };
