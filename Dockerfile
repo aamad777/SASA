@@ -2,19 +2,27 @@ FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
-COPY package.json bun.lock ./
+COPY package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile
 
 COPY . .
-RUN bun run build
+RUN NITRO_PRESET=node-server bun run build
+
+RUN test -f .output/server/index.mjs
 
 
-FROM nginx:1.27-alpine AS runner
+FROM node:22-alpine AS runner
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/dist /usr/share/nginx/html
+WORKDIR /app
 
-EXPOSE 80
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=3000
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -qO- http://127.0.0.1/health || exit 1
+COPY --from=builder /app/.output ./.output
+
+EXPOSE 3000
+
+USER node
+
+CMD ["node", ".output/server/index.mjs"]

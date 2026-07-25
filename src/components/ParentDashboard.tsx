@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { playPopSound, playSuccessSound } from '../lib/sound';
 import { kidsVideos } from './KidsVideoHome';
 import {
   BarChart3,
@@ -6,16 +8,27 @@ import {
   Bell,
   BookOpen,
   Clock3,
+  Check,
+  Film,
   Home,
+  Info,
+  Key,
   Library,
   Lock,
   Menu,
   MoreHorizontal,
+  Plus,
+  RotateCcw,
   Search,
   Settings,
   Shield,
+  Sparkles,
   Timer,
+  Trash2,
+  Unlock,
+  UserCheck,
   UserCircle,
+  Users,
   X,
 } from 'lucide-react';
 
@@ -56,18 +69,16 @@ type ManagedCustomProfile = {
   emoji: string;
   color: string;
   age?: number;
+  avatarUrl?: string;
+  image?: string;
   isProtected?: boolean;
 };
 
 type ParentDashboardProps = {
   customProfiles: ManagedCustomProfile[];
   onDeleteCustomProfile: (profileId: number) => void;
-  onUpdateCustomProfile: (
-    profile: ManagedCustomProfile,
-  ) => void;
-  onToggleProfileProtection: (
-    profileId: number,
-  ) => void;
+  onUpdateCustomProfile: (profile: ManagedCustomProfile) => void;
+  onToggleProfileProtection: (profileId: number) => void;
   onClose: () => void;
   settings: ParentControlSettings;
   profileId: number | null;
@@ -157,8 +168,9 @@ export default function ParentDashboard({
       'settings'
     >('screen-time');
 
-  const [newBlockedChannel, setNewBlockedChannel] =
-    useState('');
+  const [newBlockedChannel, setNewBlockedChannel] = useState('');
+  const [videoFilterQuery, setVideoFilterQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState('All');
 
   const [newParentPin, setNewParentPin] =
     useState(settings.parentPin || '1234');
@@ -429,7 +441,14 @@ export default function ParentDashboard({
 
   return (
     <div className="parent-dashboard">
-      <MobileHeader onClose={onClose} />
+      <MobileHeader
+        activeSection={activeSection}
+        onSelectSection={(section) => {
+          playPopSound();
+          setActiveSection(section);
+        }}
+        onClose={onClose}
+      />
 
       <aside className="parent-sidebar">
         <div className="parent-brand">WonderWatch</div>
@@ -442,7 +461,10 @@ export default function ParentDashboard({
                 ? 'parent-nav-item active'
                 : 'parent-nav-item'
             }
-            onClick={() => setActiveSection('screen-time')}
+            onClick={() => {
+              playPopSound();
+              setActiveSection('screen-time');
+            }}
           >
             <Clock3 size={26} />
             Screen Time
@@ -455,9 +477,10 @@ export default function ParentDashboard({
                 ? 'parent-nav-item active'
                 : 'parent-nav-item'
             }
-            onClick={() =>
-              setActiveSection('content-filters')
-            }
+            onClick={() => {
+              playPopSound();
+              setActiveSection('content-filters');
+            }}
           >
             <Shield size={26} />
             Content Filters
@@ -470,9 +493,10 @@ export default function ParentDashboard({
                 ? 'parent-nav-item active'
                 : 'parent-nav-item'
             }
-            onClick={() =>
-              setActiveSection('profiles')
-            }
+            onClick={() => {
+              playPopSound();
+              setActiveSection('profiles');
+            }}
           >
             <span className="parent-nav-emoji">👨‍👩‍👧</span>
             Profiles
@@ -485,9 +509,10 @@ export default function ParentDashboard({
                 ? 'parent-nav-item active'
                 : 'parent-nav-item'
             }
-            onClick={() =>
-              setActiveSection('activity-history')
-            }
+            onClick={() => {
+              playPopSound();
+              setActiveSection('activity-history');
+            }}
           >
             <BarChart3 size={26} />
             Activity & History
@@ -502,15 +527,22 @@ export default function ParentDashboard({
                 ? 'parent-settings-button active'
                 : 'parent-settings-button'
             }
-            onClick={() =>
-              setActiveSection('settings')
-            }
+            onClick={() => {
+              playPopSound();
+              setActiveSection('settings');
+            }}
           >
             <Settings size={21} />
             Settings
           </button>
 
-          <button className="parent-close-button" onClick={onClose}>
+          <button
+            className="parent-close-button"
+            onClick={() => {
+              playPopSound();
+              onClose();
+            }}
+          >
             <X size={21} />
             Exit dashboard
           </button>
@@ -561,249 +593,326 @@ export default function ParentDashboard({
           </h2>
 
           {activeSection === 'screen-time' && (
-            <>
-          <MobileScreenTimeCard
-            enabled={screenLimitEnabled}
-            minutes={screenMinutes}
-            formattedTime={formattedTime}
-            onToggle={() =>
-              updateSettings({
-                screenLimitEnabled:
-                  !screenLimitEnabled,
-              })
-            }
-            onMinutesChange={(minutes) =>
-              updateSettings({
-                screenMinutes: minutes,
-              })
-            }
-          />
+            <div className="space-y-6 max-w-6xl mx-auto">
+              {/* Daily Screen Time Control Card */}
+              <section className="bg-white rounded-3xl p-6 sm:p-8 shadow-md border border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Clock3 className="text-sky-500" size={24} />
+                      <h3 className="text-2xl font-black text-slate-800">
+                        Daily Screen Time Limit
+                      </h3>
+                    </div>
+                    <p className="text-slate-500 text-sm font-medium mt-1">
+                      Set maximum viewing time per day. App locks automatically when limit is reached.
+                    </p>
+                  </div>
 
-          <section className="screen-time-quick-control">
-            <div className="screen-time-quick-heading">
-              <div>
-                <h3>Daily Time Limit</h3>
-                <p>
-                  Select how long the child can use the app.
-                </p>
-              </div>
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${
+                        screenLimitEnabled
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : 'bg-slate-100 text-slate-600 border border-slate-200'
+                      }`}
+                    >
+                      {screenLimitEnabled ? `Active: ${formattedTime}` : 'Limit Disabled'}
+                    </span>
 
-              <strong>
-                {screenLimitEnabled
-                  ? formattedTime
-                  : 'Disabled'}
-              </strong>
-            </div>
-
-            <div className="screen-time-preset-grid">
-              {[1, 5, 15, 30, 60, 90].map(
-                (minutes) => (
-                  <button
-                    key={minutes}
-                    type="button"
-                    className={
-                      screenLimitEnabled &&
-                      screenMinutes === minutes
-                        ? 'selected'
-                        : ''
-                    }
-                    onClick={() =>
-                      updateSettings({
-                        screenLimitEnabled: true,
-                        screenMinutes: minutes,
-                      })
-                    }
-                  >
-                    {minutes < 60
-                      ? `${minutes} min`
-                      : minutes === 60
-                        ? '1 hour'
-                        : '1h 30m'}
-                  </button>
-                ),
-              )}
-            </div>
-
-            <button
-              type="button"
-              className={
-                screenLimitEnabled
-                  ? 'screen-time-disable-button'
-                  : 'screen-time-enable-button'
-              }
-              onClick={() =>
-                updateSettings({
-                  screenLimitEnabled:
-                    !screenLimitEnabled,
-                })
-              }
-            >
-              {screenLimitEnabled
-                ? 'Disable Time Limit'
-                : 'Enable Time Limit'}
-            </button>
-
-            <p className="screen-time-help">
-              The new timer starts when you exit the
-              parent dashboard.
-            </p>
-          </section>
-
-          <MobileHistory />
-
-          <MobileBlockedChannels
-            channels={blockedChannels}
-            onUnblock={unblockChannel}
-          />
-
-          <section className="parent-desktop-layout">
-            <div className="parent-chart-card">
-              <div className="parent-card-heading">
-                <div>
-                  <h2>Weekly Overview</h2>
-                  <p>Total: 14h 25m</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playPopSound();
+                        updateSettings({
+                          screenLimitEnabled: !screenLimitEnabled,
+                        });
+                      }}
+                      className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        screenLimitEnabled ? 'bg-sky-500' : 'bg-slate-300'
+                      }`}
+                      aria-label="Toggle screen limit"
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          screenLimitEnabled ? 'translate-x-6' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
 
-                <button className="parent-round-button">
-                  <MoreHorizontal size={22} />
-                </button>
-              </div>
-
-              <div className="parent-chart">
-                {chartData.map((item) => (
-                  <div className="parent-chart-column" key={item.day}>
-                    <div className="parent-bars">
-                      <div
-                        className="bar videos"
-                        style={{ height: `${item.videos}%` }}
-                      />
-                      <div
-                        className="bar reading"
-                        style={{ height: `${item.reading}%` }}
-                      />
-                      <div
-                        className="bar games"
-                        style={{ height: `${item.games}%` }}
-                      />
+                {/* Range Slider & Fine Adjustments */}
+                <div className="py-6 space-y-6">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-sky-50/60 p-5 rounded-2xl border border-sky-100">
+                    <div className="text-center sm:text-left">
+                      <span className="text-xs font-black uppercase tracking-wider text-sky-600">
+                        Target Daily Limit
+                      </span>
+                      <div className="text-4xl font-black text-sky-950 mt-0.5">
+                        {screenLimitEnabled ? formattedTime : 'Unlimited'}
+                      </div>
                     </div>
 
-                    <span>{item.day}</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={!screenLimitEnabled || screenMinutes <= 15}
+                        onClick={() => {
+                          playPopSound();
+                          updateSettings({
+                            screenMinutes: Math.max(15, screenMinutes - 15),
+                          });
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-white hover:bg-sky-100 disabled:opacity-40 font-black text-sky-700 shadow-sm border border-sky-200 text-sm transition"
+                      >
+                        -15 min
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={!screenLimitEnabled}
+                        onClick={() => {
+                          playPopSound();
+                          updateSettings({
+                            screenMinutes: screenMinutes + 15,
+                          });
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 disabled:opacity-40 font-black text-white shadow-sm text-sm transition"
+                      >
+                        +15 min
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
 
-              <div className="chart-legend">
-                <Legend colorClass="videos" label="Videos" />
-                <Legend colorClass="games" label="Games" />
-                <Legend colorClass="reading" label="Reading" />
-              </div>
-            </div>
+                  {/* Range Slider */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-bold text-slate-500">
+                      <span>15 min</span>
+                      <span>1 hour</span>
+                      <span>2 hours</span>
+                      <span>3 hours</span>
+                      <span>4 hours</span>
+                    </div>
 
-            <div className="parent-stat-column">
-              <article className="parent-stat-card daily-average">
-                <div className="stat-icon">
-                  <Timer size={32} />
-                </div>
-                <h3>Daily Average</h3>
-                <strong>2h 03m</strong>
-              </article>
-
-              <article className="parent-stat-card bedtime-card">
-                <div className="bedtime-heading">
-                  <div className="bedtime-icon">
-                    <Bed size={24} />
+                    <input
+                      type="range"
+                      min="15"
+                      max="240"
+                      step="15"
+                      value={screenMinutes}
+                      disabled={!screenLimitEnabled}
+                      onChange={(e) => {
+                        updateSettings({
+                          screenMinutes: Number(e.target.value),
+                        });
+                      }}
+                      className="w-full h-3 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500 disabled:opacity-40"
+                    />
                   </div>
 
+                  {/* Preset Chips */}
                   <div>
-                    <h3>Bedtime Mode</h3>
-                    <p>
-                      {bedtimeStart} – {bedtimeEnd}
+                    <span className="text-xs font-bold text-slate-400 block mb-2">
+                      Quick Time Presets:
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
+                      {[15, 30, 45, 60, 90, 120, 180].map((minutes) => (
+                        <button
+                          key={minutes}
+                          type="button"
+                          className={`py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border transition-all ${
+                            screenLimitEnabled && screenMinutes === minutes
+                              ? 'bg-sky-500 text-white border-sky-600 shadow-md scale-105'
+                              : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
+                          onClick={() => {
+                            playPopSound();
+                            updateSettings({
+                              screenLimitEnabled: true,
+                              screenMinutes: minutes,
+                            });
+                          }}
+                        >
+                          {minutes < 60
+                            ? `${minutes} min`
+                            : minutes === 60
+                              ? '1 hour'
+                              : `${Math.floor(minutes / 60)}h ${minutes % 60 ? (minutes % 60) + 'm' : ''}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 flex items-start gap-3">
+                  <Info className="text-amber-600 shrink-0 mt-0.5" size={18} />
+                  <p className="text-xs text-amber-900 font-medium">
+                    <strong>Timer behavior:</strong> The daily countdown activates when your child enters the kid profile and pauses when returning to the parent dashboard.
+                  </p>
+                </div>
+              </section>
+
+              {/* Grid Layout: Weekly Overview & Side Cards */}
+              <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Weekly Analytics Chart Card */}
+                <div className="lg:col-span-2 bg-white rounded-3xl p-6 sm:p-8 shadow-md border border-slate-100">
+                  <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                    <div>
+                      <h3 className="text-xl font-black text-slate-800">Weekly Usage Overview</h3>
+                      <p className="text-xs text-slate-500 font-medium">Total watch & play activity this week</p>
+                    </div>
+                    <span className="px-3 py-1 bg-sky-50 text-sky-700 font-bold text-xs rounded-full border border-sky-200">
+                      14h 25m total
+                    </span>
+                  </div>
+
+                  <div className="parent-chart">
+                    {chartData.map((item) => (
+                      <div className="parent-chart-column" key={item.day}>
+                        <div className="parent-bars">
+                          <div
+                            className="bar videos"
+                            style={{ height: `${item.videos}%` }}
+                            title={`Videos: ${item.videos}%`}
+                          />
+                          <div
+                            className="bar reading"
+                            style={{ height: `${item.reading}%` }}
+                            title={`Reading: ${item.reading}%`}
+                          />
+                          <div
+                            className="bar games"
+                            style={{ height: `${item.games}%` }}
+                            title={`Games: ${item.games}%`}
+                          />
+                        </div>
+                        <span>{item.day}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="chart-legend">
+                    <Legend colorClass="videos" label="Videos" />
+                    <Legend colorClass="games" label="Games" />
+                    <Legend colorClass="reading" label="Reading" />
+                  </div>
+                </div>
+
+                {/* Right Column: Bedtime & Instant Lock */}
+                <div className="space-y-6">
+                  {/* Bedtime Mode Card */}
+                  <article className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl border border-slate-800 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                      <Bed size={120} />
+                    </div>
+
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          <Bed size={22} />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-black text-white">Bedtime Curfew</h3>
+                          <p className="text-xs text-slate-400">Lock app during sleep hours</p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playPopSound();
+                          updateSettings({
+                            bedtimeEnabled: !bedtimeEnabled,
+                          });
+                        }}
+                        className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase transition ${
+                          bedtimeEnabled
+                            ? 'bg-indigo-500 text-white'
+                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                        }`}
+                      >
+                        {bedtimeEnabled ? 'ACTIVE' : 'OFF'}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 my-4">
+                      <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700">
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Curfew Starts</span>
+                        <input
+                          type="time"
+                          value={bedtimeStart}
+                          onChange={(e) =>
+                            updateSettings({
+                              bedtimeStart: e.target.value,
+                            })
+                          }
+                          className="w-full bg-transparent text-white font-mono font-bold text-base focus:outline-none cursor-pointer mt-0.5"
+                        />
+                      </div>
+
+                      <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700">
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Curfew Ends</span>
+                        <input
+                          type="time"
+                          value={bedtimeEnd}
+                          onChange={(e) =>
+                            updateSettings({
+                              bedtimeEnd: e.target.value,
+                            })
+                          }
+                          className="w-full bg-transparent text-white font-mono font-bold text-base focus:outline-none cursor-pointer mt-0.5"
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-indigo-200/70 font-medium">
+                      🌙 Screen locks automatically between {bedtimeStart} and {bedtimeEnd}.
+                    </p>
+                  </article>
+
+                  {/* Instant Break / Lock Card */}
+                  <article className="bg-gradient-to-br from-rose-50 to-orange-50 rounded-3xl p-6 border-2 border-rose-200 shadow-md">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2.5 rounded-2xl bg-rose-500 text-white shadow-sm">
+                        <Lock size={20} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-rose-950">Dinner / Study Break</h3>
+                        <p className="text-xs text-rose-700 font-medium">Instantly lock app anytime</p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-600 mb-4 font-medium leading-relaxed">
+                      Need immediate attention for dinner, homework, or bedtime? Tap below to lock the video player instantly.
                     </p>
 
-                    <small className="bedtime-saved-message">
-                      Schedule saved automatically
-                    </small>
-                  </div>
-                </div>
-
-                <div className="bedtime-time-controls">
-                  <label>
-                    <span>Starts</span>
-                    <input
-                      type="time"
-                      value={bedtimeStart}
-                      onChange={(event) =>
-                        updateSettings({
-                          bedtimeStart: event.target.value,
-                        })
-                      }
-                    />
-                  </label>
-
-                  <label>
-                    <span>Ends</span>
-                    <input
-                      type="time"
-                      value={bedtimeEnd}
-                      onChange={(event) =>
-                        updateSettings({
-                          bedtimeEnd: event.target.value,
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-
-                <div className="bedtime-status">
-                  <span>Status</span>
-
-                  <button
-                    type="button"
-                    className={
-                      bedtimeEnabled
-                        ? 'bedtime-toggle enabled'
-                        : 'bedtime-toggle'
-                    }
-                    onClick={() =>
-                      updateSettings({
-                        bedtimeEnabled: !bedtimeEnabled,
-                      })
-                    }
-                  >
-                    <strong>
-                      {bedtimeEnabled ? 'ON' : 'OFF'}
-                    </strong>
-
-                    <span>
-                      {bedtimeEnabled ? (
-                        <Bed size={17} />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playSuccessSound();
+                        updateSettings({ deviceLocked: !deviceLocked });
+                      }}
+                      className={`w-full py-3 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-md transition-all ${
+                        deviceLocked
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                          : 'bg-rose-600 hover:bg-rose-700 text-white'
+                      }`}
+                    >
+                      {deviceLocked ? (
+                        <>
+                          <Unlock size={18} /> Unlock Device Now
+                        </>
                       ) : (
-                        <Clock3 size={17} />
+                        <>
+                          <Lock size={18} /> Lock Device Instantly
+                        </>
                       )}
-                    </span>
-                  </button>
+                    </button>
+                  </article>
                 </div>
-              </article>
-
-              <article className="parent-lock-card">
-                <h3>Need a break?</h3>
-                <p>
-                  Instantly lock the device for dinner time or chores.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() => updateSettings({ deviceLocked: !deviceLocked })}
-                >
-                  <Lock size={20} />
-                  {deviceLocked
-                    ? 'Unlock Device'
-                    : 'Lock Device Now'}
-                </button>
-              </article>
+              </section>
             </div>
-          </section>
-            </>
           )}
 
           {activeSection === 'content-filters' && (
@@ -892,56 +1001,123 @@ export default function ParentDashboard({
                   <div>
                     <h2>Video Catalog Management</h2>
                     <p>
-                      Toggle block or allow status for
-                      individual videos.
+                      Toggle block or allow status for individual cartoons & shows.
                     </p>
                   </div>
 
-                  <strong>
-                    {blockedVideoIds.length} blocked
-                  </strong>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition"
+                      onClick={() => {
+                        playSuccessSound();
+                        updateSettings({ blockedVideoIds: [] });
+                      }}
+                    >
+                      Allow All
+                    </button>
+                    <button
+                      type="button"
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition"
+                      onClick={() => {
+                        playPopSound();
+                        updateSettings({
+                          blockedVideoIds: kidsVideos.map((v) => v.id),
+                        });
+                      }}
+                    >
+                      Block All
+                    </button>
+                    <strong className="text-slate-700 ml-2">
+                      {blockedVideoIds.length} blocked
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Video Catalog Search and Category Filter */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 my-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-3 text-slate-400" size={18} />
+                    <input
+                      type="text"
+                      placeholder="Search videos by title..."
+                      value={videoFilterQuery}
+                      onChange={(e) => setVideoFilterQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                    {['All', 'Cartoons', 'Learning', 'Songs', 'Stories'].map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => {
+                          playPopSound();
+                          setFilterCategory(cat);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                          filterCategory === cat
+                            ? 'bg-sky-500 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="video-filter-grid">
-                  {kidsVideos.map((video) => {
-                    const blocked =
-                      blockedVideoIds.includes(video.id);
+                  {kidsVideos
+                    .filter((video) => {
+                      const matchesSearch = video.title
+                        .toLowerCase()
+                        .includes(videoFilterQuery.toLowerCase());
+                      const matchesCategory =
+                        filterCategory === 'All' ||
+                        video.category.toLowerCase().includes(filterCategory.toLowerCase());
+                      return matchesSearch && matchesCategory;
+                    })
+                    .map((video) => {
+                      const blocked = blockedVideoIds.includes(video.id);
 
-                    return (
-                      <div
-                        className={
-                          blocked
-                            ? 'video-filter-item blocked'
-                            : 'video-filter-item'
-                        }
-                        key={video.id}
-                      >
-                        <img
-                          src={video.image}
-                          alt={video.title}
-                        />
-
-                        <div className="video-filter-details">
-                          <h3>{video.title}</h3>
-                          <p>{video.category}</p>
-                        </div>
-
-                        <button
-                          type="button"
+                      return (
+                        <div
                           className={
                             blocked
-                              ? 'allow-video-button'
-                              : 'block-video-button'
+                              ? 'video-filter-item blocked'
+                              : 'video-filter-item'
                           }
-                          onClick={() =>
-                            toggleVideoBlock(video.id)
-                          }
+                          key={video.id}
                         >
-                          {blocked ? 'Allow' : 'Block'}
-                        </button>
-                      </div>
-                    );
-                  })}
+                          <img
+                            src={video.image}
+                            alt={video.title}
+                          />
+
+                          <div className="video-filter-details">
+                            <h3>{video.title}</h3>
+                            <p>{video.category}</p>
+                          </div>
+
+                          <button
+                            type="button"
+                            className={
+                              blocked
+                                ? 'allow-video-button'
+                                : 'block-video-button'
+                            }
+                            onClick={() => {
+                              playPopSound();
+                              toggleVideoBlock(video.id);
+                            }}
+                          >
+                            {blocked ? 'Allow' : 'Block'}
+                          </button>
+                        </div>
+                      );
+                    })}
                 </div>
               </article>
             </section>
@@ -1067,18 +1243,24 @@ export default function ParentDashboard({
                     name: 'Leo',
                     emoji: '🦁',
                     color: '#ffa62b',
+                    image:
+                      'https://lh3.googleusercontent.com/aida-public/AB6AXuBXKmBbTEschT2fVlXzamCeETx0M3rctPouvJQ6jyWboczUe-WXt302CDJtMx5T_L9-zEaxhM_vxlITgSZt9_ApPXqHF9Vx39tEHo5gDXRFuGHRZ_rrEz6fOH5KlalMKiv82rUKm_4IRONsQ-wF064xYk_0ZIzAijLaovdE2H-qhe86S9qU1K70VcVvqOQ7GxR9ujHTTCg5GPHGI4VYoTLTPpwFitUSQ7JP8kSUjWRij6OOEIBXNKbLcaKkBrH4y-J_4PM1zmklxnA',
                   },
                   {
                     id: 2,
                     name: 'Poppy',
                     emoji: '🐼',
                     color: '#95d5b2',
+                    image:
+                      'https://lh3.googleusercontent.com/aida-public/AB6AXuCONd4umMhgrulZ5f-ZZt2Uuy9-ach-KvWVrVKGmgiL58eNixQ0RjTvy4dEfDeZ1J7AjEKiLqrUKdXuuqdwFo-IF87mvFkdWZwpDs4hfs2FGU19CtmN6-k04UQXX4ibVERtYQS4ejdOmmIu6QKvrqVw2lGKdJHCiNNzzQGpdSP3Zir5sHO0B2Dt0_hf7PLpsbxeTuzJbU0-bxuCDZ2egbgYTHvpvt7p7Nl-GMz8P2cZlpqKbDqaybqBQFAYBqN6KlDGvQr8Yd7diDQ',
                   },
                   {
                     id: 3,
                     name: 'Ruby',
                     emoji: '🐰',
                     color: '#ff8fa3',
+                    image:
+                      'https://lh3.googleusercontent.com/aida-public/AB6AXuBSpgsSIXN0d0LIyQMwB5SQbDUf6iitsVRQwTNbcaYYxamCvTLMt2omcQa9RPFVNaWlGDX2OTgHS9ZHHumfzn4jTOqF8IM0wzwTvI6lEkYLR5e4j1moqa0_Wrartxg-46lIyoXuBdsEFX9pa7gJgLs0L0SshcnaM8a_OnasZM-Uogwwpf5DOLftEcb2sg4fUl5uLX5o-g-g9wxt8QgqtmJ1Zii35Iibp-f7PH3ACFzlM57Cuf4m8MVAwA0J5c_n1YsiT4-gFfBgNg0',
                   },
                 ].map((child) => (
                   <article
@@ -1086,12 +1268,20 @@ export default function ParentDashboard({
                     className="profile-management-card"
                   >
                     <div
-                      className="profile-management-avatar"
+                      className="profile-management-avatar overflow-hidden"
                       style={{
                         backgroundColor: child.color,
                       }}
                     >
-                      {child.emoji}
+                      {child.image ? (
+                        <img
+                          src={child.image}
+                          alt={child.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        child.emoji
+                      )}
                     </div>
 
                     <div className="profile-management-info">
@@ -1108,6 +1298,7 @@ export default function ParentDashboard({
                 {customProfiles.map((child) => {
                   const isEditing =
                     editingProfileId === child.id;
+                  const photoUrl = child.avatarUrl || (child as any).image;
 
                   return (
                     <article
@@ -1122,13 +1313,21 @@ export default function ParentDashboard({
                         <div className="profile-edit-form">
                           <div className="profile-edit-preview">
                             <div
-                              className="profile-management-avatar"
+                              className="profile-management-avatar overflow-hidden"
                               style={{
                                 backgroundColor:
                                   editProfileColor,
-                              }}
+                                }}
                             >
-                              {editProfileEmoji}
+                              {photoUrl ? (
+                                <img
+                                  src={photoUrl}
+                                  alt={child.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                editProfileEmoji
+                              )}
                             </div>
                           </div>
 
@@ -1229,13 +1428,21 @@ export default function ParentDashboard({
                       ) : (
                         <>
                           <div
-                            className="profile-management-avatar"
+                            className="profile-management-avatar overflow-hidden"
                             style={{
                               backgroundColor:
                                 child.color,
                             }}
                           >
-                            {child.emoji}
+                            {photoUrl ? (
+                              <img
+                                src={photoUrl}
+                                alt={child.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              child.emoji
+                            )}
                           </div>
 
                           <div className="profile-management-info">
@@ -1455,167 +1662,174 @@ export default function ParentDashboard({
         </div>
       </main>
 
-      <MobileBottomNavigation />
+      <MobileBottomNavigation
+        activeSection={activeSection}
+        onSelectSection={(section) => {
+          playPopSound();
+          setActiveSection(section);
+        }}
+      />
     </div>
   );
 }
 
-function MobileHeader({ onClose }: { onClose: () => void }) {
-  return (
-    <header className="parent-mobile-header">
-      <button>
-        <Menu size={25} />
-      </button>
-
-      <h1>WonderWatch</h1>
-
-      <button onClick={onClose}>
-        <X size={25} />
-      </button>
-    </header>
-  );
-}
-
-function MobileScreenTimeCard({
-  enabled,
-  minutes,
-  formattedTime,
-  onToggle,
-  onMinutesChange,
+function MobileHeader({
+  activeSection,
+  onSelectSection,
+  onClose,
 }: {
-  enabled: boolean;
-  minutes: number;
-  formattedTime: string;
-  onToggle: () => void;
-  onMinutesChange: (minutes: number) => void;
+  activeSection: string;
+  onSelectSection: (
+    section:
+      | 'screen-time'
+      | 'content-filters'
+      | 'activity-history'
+      | 'profiles'
+      | 'settings',
+  ) => void;
+  onClose: () => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const sectionTitles: Record<string, string> = {
+    'screen-time': 'Screen Time',
+    'content-filters': 'Content Filters',
+    profiles: 'Profiles',
+    'activity-history': 'Activity & History',
+    settings: 'Settings',
+  };
+
   return (
-    <section className="mobile-screen-time-card">
-      <div className="parent-card-heading">
-        <div>
-          <h2>Screen Time Limit</h2>
-          <p>Daily Limit</p>
+    <header className="relative z-30 bg-slate-900 text-white border-b border-slate-800 px-4 py-3 md:hidden">
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => {
+            playPopSound();
+            setMenuOpen(!menuOpen);
+          }}
+          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 transition"
+          aria-label="Toggle navigation menu"
+        >
+          <Menu size={22} />
+        </button>
+
+        <div className="flex items-center gap-2">
+          <Shield className="text-sky-400" size={20} />
+          <h1 className="text-base font-black tracking-tight text-white">
+            {sectionTitles[activeSection] || 'Parent Dashboard'}
+          </h1>
         </div>
 
         <button
           type="button"
-          className={
-            enabled
-              ? 'parent-switch enabled'
-              : 'parent-switch'
-          }
-          onClick={onToggle}
-          aria-label="Toggle screen time limit"
+          onClick={() => {
+            playPopSound();
+            onClose();
+          }}
+          className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition"
+          aria-label="Exit dashboard"
         >
-          <span />
+          <X size={22} />
         </button>
       </div>
 
-      <strong className="screen-time-value">
-        {formattedTime}
-      </strong>
+      {/* Slide-down Mobile Navigation Drawer */}
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.nav
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden mt-3 pt-3 border-t border-slate-800 space-y-1"
+          >
+            {[
+              { id: 'screen-time', label: 'Screen Time', icon: Clock3 },
+              { id: 'content-filters', label: 'Content Filters', icon: Shield },
+              { id: 'profiles', label: 'Profiles', icon: Users },
+              { id: 'activity-history', label: 'Activity & History', icon: BarChart3 },
+              { id: 'settings', label: 'Settings', icon: Settings },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeSection === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectSection(tab.id as any);
+                    setMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition ${
+                    isActive
+                      ? 'bg-sky-500 text-white shadow-md'
+                      : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <Icon size={18} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
 
-      <input
-        className="parent-range"
-        type="range"
-        min="0"
-        max="180"
-        step="15"
-        value={minutes}
-        disabled={!enabled}
-        onChange={(event) =>
-          onMinutesChange(Number(event.target.value))
-        }
-      />
-
-      <p className="screen-time-help">
-        Set a daily limit for viewing.
-      </p>
-    </section>
-  );
-}
-
-function MobileHistory() {
-  return (
-    <section className="mobile-dashboard-section">
-      <div className="mobile-section-heading">
-        <h2>Watch History</h2>
-        <button>See All</button>
-      </div>
-
-      <div className="mobile-history-list">
-        {historyItems.map((item) => (
-          <article className="history-card" key={item.id}>
-            <img src={item.image} alt={item.title} />
-            <h3>{item.title}</h3>
-            <p>{item.watched}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function MobileBlockedChannels({
-  channels,
-  onUnblock,
-}: {
-  channels: BlockedChannel[];
-  onUnblock: (id: number) => void;
-}) {
-  return (
-    <section className="mobile-dashboard-section blocked-section">
-      <div className="mobile-section-heading">
-        <h2>Blocked Channels</h2>
-        <button>Add</button>
-      </div>
-
-      <div className="blocked-channel-list">
-        {channels.length === 0 && (
-          <p className="empty-blocked-message">
-            No channels are currently blocked.
-          </p>
-        )}
-
-        {channels.map((channel) => (
-          <div className="blocked-channel" key={channel.id}>
-            <div>
-              <img src={channel.image} alt={channel.name} />
-              <strong>{channel.name}</strong>
-            </div>
-
-            <button onClick={() => onUnblock(channel.id)}>
-              Unblock
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+              }}
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm text-rose-400 hover:bg-rose-500/10 mt-2 transition"
+            >
+              <X size={18} />
+              <span>Exit Dashboard</span>
             </button>
-          </div>
-        ))}
-      </div>
-    </section>
+          </motion.nav>
+        )}
+      </AnimatePresence>
+    </header>
   );
 }
 
-function MobileBottomNavigation() {
+function MobileBottomNavigation({
+  activeSection,
+  onSelectSection,
+}: {
+  activeSection: string;
+  onSelectSection: (
+    section:
+      | 'screen-time'
+      | 'content-filters'
+      | 'activity-history'
+      | 'profiles'
+      | 'settings',
+  ) => void;
+}) {
+  const tabs = [
+    { id: 'screen-time', label: 'Screen', icon: Clock3 },
+    { id: 'content-filters', label: 'Filters', icon: Shield },
+    { id: 'profiles', label: 'Profiles', icon: Users },
+    { id: 'activity-history', label: 'Activity', icon: BarChart3 },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ];
+
   return (
-    <nav className="parent-mobile-bottom-nav">
-      <button>
-        <Home size={26} />
-        <span>Home</span>
-      </button>
-
-      <button>
-        <Search size={26} />
-        <span>Search</span>
-      </button>
-
-      <button>
-        <Library size={26} />
-        <span>Library</span>
-      </button>
-
-      <button className="active">
-        <UserCircle size={26} />
-        <span>Profile</span>
-      </button>
+    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-slate-900 border-t border-slate-800 px-2 py-1.5 flex items-center justify-around md:hidden shadow-2xl">
+      {tabs.map((tab) => {
+        const Icon = tab.icon;
+        const isActive = activeSection === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onSelectSection(tab.id as any)}
+            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition ${
+              isActive ? 'text-sky-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Icon size={20} className={isActive ? 'scale-110' : ''} />
+            <span className="text-[10px] mt-0.5 tracking-tight">{tab.label}</span>
+          </button>
+        );
+      })}
     </nav>
   );
 }

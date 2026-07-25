@@ -1,8 +1,11 @@
 .git
 .github
 node_modules
+.output
 dist
-.env
-.env.local
+.wrangler
 *.log
-README.md
+*.before-*
+.env.local
+Dockerfile.before-*
+nginx.conf

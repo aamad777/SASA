@@ -4,12 +4,12 @@ import {
   EyeOff,
   LockKeyhole,
   Mail,
+  User,
+  ShieldCheck,
+  UserPlus,
 } from 'lucide-react';
 
-import {
-  loginParent,
-  signupParent,
-} from '../lib/api';
+import { loginParent, registerParent } from '../lib/api';
 
 type ParentLoginProps = {
   onSuccess: (
@@ -19,188 +19,123 @@ type ParentLoginProps = {
   onGuest: () => void;
 };
 
-type AccountMode = 'login' | 'signup';
-
 export default function ParentLogin({
   onSuccess,
   onGuest,
 }: ParentLoginProps) {
-  const [mode, setMode] =
-    useState<AccountMode>('login');
-
-  const [displayName, setDisplayName] =
-    useState('');
-
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-
-  const [password, setPassword] =
-    useState('');
-
-  const [confirmPassword, setConfirmPassword] =
-    useState('');
-
-  const [showPassword, setShowPassword] =
-    useState(false);
-
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [loading, setLoading] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const clearMessages = () => {
-    setError('');
-  };
-
-  const completeLogin = async (
-    cleanEmail: string,
-    accountPassword: string,
-  ) => {
-    const result = await loginParent(
-      cleanEmail,
-      accountPassword,
-    );
-
-    localStorage.setItem(
-      'sasa-parent-token',
-      result.token,
-    );
-
-    localStorage.setItem(
-      'sasa-parent-name',
-      result.user.display_name,
-    );
-
-    onSuccess(
-      result.token,
-      result.user.display_name,
-    );
-  };
-
-  const submit = async () => {
+  const handleSubmit = async () => {
     const cleanEmail = email.trim();
-    const cleanName = displayName.trim();
+    const cleanName = name.trim();
 
-    if (!cleanEmail || !password) {
-      setError(
-        'Enter your email address and password.',
-      );
+    if (mode === 'register' && !cleanName) {
+      setError('Please enter your parent name.');
       return;
     }
 
-    if (mode === 'signup') {
-      if (!cleanName) {
-        setError('Enter the parent name.');
-        return;
-      }
-
-      if (password.length < 8) {
-        setError(
-          'Password must contain at least 8 characters.',
-        );
-        return;
-      }
-
-      if (password !== confirmPassword) {
-        setError('The passwords do not match.');
-        return;
-      }
+    if (!cleanEmail || !password) {
+      setError('Enter your parent email and password.');
+      return;
     }
 
     setLoading(true);
     setError('');
 
     try {
-      if (mode === 'signup') {
-        await signupParent(
-          cleanName,
-          cleanEmail,
-          password,
-        );
+      let result;
+      if (mode === 'register') {
+        result = await registerParent(cleanName, cleanEmail, password);
+      } else {
+        result = await loginParent(cleanEmail, password);
       }
 
-      await completeLogin(
-        cleanEmail,
-        password,
-      );
-    } catch (requestError) {
+      localStorage.setItem('sasa-parent-token', result.token);
+      localStorage.setItem('sasa-parent-name', result.user.display_name);
+
+      onSuccess(result.token, result.user.display_name);
+    } catch (err) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : mode === 'signup'
-            ? 'Account registration failed.'
-            : 'Parent login failed.',
+        err instanceof Error
+          ? err.message
+          : mode === 'register'
+          ? 'Parent registration failed.'
+          : 'Parent login failed.'
       );
     } finally {
       setLoading(false);
     }
   };
 
-  const changeMode = (
-    nextMode: AccountMode,
-  ) => {
-    setMode(nextMode);
-    setError('');
-    setPassword('');
-    setConfirmPassword('');
-  };
-
   return (
     <main className="parent-login-page">
-      <section className="parent-login-card">
-        <div className="parent-login-icon">
-          <LockKeyhole size={36} />
+      <section className="parent-login-card max-w-md w-full">
+        <div className="parent-login-icon bg-purple-100 text-purple-700 p-3 rounded-full inline-flex">
+          <ShieldCheck size={36} />
         </div>
 
-        <div className="parent-account-tabs">
+        {/* Auth Mode Toggle Tabs */}
+        <div className="flex bg-slate-100 p-1.5 rounded-2xl my-4 w-full border border-slate-200">
           <button
             type="button"
-            className={
-              mode === 'login' ? 'active' : ''
-            }
-            onClick={() => changeMode('login')}
+            onClick={() => {
+              setMode('login');
+              setError('');
+            }}
+            className={`flex-1 py-2 text-xs font-black rounded-xl transition ${
+              mode === 'login'
+                ? 'bg-white text-purple-700 shadow-sm'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
           >
             Sign In
           </button>
-
           <button
             type="button"
-            className={
-              mode === 'signup' ? 'active' : ''
-            }
-            onClick={() => changeMode('signup')}
+            onClick={() => {
+              setMode('register');
+              setError('');
+            }}
+            className={`flex-1 py-2 text-xs font-black rounded-xl transition flex items-center justify-center gap-1 ${
+              mode === 'register'
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
           >
-            Create Account
+            <UserPlus size={14} />
+            <span>Register Parent</span>
           </button>
         </div>
 
-        <h1>
-          {mode === 'signup'
-            ? 'Create Parent Account'
-            : 'Parent Login'}
+        <h1 className="text-xl font-black text-slate-800">
+          {mode === 'register' ? 'Register Parent Account' : 'Parent Login'}
         </h1>
 
-        <p>
-          {mode === 'signup'
-            ? 'Create an account to save children, controls, history, and settings.'
-            : 'Sign in using your SARA Tube parent or administrator account.'}
+        <p className="text-xs text-slate-500 mb-4">
+          {mode === 'register'
+            ? "Create a parent account to set up and manage your kids' custom profiles."
+            : 'Sign in using your SARA Tube parent account.'}
         </p>
 
-        {mode === 'signup' && (
+        {mode === 'register' && (
           <label className="parent-login-field">
-            <span>Parent name</span>
-
+            <span>Parent Name</span>
             <div>
-              <LockKeyhole size={20} />
-
+              <User size={20} />
               <input
                 type="text"
-                value={displayName}
+                value={name}
                 autoComplete="name"
-                placeholder="Your name"
+                placeholder="e.g. Sarah Connor"
                 onChange={(event) => {
-                  setDisplayName(
-                    event.target.value,
-                  );
-                  clearMessages();
+                  setName(event.target.value);
+                  setError('');
                 }}
               />
             </div>
@@ -209,10 +144,8 @@ export default function ParentLogin({
 
         <label className="parent-login-field">
           <span>Email address</span>
-
           <div>
             <Mail size={20} />
-
             <input
               type="email"
               value={email}
@@ -220,7 +153,7 @@ export default function ParentLogin({
               placeholder="parent@example.com"
               onChange={(event) => {
                 setEmail(event.target.value);
-                clearMessages();
+                setError('');
               }}
             />
           </div>
@@ -228,37 +161,20 @@ export default function ParentLogin({
 
         <label className="parent-login-field">
           <span>Password</span>
-
           <div>
             <LockKeyhole size={20} />
-
             <input
-              type={
-                showPassword
-                  ? 'text'
-                  : 'password'
-              }
+              type={showPassword ? 'text' : 'password'}
               value={password}
-              autoComplete={
-                mode === 'signup'
-                  ? 'new-password'
-                  : 'current-password'
-              }
-              placeholder={
-                mode === 'signup'
-                  ? 'Minimum 8 characters'
-                  : 'Enter password'
-              }
+              autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+              placeholder="Enter password"
               onChange={(event) => {
                 setPassword(event.target.value);
-                clearMessages();
+                setError('');
               }}
               onKeyDown={(event) => {
-                if (
-                  event.key === 'Enter' &&
-                  mode === 'login'
-                ) {
-                  submit();
+                if (event.key === 'Enter') {
+                  handleSubmit();
                 }
               }}
             />
@@ -266,77 +182,29 @@ export default function ParentLogin({
             <button
               type="button"
               className="parent-login-password-toggle"
-              onClick={() =>
-                setShowPassword(
-                  (current) => !current,
-                )
-              }
-              aria-label={
-                showPassword
-                  ? 'Hide password'
-                  : 'Show password'
-              }
+              onClick={() => setShowPassword((current) => !current)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
-              {showPassword ? (
-                <EyeOff size={19} />
-              ) : (
-                <Eye size={19} />
-              )}
+              {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
             </button>
           </div>
         </label>
 
-        {mode === 'signup' && (
-          <label className="parent-login-field">
-            <span>Confirm password</span>
-
-            <div>
-              <LockKeyhole size={20} />
-
-              <input
-                type={
-                  showPassword
-                    ? 'text'
-                    : 'password'
-                }
-                value={confirmPassword}
-                autoComplete="new-password"
-                placeholder="Repeat password"
-                onChange={(event) => {
-                  setConfirmPassword(
-                    event.target.value,
-                  );
-                  clearMessages();
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    submit();
-                  }
-                }}
-              />
-            </div>
-          </label>
-        )}
-
-        {error && (
-          <div className="parent-login-error">
-            {error}
-          </div>
-        )}
+        {error && <div className="parent-login-error">{error}</div>}
 
         <button
           type="button"
-          className="parent-login-submit"
+          className="parent-login-submit cursor-pointer"
           disabled={loading}
-          onClick={submit}
+          onClick={handleSubmit}
         >
           {loading
-            ? mode === 'signup'
-              ? 'Creating account...'
+            ? mode === 'register'
+              ? 'Creating Parent Account...'
               : 'Signing in...'
-            : mode === 'signup'
-              ? 'Create Account'
-              : 'Sign In'}
+            : mode === 'register'
+            ? 'Create Parent Account'
+            : 'Sign In'}
         </button>
 
         <div className="parent-login-divider">
@@ -345,18 +213,18 @@ export default function ParentLogin({
 
         <button
           type="button"
-          className="parent-login-guest"
+          className="parent-login-guest cursor-pointer"
           disabled={loading}
           onClick={onGuest}
         >
           Continue as Guest
         </button>
 
-        <small>
-          Guest mode opens the original kids profiles
-          and videos without a database account.
+        <small className="text-[11px] text-slate-400 mt-3 block">
+          Guest mode lets kids jump straight into watching safe videos without an account. Registering a parent account enables multi-profile setup and time limits.
         </small>
       </section>
     </main>
   );
 }
+
