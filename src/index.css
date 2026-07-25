@@ -5250,3 +5250,84 @@ button {
   color: #2563eb;
   box-shadow: 0 3px 10px rgba(15, 23, 42, 0.12);
 }
+
+
+/* Latest profile-selection layout */
+.profile-card {
+  width: min(720px, 100%);
+  padding: 52px 32px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 36px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 24px 80px rgba(61, 71, 118, 0.15);
+  backdrop-filter: blur(18px);
+}
+
+.profile-card h1 {
+  margin: 0;
+  font-size: clamp(38px, 7vw, 64px);
+  color: #333d69;
+}
+
+.profile-card > p {
+  margin: 10px 0 34px;
+  color: #7580a5;
+  font-size: 17px;
+}
+
+.profile-avatar {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  border-radius: 22px;
+  font-size: 54px;
+}
+
+  .profile-card {
+    padding: 38px 20px;
+  }
+
+  .profile-avatar {
+    max-height: 160px;
+  }
+
+.kids-profile-page {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: max(884px, 100dvh);
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  font-family: 'Fredoka', sans-serif;
+  background-color: #a4e5ff;
+  background-image:
+    radial-gradient(circle at center, #b9edff 0%, #a4e5ff 100%);
+}
+
+.kids-title-text {
+  paint-order: stroke fill;
+  -webkit-text-stroke: 8px #1e293b;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.2));
+}
+
+.leo-halo {
+  box-shadow: 0 0 30px 10px rgba(255, 255, 255, 0.9);
+}
+
+.cloud-one {
+  top: 2.5rem;
+  left: 2.5rem;
+  width: 6rem;
+  height: 2.5rem;
+}
+
+.cloud-two {
+  top: 6rem;
+  right: 1.25rem;
+  width: 8rem;
+  height: 3rem;
+}

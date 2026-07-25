@@ -1,4 +1,7 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode, type MouseEvent } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import confetti from 'canvas-confetti';
+import { playPopSound, playSuccessSound } from '../lib/sound';
 
 type CustomProfile = {
   id: number;
@@ -6,6 +9,8 @@ type CustomProfile = {
   emoji: string;
   color: string;
   age?: number;
+  avatarUrl?: string;
+  image?: string;
 };
 
 type ProfileSelectionProps = {
@@ -15,6 +20,7 @@ type ProfileSelectionProps = {
     emoji: string,
     color: string,
     id: number,
+    image?: string,
   ) => void;
   onOpenParentalControls: () => void;
   onAddProfile: () => void;
@@ -59,8 +65,47 @@ export default function ProfileSelection({
   onOpenParentalControls,
   onAddProfile,
 }: ProfileSelectionProps) {
+  const [selectingId, setSelectingId] = useState<number | string | null>(null);
+
+  const handleProfileClick = (
+    name: string,
+    emoji: string,
+    color: string,
+    id: number | string,
+    image: string | undefined,
+    event: MouseEvent,
+  ) => {
+    if (selectingId !== null) return; // Prevent double taps during transition
+
+    setSelectingId(id);
+    playSuccessSound();
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (rect.left + rect.width / 2) / window.innerWidth;
+    const y = (rect.top + rect.height / 2) / window.innerHeight;
+
+    confetti({
+      particleCount: 45,
+      spread: 85,
+      origin: { x, y },
+      colors: ['#ff8fa3', '#ffa62b', '#ffde59', '#95d5b2', '#8ecae6'],
+    });
+
+    const numericId = typeof id === 'number' ? id : Number(id) || 0;
+
+    setTimeout(() => {
+      onSelectProfile(name, emoji, color, numericId, image);
+    }, 420);
+  };
+
   return (
-    <div className="kids-profile-page">
+    <motion.div
+      className="kids-profile-page"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.4, ease: 'easeOut' }}
+    >
       <div className="cloud cloud-one" />
       <div className="cloud cloud-two" />
       <div className="cloud cloud-three" />
@@ -70,10 +115,18 @@ export default function ProfileSelection({
       <div className="kids-star star-three" />
 
       <header className="relative z-10 flex w-full justify-end px-6 pt-6">
-        <button
+        <motion.button
           type="button"
-          className="flex items-center gap-2 rounded-full border-2 border-slate-400/30 bg-white/80 px-4 py-2 shadow-sm backdrop-blur-sm transition hover:scale-105"
-          onClick={onOpenParentalControls}
+          animate={selectingId !== null ? { opacity: 0.3, scale: 0.95 } : { opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          whileHover={selectingId === null ? { scale: 1.08 } : undefined}
+          whileTap={selectingId === null ? { scale: 0.92 } : undefined}
+          className="flex items-center gap-2 rounded-full border-2 border-slate-400/30 bg-white/90 px-5 py-2.5 shadow-md backdrop-blur-md cursor-pointer"
+          onClick={() => {
+            if (selectingId !== null) return;
+            playPopSound();
+            onOpenParentalControls();
+          }}
         >
           <svg
             className="h-7 w-7 text-slate-600"
@@ -100,11 +153,15 @@ export default function ProfileSelection({
             <br />
             Controls
           </span>
-        </button>
+        </motion.button>
       </header>
 
       <main className="relative z-10 -mt-8 flex w-full flex-grow flex-col items-center justify-center px-8">
-        <div className="mb-8 text-center">
+        <motion.div
+          className="mb-8 text-center"
+          animate={selectingId !== null ? { opacity: 0.35, scale: 0.94 } : { opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+        >
           <h1 className="flex flex-col items-center text-5xl font-extrabold md:text-6xl">
             <span className="kids-title-text -mb-2 text-[#8ecae6]">
               Who&apos;s
@@ -122,88 +179,174 @@ export default function ProfileSelection({
               <span className="kids-title-text text-[#ffde59]">?</span>
             </span>
           </h1>
-        </div>
+        </motion.div>
 
         <div className="grid w-full max-w-sm grid-cols-2 gap-x-8 gap-y-10">
-          {profiles.map((profile) => (
-            <button
-              type="button"
-              key={profile.id}
-              className="group flex flex-col items-center gap-3"
-              onClick={() =>
-                onSelectProfile(
-                  profile.name,
-                  profile.emoji,
-                  profile.color,
-                  profile.id,
-                )
-              }
-            >
-              <div className="relative">
-                {profile.name === 'Leo' && (
-                  <div className="leo-halo absolute inset-0 scale-110 rounded-full bg-white opacity-50" />
-                )}
+          {profiles.map((profile, idx) => {
+            const isSelected = selectingId === profile.id;
+            const isOtherSelected = selectingId !== null && !isSelected;
 
-                <div
-                  className={`relative z-10 h-32 w-32 overflow-hidden rounded-full border-4 border-white shadow-lg transition-transform group-hover:scale-105 ${profile.background}`}
-                >
-                  <img
-                    src={profile.image}
-                    alt={profile.name}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              </div>
-
-              <span
-                className={`profile-name-text text-3xl font-black uppercase ${profile.nameColor}`}
+            return (
+              <motion.button
+                key={profile.id}
+                initial={{ opacity: 0, scale: 0.82, y: 20 }}
+                animate={
+                  isSelected
+                    ? { opacity: 1, scale: 1.18, y: -10 }
+                    : isOtherSelected
+                    ? { opacity: 0.15, scale: 0.8, y: 10 }
+                    : { opacity: 1, scale: 1, y: 0 }
+                }
+                transition={
+                  isSelected
+                    ? { type: 'spring', stiffness: 320, damping: 22 }
+                    : { duration: 0.3, ease: 'easeInOut', delay: idx * 0.06 }
+                }
+                whileHover={selectingId === null ? { scale: 1.1, rotate: idx % 2 === 0 ? 3 : -3 } : undefined}
+                whileTap={selectingId === null ? { scale: 0.92 } : undefined}
+                type="button"
+                className="group flex flex-col items-center gap-3 relative cursor-pointer"
+                onClick={(e) =>
+                  handleProfileClick(
+                    profile.name,
+                    profile.emoji,
+                    profile.color,
+                    profile.id,
+                    profile.image,
+                    e,
+                  )
+                }
               >
-                {profile.name}
-              </span>
-            </button>
-          ))}
+                <div className="relative">
+                  {(profile.name === 'Leo' || isSelected) && (
+                    <motion.div
+                      animate={isSelected ? { scale: [1, 1.3, 1.18], opacity: [0.6, 1, 0.8] } : { scale: 1.1, opacity: 0.5 }}
+                      transition={isSelected ? { repeat: Infinity, duration: 1.2, ease: 'easeInOut' } : { duration: 0.3 }}
+                      className={`leo-halo absolute inset-0 rounded-full blur-md ${
+                        isSelected ? 'bg-amber-400 scale-125' : 'bg-amber-200/50 scale-110'
+                      }`}
+                    />
+                  )}
 
-          {customProfiles.map((profile) => (
-            <button
-              type="button"
-              key={profile.id}
-              className="group flex flex-col items-center gap-3"
-              onClick={() =>
-                onSelectProfile(
-                  profile.name,
-                  profile.emoji,
-                  profile.color,
-                  profile.id,
-                )
-              }
-            >
-              <div className="relative">
-                <div
-                  className="relative z-10 grid h-32 w-32 place-items-center overflow-hidden rounded-full border-4 border-white shadow-lg transition-transform group-hover:scale-105"
-                  style={{ backgroundColor: profile.color }}
-                >
-                  <span className="text-6xl">
-                    {profile.emoji}
-                  </span>
+                  <div
+                    className={`relative z-10 h-24 w-24 sm:h-32 sm:w-32 overflow-hidden rounded-full border-4 ${
+                      isSelected
+                        ? 'border-amber-300 shadow-[0_0_35px_rgba(251,191,36,0.9)] ring-4 ring-amber-400/50'
+                        : 'border-white shadow-xl'
+                    } transition-all duration-300 ${profile.background}`}
+                  >
+                    <img
+                      src={profile.image}
+                      alt={profile.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <span
-                className="profile-name-text max-w-32 truncate text-2xl font-black uppercase"
-                style={{ color: profile.color }}
+                <span
+                  className={`profile-name-text text-2xl sm:text-3xl font-black uppercase transition-transform ${profile.nameColor}`}
+                >
+                  {profile.name}
+                </span>
+              </motion.button>
+            );
+          })}
+
+          {customProfiles.map((profile, idx) => {
+            const photoUrl = profile.avatarUrl || profile.image;
+            const isSelected = selectingId === profile.id;
+            const isOtherSelected = selectingId !== null && !isSelected;
+
+            return (
+              <motion.button
+                key={profile.id}
+                initial={{ opacity: 0, scale: 0.82, y: 20 }}
+                animate={
+                  isSelected
+                    ? { opacity: 1, scale: 1.18, y: -10 }
+                    : isOtherSelected
+                    ? { opacity: 0.15, scale: 0.8, y: 10 }
+                    : { opacity: 1, scale: 1, y: 0 }
+                }
+                transition={
+                  isSelected
+                    ? { type: 'spring', stiffness: 320, damping: 22 }
+                    : { duration: 0.3, ease: 'easeInOut', delay: (profiles.length + idx) * 0.06 }
+                }
+                whileHover={selectingId === null ? { scale: 1.1, rotate: -2 } : undefined}
+                whileTap={selectingId === null ? { scale: 0.92 } : undefined}
+                type="button"
+                className="group flex flex-col items-center gap-3 relative cursor-pointer"
+                onClick={(e) =>
+                  handleProfileClick(
+                    profile.name,
+                    profile.emoji,
+                    profile.color,
+                    profile.id,
+                    photoUrl,
+                    e,
+                  )
+                }
               >
-                {profile.name}
-              </span>
-            </button>
-          ))}
+                <div className="relative">
+                  {isSelected && (
+                    <motion.div
+                      animate={{ scale: [1, 1.3, 1.18], opacity: [0.6, 1, 0.8] }}
+                      transition={{ repeat: Infinity, duration: 1.2, ease: 'easeInOut' }}
+                      className="absolute inset-0 rounded-full blur-md bg-purple-400 scale-125"
+                    />
+                  )}
 
-          <button
+                  <div
+                    className={`relative z-10 grid h-24 w-24 sm:h-32 sm:w-32 place-items-center overflow-hidden rounded-full border-4 ${
+                      isSelected
+                        ? 'border-amber-300 shadow-[0_0_35px_rgba(251,191,36,0.9)] ring-4 ring-amber-400/50'
+                        : 'border-white shadow-xl'
+                    } transition-all duration-300`}
+                    style={{ backgroundColor: profile.color }}
+                  >
+                    {photoUrl ? (
+                      <img
+                        src={photoUrl}
+                        alt={profile.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-4xl sm:text-6xl">{profile.emoji}</span>
+                    )}
+                  </div>
+                </div>
+
+                <span
+                  className="profile-name-text max-w-28 sm:max-w-32 truncate text-xl sm:text-2xl font-black uppercase"
+                  style={{ color: profile.color }}
+                >
+                  {profile.name}
+                </span>
+              </motion.button>
+            );
+          })}
+
+          <motion.button
+            initial={{ opacity: 0, scale: 0.82, y: 20 }}
+            animate={
+              selectingId !== null
+                ? { opacity: 0.15, scale: 0.8, y: 10 }
+                : { opacity: 1, scale: 1, y: 0 }
+            }
+            transition={{ duration: 0.3, ease: 'easeInOut', delay: (profiles.length + customProfiles.length) * 0.06 }}
+            whileHover={selectingId === null ? { scale: 1.08 } : undefined}
+            whileTap={selectingId === null ? { scale: 0.92 } : undefined}
             type="button"
-            className="group flex flex-col items-center gap-3"
-            onClick={onAddProfile}
+            className="group flex flex-col items-center gap-3 cursor-pointer"
+            onClick={() => {
+              if (selectingId !== null) return;
+              playPopSound();
+              onAddProfile();
+            }}
           >
-            <div className="flex h-32 w-32 items-center justify-center rounded-full border-4 border-white bg-white/40 shadow-lg transition-transform group-hover:scale-105">
-              <svg className="h-16 w-16" viewBox="0 0 100 100">
+            <div className="flex h-24 w-24 sm:h-32 sm:w-32 items-center justify-center rounded-full border-4 border-white bg-white/40 shadow-lg transition-transform group-hover:scale-105">
+              <svg className="h-12 w-12 sm:h-16 sm:w-16" viewBox="0 0 100 100">
                 <path
                   d="M42 10 L58 10 L58 42 L90 42 L90 58 L58 58 L58 90 L42 90 L42 58 L10 58 L10 42 L42 42 Z"
                   fill="#66bb6a"
@@ -217,12 +360,12 @@ export default function ProfileSelection({
             <span className="profile-name-text whitespace-nowrap text-center text-xl font-black uppercase text-[#66bb6a]">
               Add Profile
             </span>
-          </button>
+          </motion.button>
         </div>
       </main>
 
       <BottomNavigation />
-    </div>
+    </motion.div>
   );
 }
 
