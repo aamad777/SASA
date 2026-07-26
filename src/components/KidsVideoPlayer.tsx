@@ -386,8 +386,37 @@ export default function KidsVideoPlayer({
           </motion.div>
         )}
 
-        {video.id === 7 || video.category === 'Numbers' ? (
-          <NumbersLearningVideo isPlaying={playing} onTogglePlay={handleTogglePlay} />
+        {video.sourceType === 'youtube' &&
+        video.youtubeVideoId ? (
+          <section className="kids-player-hero relative rounded-3xl overflow-hidden shadow-xl bg-black aspect-video">
+            <iframe
+              className="absolute inset-0 w-full h-full"
+              src={`https://www.youtube-nocookie.com/embed/${video.youtubeVideoId}?rel=0&modestbranding=1`}
+              title={video.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          </section>
+        ) : video.sourceType === 'upload' &&
+          video.sourceUrl ? (
+          <section className="kids-player-hero relative rounded-3xl overflow-hidden shadow-xl bg-black aspect-video">
+            <video
+              className="w-full h-full object-contain bg-black"
+              src={video.sourceUrl}
+              controls
+              playsInline
+              preload="metadata"
+              poster={video.image}
+            >
+              Your browser does not support video playback.
+            </video>
+          </section>
+        ) : video.id === 7 ||
+          video.category === 'Numbers' ? (
+          <NumbersLearningVideo
+            isPlaying={playing}
+            onTogglePlay={handleTogglePlay}
+          />
         ) : (
           <section className="kids-player-hero relative group rounded-3xl overflow-hidden shadow-xl">
             <img src={video.image} alt={video.title} />

@@ -391,3 +391,203 @@ export async function getAdminChildren(
 }
 
 export { API_BASE_URL };
+
+
+export type ParentMediaInput = {
+  title: string;
+  category: string;
+  childIds: number[];
+};
+
+async function readApiResponse(response: Response) {
+  const contentType =
+    response.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+
+  const body = await response.text();
+
+  throw new Error(
+    `API returned invalid content (${response.status}): ` +
+    body.slice(0, 120),
+  );
+}
+
+export async function uploadParentVideo(
+  token: string,
+  file: File,
+  input: ParentMediaInput,
+) {
+  const formData = new FormData();
+
+  formData.append('file', file);
+  formData.append('title', input.title);
+  formData.append('category', input.category);
+  formData.append(
+    'child_ids',
+    JSON.stringify(input.childIds),
+  );
+
+  const response = await fetch(
+    `${API_BASE_URL}/parent/media/upload`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    },
+  );
+
+  const data = await readApiResponse(response);
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || 'Video upload failed.',
+    );
+  }
+
+  return data;
+}
+
+export async function addParentYoutubeVideo(
+  token: string,
+  input: ParentMediaInput & {
+    url: string;
+    description?: string;
+  },
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/parent/media/youtube`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: input.url,
+        title: input.title,
+        description: input.description || '',
+        category: input.category,
+        child_ids: input.childIds,
+      }),
+    },
+  );
+
+  const data = await readApiResponse(response);
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || 'Unable to add YouTube video.',
+    );
+  }
+
+  return data;
+}
+
+export async function deleteChild(
+  token: string,
+  childId: number,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/children/${childId}`,
+    {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  if (response.ok) {
+    return;
+  }
+
+  const contentType =
+    response.headers.get('content-type') || '';
+
+  const data = contentType.includes('application/json')
+    ? await response.json()
+    : null;
+
+  throw new Error(
+    data?.error || 'Unable to delete child profile.',
+  );
+}
+
+
+export type AssignedChildMedia = {
+  id: number;
+  filename: string | null;
+  original_name: string | null;
+  media_type: string;
+  storage_path: string | null;
+  public_url: string | null;
+  visibility: string | null;
+  title: string | null;
+  description: string | null;
+  category: string | null;
+  created_at: string;
+};
+
+export async function getChildAssignedMedia(
+  token: string,
+  childId: number,
+): Promise<AssignedChildMedia[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/parent/children/${childId}/media`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  const contentType =
+    response.headers.get('content-type') || '';
+
+  if (!contentType.includes('application/json')) {
+    const body = await response.text();
+
+    throw new Error(
+      `Child media API returned invalid content ` +
+      `(${response.status}): ${body.slice(0, 120)}`,
+    );
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || 'Unable to load child media.',
+    );
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+export function getApiAssetUrl(
+  value: string | null | undefined,
+): string {
+  if (!value) return '';
+
+  if (
+    value.startsWith('http://') ||
+    value.startsWith('https://') ||
+    value.startsWith('data:')
+  ) {
+    return value;
+  }
+
+  const apiOrigin = API_BASE_URL.replace(
+    /\/api\/?$/,
+    '',
+  );
+
+  return `${apiOrigin}${
+    value.startsWith('/') ? value : `/${value}`
+  }`;
+}

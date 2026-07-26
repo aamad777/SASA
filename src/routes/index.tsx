@@ -24,8 +24,11 @@ import ProfileSelection from "@/components/ProfileSelection";
 import AdminDashboard from "@/components/AdminDashboard";
 import FreeAccountBanner from "@/components/FreeAccountBanner";
 import {
+  getApiAssetUrl,
   getApiHealth,
+  getChildAssignedMedia,
   getChildren,
+  type AssignedChildMedia,
   type DatabaseChild,
 } from "@/lib/api";
 
@@ -72,15 +75,31 @@ function SasaApp() {
     getStorageItem("sasa-parent-token")
   );
 
-  const [guestMode, setGuestMode] = useState(() =>
-    getStorageItem("sasa-account-mode") === "guest"
-  );
+  const [guestMode, setGuestMode] = useState(() => {
+    const savedParentToken =
+      getStorageItem("sasa-parent-token");
+
+    return (
+      !savedParentToken &&
+      getStorageItem("sasa-account-mode") === "guest"
+    );
+  });
 
   const [parentName, setParentName] = useState(() =>
     getStorageItem("sasa-parent-name") || "Parent"
   );
 
   const [databaseChildren, setDatabaseChildren] = useState<DatabaseChild[]>([]);
+
+  useEffect(() => {
+    if (!parentToken) return;
+
+    localStorage.removeItem("sasa-account-mode");
+
+    if (guestMode) {
+      setGuestMode(false);
+    }
+  }, [parentToken, guestMode]);
   const [databaseChildrenLoading, setDatabaseChildrenLoading] = useState(false);
   const [databaseChildrenError, setDatabaseChildrenError] = useState("");
 
@@ -105,7 +124,110 @@ function SasaApp() {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [selectedKidsVideo, setSelectedKidsVideo] = useState<KidsVideoItem | null>(null);
+  const [assignedVideos, setAssignedVideos] =
+    useState<KidsVideoItem[]>([]);
+
+  const [assignedMediaError, setAssignedMediaError] =
+    useState('');
+
   const [homeTab, setHomeTab] = useState<KidsHomeTab>("home");
+
+  useEffect(() => {
+    if (!parentToken || !profile) {
+      setAssignedVideos([]);
+      setAssignedMediaError('');
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAssignedVideos = async () => {
+      setAssignedMediaError('');
+
+      try {
+        const media = await getChildAssignedMedia(
+          parentToken,
+          profile.id,
+        );
+
+        if (cancelled) return;
+
+        const mapped: KidsVideoItem[] = media.map(
+          (item: AssignedChildMedia) => {
+            const publicUrl =
+              item.public_url || item.storage_path || '';
+
+            const youtubeMatch = publicUrl.match(
+              /(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{6,20})/,
+            );
+
+            const youtubeVideoId =
+              youtubeMatch?.[1] || undefined;
+
+            const isYoutube = Boolean(youtubeVideoId);
+
+            const image = isYoutube
+              ? `https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg`
+              : `data:image/svg+xml,${encodeURIComponent(`
+                  <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">
+                    <defs>
+                      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#7c3aed"/>
+                        <stop offset="100%" stop-color="#ec4899"/>
+                      </linearGradient>
+                    </defs>
+                    <rect width="640" height="360" fill="url(#g)"/>
+                    <circle cx="320" cy="170" r="65" fill="white" fill-opacity="0.95"/>
+                    <polygon points="300,130 300,210 365,170" fill="#7c3aed"/>
+                    <text x="320" y="295" text-anchor="middle"
+                      font-family="Arial" font-size="30" font-weight="700"
+                      fill="white">Parent Video</text>
+                  </svg>
+                `)}`;
+
+            return {
+              id: 1000000 + Number(item.id),
+              title:
+                item.title ||
+                item.original_name ||
+                'Parent Video',
+              duration: isYoutube
+                ? 'YouTube'
+                : 'Uploaded',
+              category:
+                item.category ||
+                'Parent Upload',
+              image,
+              sourceType: isYoutube
+                ? 'youtube'
+                : 'upload',
+              sourceUrl: isYoutube
+                ? publicUrl
+                : getApiAssetUrl(publicUrl),
+              youtubeVideoId,
+            };
+          },
+        );
+
+        setAssignedVideos(mapped);
+      } catch (error) {
+        if (cancelled) return;
+
+        setAssignedVideos([]);
+        setAssignedMediaError(
+          error instanceof Error
+            ? error.message
+            : 'Unable to load assigned videos.',
+        );
+      }
+    };
+
+    loadAssignedVideos();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [parentToken, profile?.id]);
 
   const [showAddProfile, setShowAddProfile] = useState(false);
   const [showParentGate, setShowParentGate] = useState(false);
@@ -272,6 +394,20 @@ function SasaApp() {
   if (showParentDashboard) {
     return (
       <ParentDashboard
+        parentToken={parentToken!}
+        databaseChildren={databaseChildren}
+        onDatabaseChildDeleted={(childId) => {
+          setDatabaseChildren((current) =>
+            current.filter(
+              (child) => child.id !== childId
+            )
+          );
+
+          if (profile?.id === childId) {
+            setProfile(null);
+            setSelectedKidsVideo(null);
+          }
+        }}
         settings={parentControls}
         profileId={profile?.id ?? null}
         profileName={profile?.name ?? "Child"}
@@ -425,7 +561,7 @@ function SasaApp() {
   if (!profile) {
     return (
       <>
-        {guestMode && (
+        {guestMode && !parentToken && (
           <FreeAccountBanner
             onCreateAccount={() => {
               localStorage.removeItem("sasa-account-mode");
@@ -499,6 +635,7 @@ function SasaApp() {
   return (
     <div className="min-h-screen flex flex-col">
       <KidsVideoHome
+        assignedVideos={assignedVideos}
         profileName={profile.name}
         profileEmoji={profile.emoji}
         profileId={profile.id}
@@ -509,7 +646,7 @@ function SasaApp() {
         onOpenParentalControls={openParentGate}
         onChangeProfile={changeProfile}
         onOpenFreeAccount={
-          guestMode
+          guestMode && !parentToken
             ? () => {
                 localStorage.removeItem("sasa-account-mode");
                 setGuestMode(false);

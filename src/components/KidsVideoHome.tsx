@@ -41,6 +41,9 @@ export type KidsVideoItem = {
   duration: string;
   image: string;
   category: string;
+  sourceType?: 'built-in' | 'upload' | 'youtube';
+  sourceUrl?: string;
+  youtubeVideoId?: string;
 };
 
 export type KidsHomeTab = 'home' | 'search' | 'library' | 'songs' | 'games' | 'studio' | 'profile';
@@ -51,6 +54,7 @@ type KidsVideoHomeProps = {
   profileEmoji: string;
   profileId?: number;
   profileImage?: string;
+  assignedVideos?: KidsVideoItem[];
   initialTab?: KidsHomeTab;
   activeTab?: KidsHomeTab;
   onTabChange?: (tab: KidsHomeTab) => void;
@@ -179,6 +183,7 @@ export default function KidsVideoHome({
   profileEmoji,
   profileId,
   profileImage,
+  assignedVideos = [],
   initialTab = 'home',
   activeTab: activeTabProp,
   onTabChange,
@@ -187,6 +192,9 @@ export default function KidsVideoHome({
   onChangeProfile,
   onOpenFreeAccount,
 }: KidsVideoHomeProps) {
+  const isGuestAccount =
+    typeof onOpenFreeAccount === 'function';
+
   const [currentTab, setCurrentTab] = useState<KidsHomeTab>(activeTabProp || initialTab);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchText, setSearchText] = useState('');
@@ -321,7 +329,14 @@ export default function KidsVideoHome({
 
   const displayedVideos = useMemo(() => {
     const blockedVideoIds = loadBlockedVideoIds();
-    let list = kidsVideos.filter((video) => !blockedVideoIds.includes(video.id));
+
+    let list = [
+      ...assignedVideos,
+      ...kidsVideos,
+    ].filter(
+      (video) =>
+        !blockedVideoIds.includes(video.id),
+    );
 
     if (currentTab === 'library') {
       list = list.filter((video) => libraryIds.includes(video.id));
@@ -341,7 +356,13 @@ export default function KidsVideoHome({
     }
 
     return list;
-  }, [currentTab, libraryIds, searchText, selectedCategory]);
+  }, [
+    assignedVideos,
+    currentTab,
+    libraryIds,
+    searchText,
+    selectedCategory,
+  ]);
 
   const toggleLibrary = (videoId: number, event: MouseEvent) => {
     event.stopPropagation();
@@ -403,11 +424,11 @@ export default function KidsVideoHome({
       transition={{ duration: 0.35, ease: 'easeOut' }}
     >
       <div className="kids-video-sticky">
-        <header className="kids-video-header flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 sm:p-5">
+        <header className="kids-video-header kids-centered-header">
           {/* Left Side: Hello Greeting, Title & Free Account Button */}
-          <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 flex-1 min-w-0">
-            <div>
-              <span className="flex items-center gap-1.5 font-bold text-amber-200 text-xs sm:text-sm">
+          <div className="kids-header-main">
+            <div className="kids-header-title">
+              <span className="flex items-center justify-center gap-1.5 font-bold text-amber-200 text-xs sm:text-sm">
                 <span className="text-lg sm:text-xl">{profileEmoji}</span> Hello, {profileName}!
               </span>
               <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight drop-shadow-xs">
@@ -427,32 +448,30 @@ export default function KidsVideoHome({
               </h1>
             </div>
 
-            {/* Free Account Button - Opposite of Parental Settings */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.94 }}
-              onClick={() => {
-                playSuccessSound();
-                if (onOpenFreeAccount) {
+            {/* Free Account button is visible only in guest mode */}
+            {isGuestAccount && (
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.94 }}
+                onClick={() => {
+                  playSuccessSound();
                   onOpenFreeAccount();
-                } else {
-                  setShowFreeModal(true);
-                }
-              }}
-              className="bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs sm:text-sm px-3.5 py-2 rounded-2xl shadow-md border-2 border-white flex items-center gap-1.5 cursor-pointer shrink-0"
-              title="Free Account Status & Details"
-            >
-              <Sparkles size={16} className="text-amber-900 fill-amber-300" />
-              <span>Free Account</span>
-              <span className="bg-amber-900 text-amber-100 text-[10px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider">
-                FREE
-              </span>
-            </motion.button>
+                }}
+                className="bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs sm:text-sm px-3.5 py-2 rounded-2xl shadow-md border-2 border-white flex items-center gap-1.5 cursor-pointer shrink-0"
+                title="Create a parent account"
+              >
+                <Sparkles
+                  size={16}
+                  className="text-amber-900 fill-amber-300"
+                />
+                <span>Create Free Account</span>
+              </motion.button>
+            )}
           </div>
 
           {/* Right Side: Theme, Volume, Parental Settings */}
-          <div className="topbar-actions flex items-center justify-end gap-2 shrink-0">
+          <div className="topbar-actions kids-centered-actions">
             <motion.button
               type="button"
               whileHover={{ scale: 1.08 }}
@@ -500,39 +519,6 @@ export default function KidsVideoHome({
           </div>
         </header>
 
-        {/* Top Header Quick Tab Pills Bar for Easy Desktop & Tablet Access */}
-        <div className="px-4 py-2 flex items-center gap-2 overflow-x-auto scrollbar-none bg-white/60 backdrop-blur-md border-y border-purple-100/60 my-1">
-          {[
-            { id: 'home', label: 'Home', icon: '🏠' },
-            { id: 'search', label: 'Search', icon: '🔍' },
-            { id: 'library', label: 'Library', icon: '❤️' },
-            { id: 'songs', label: 'Songs', icon: '🎵' },
-            { id: 'games', label: 'Arcade', icon: '🎮' },
-            { id: 'studio', label: 'Studio', icon: '🎨' },
-            { id: 'profile', label: 'Profile', icon: activeEmoji || '👤' },
-          ].map((tab) => {
-            const active = currentTab === tab.id;
-            return (
-              <motion.button
-                key={tab.id}
-                type="button"
-                whileHover={{ scale: 1.06 }}
-                whileTap={{ scale: 0.94 }}
-                onClick={() => changeTab(tab.id as KidsHomeTab)}
-                className={`px-3.5 py-1.5 rounded-2xl font-black text-xs flex items-center gap-1.5 shrink-0 border-2 transition cursor-pointer ${
-                  active
-                    ? 'bg-purple-600 text-white border-purple-600 shadow-md scale-105'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-50 hover:border-purple-200'
-                }`}
-              >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
-              </motion.button>
-            );
-          })}
-        </div>
-
-        {/* Theme Picker Popover */}
         <AnimatePresence>
           {showThemePicker && (
             <motion.div
@@ -1118,7 +1104,7 @@ export default function KidsVideoHome({
 
       {/* Free Account Information Modal */}
       <AnimatePresence>
-        {showFreeModal && (
+        {isGuestAccount && showFreeModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

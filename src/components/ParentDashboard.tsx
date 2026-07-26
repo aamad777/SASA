@@ -3,6 +3,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { playPopSound, playSuccessSound } from '../lib/sound';
 import { kidsVideos } from './KidsVideoHome';
 import {
+  addParentYoutubeVideo,
+  deleteChild,
+  uploadParentVideo,
+  type DatabaseChild,
+} from '../lib/api';
+import {
   BarChart3,
   Bed,
   Bell,
@@ -75,6 +81,9 @@ type ManagedCustomProfile = {
 };
 
 type ParentDashboardProps = {
+  parentToken: string;
+  databaseChildren: DatabaseChild[];
+  onDatabaseChildDeleted: (childId: number) => void;
   customProfiles: ManagedCustomProfile[];
   onDeleteCustomProfile: (profileId: number) => void;
   onUpdateCustomProfile: (profile: ManagedCustomProfile) => void;
@@ -149,6 +158,9 @@ const chartData = [
 ];
 
 export default function ParentDashboard({
+  parentToken,
+  databaseChildren,
+  onDatabaseChildDeleted,
   onClose,
   settings,
   profileId,
@@ -164,9 +176,40 @@ export default function ParentDashboard({
       'screen-time' |
       'content-filters' |
       'activity-history' |
+      'kids-media' |
       'profiles' |
       'settings'
     >('screen-time');
+
+  const [mediaMode, setMediaMode] =
+    useState<'upload' | 'youtube'>('upload');
+
+  const [mediaTitle, setMediaTitle] =
+    useState('');
+
+  const [mediaCategory, setMediaCategory] =
+    useState('Parent Upload');
+
+  const [youtubeUrl, setYoutubeUrl] =
+    useState('');
+
+  const [videoFile, setVideoFile] =
+    useState<File | null>(null);
+
+  const [selectedMediaChildIds, setSelectedMediaChildIds] =
+    useState<number[]>([]);
+
+  const [mediaSaving, setMediaSaving] =
+    useState(false);
+
+  const [mediaMessage, setMediaMessage] =
+    useState('');
+
+  const [mediaError, setMediaError] =
+    useState('');
+
+  const [deletingDatabaseChildId, setDeletingDatabaseChildId] =
+    useState<number | null>(null);
 
   const [newBlockedChannel, setNewBlockedChannel] = useState('');
   const [videoFilterQuery, setVideoFilterQuery] = useState('');
@@ -439,6 +482,148 @@ export default function ParentDashboard({
     }
   };
 
+  const toggleMediaChild = (childId: number) => {
+    setSelectedMediaChildIds((current) =>
+      current.includes(childId)
+        ? current.filter((id) => id !== childId)
+        : [...current, childId],
+    );
+  };
+
+  const saveParentMedia = async () => {
+    setMediaError('');
+    setMediaMessage('');
+
+    if (selectedMediaChildIds.length === 0) {
+      setMediaError(
+        'Select at least one child.',
+      );
+      return;
+    }
+
+    if (!mediaTitle.trim()) {
+      setMediaError(
+        'Enter a title.',
+      );
+      return;
+    }
+
+    if (mediaMode === 'upload' && !videoFile) {
+      setMediaError(
+        'Select a video file.',
+      );
+      return;
+    }
+
+    if (
+      mediaMode === 'youtube' &&
+      !youtubeUrl.trim()
+    ) {
+      setMediaError(
+        'Enter a YouTube link.',
+      );
+      return;
+    }
+
+    setMediaSaving(true);
+
+    try {
+      if (mediaMode === 'upload' && videoFile) {
+        await uploadParentVideo(
+          parentToken,
+          videoFile,
+          {
+            title: mediaTitle.trim(),
+            category:
+              mediaCategory.trim() ||
+              'Parent Upload',
+            childIds: selectedMediaChildIds,
+          },
+        );
+      } else {
+        await addParentYoutubeVideo(
+          parentToken,
+          {
+            url: youtubeUrl.trim(),
+            title: mediaTitle.trim(),
+            category:
+              mediaCategory.trim() ||
+              'Parent Upload',
+            childIds: selectedMediaChildIds,
+          },
+        );
+      }
+
+      setMediaMessage(
+        `Media assigned to ${selectedMediaChildIds.length} child profile(s).`,
+      );
+
+      setMediaTitle('');
+      setYoutubeUrl('');
+      setVideoFile(null);
+      setSelectedMediaChildIds([]);
+
+      const fileInput =
+        document.getElementById(
+          'parent-video-file',
+        ) as HTMLInputElement | null;
+
+      if (fileInput) {
+        fileInput.value = '';
+      }
+
+      playSuccessSound();
+    } catch (error) {
+      setMediaError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save media.',
+      );
+    } finally {
+      setMediaSaving(false);
+    }
+  };
+
+  const removeDatabaseChild = async (
+    child: DatabaseChild,
+  ) => {
+    const confirmed = window.confirm(
+      `Delete ${child.display_name}'s profile permanently?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingDatabaseChildId(child.id);
+
+    try {
+      await deleteChild(
+        parentToken,
+        child.id,
+      );
+
+      localStorage.removeItem(
+        `sasa-child-image-${child.id}`,
+      );
+
+      localStorage.removeItem(
+        `sasa-screen-expiry-${child.id}`,
+      );
+
+      onDatabaseChildDeleted(child.id);
+      playSuccessSound();
+    } catch (error) {
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : 'Unable to delete child profile.',
+      );
+    } finally {
+      setDeletingDatabaseChildId(null);
+    }
+  };
+
   return (
     <div className="parent-dashboard">
       <MobileHeader
@@ -484,6 +669,22 @@ export default function ParentDashboard({
           >
             <Shield size={26} />
             Content Filters
+          </button>
+
+          <button
+            type="button"
+            className={
+              activeSection === 'kids-media'
+                ? 'parent-nav-item active'
+                : 'parent-nav-item'
+            }
+            onClick={() => {
+              playPopSound();
+              setActiveSection('kids-media');
+            }}
+          >
+            <Film size={26} />
+            Kids Media
           </button>
 
           <button
@@ -558,9 +759,11 @@ export default function ParentDashboard({
                 ? 'Content Filters'
                 : activeSection === 'activity-history'
                   ? 'Activity & History'
-                  : activeSection === 'profiles'
-                    ? 'Profile Management'
-                    : 'Parent Settings'}
+                  : activeSection === 'kids-media'
+                    ? 'Kids Media'
+                    : activeSection === 'profiles'
+                      ? 'Profile Management'
+                      : 'Parent Settings'}
           </h1>
 
           <div className="parent-account-area">
@@ -587,9 +790,11 @@ export default function ParentDashboard({
                 ? 'Content Filters'
                 : activeSection === 'activity-history'
                   ? 'Activity & History'
-                  : activeSection === 'profiles'
-                    ? 'Profiles'
-                    : 'Parent Settings'}
+                  : activeSection === 'kids-media'
+                    ? 'Kids Media'
+                    : activeSection === 'profiles'
+                      ? 'Profiles'
+                      : 'Parent Settings'}
           </h2>
 
           {activeSection === 'screen-time' && (
@@ -1220,6 +1425,226 @@ export default function ParentDashboard({
             </section>
           )}
 
+          {activeSection === 'kids-media' && (
+            <section className="max-w-5xl mx-auto space-y-6">
+              <article className="bg-white rounded-3xl border border-slate-200 shadow-md p-4 sm:p-7">
+                <div className="flex flex-col gap-2 mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-2xl bg-purple-100 text-purple-700">
+                      <Film size={24} />
+                    </div>
+
+                    <div>
+                      <h2 className="text-xl sm:text-2xl font-black text-slate-900">
+                        Assign Media to Children
+                      </h2>
+
+                      <p className="text-sm text-slate-500 font-medium">
+                        Upload a video or add a YouTube link, then select who can see it.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 mb-5">
+                  <button
+                    type="button"
+                    onClick={() => setMediaMode('upload')}
+                    className={`flex-1 py-3 px-4 rounded-2xl font-black text-sm transition ${
+                      mediaMode === 'upload'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    Upload Video
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMediaMode('youtube')}
+                    className={`flex-1 py-3 px-4 rounded-2xl font-black text-sm transition ${
+                      mediaMode === 'youtube'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    YouTube Link
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-black text-slate-700">
+                      Title
+                    </span>
+
+                    <input
+                      type="text"
+                      value={mediaTitle}
+                      onChange={(event) =>
+                        setMediaTitle(event.target.value)
+                      }
+                      placeholder="My child video"
+                      className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-purple-400"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-black text-slate-700">
+                      Category
+                    </span>
+
+                    <input
+                      type="text"
+                      value={mediaCategory}
+                      onChange={(event) =>
+                        setMediaCategory(event.target.value)
+                      }
+                      placeholder="Parent Upload"
+                      className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-purple-400"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-4">
+                  {mediaMode === 'upload' ? (
+                    <label className="flex flex-col gap-2">
+                      <span className="text-sm font-black text-slate-700">
+                        Video file
+                      </span>
+
+                      <input
+                        id="parent-video-file"
+                        type="file"
+                        accept="video/*"
+                        onChange={(event) =>
+                          setVideoFile(
+                            event.target.files?.[0] || null,
+                          )
+                        }
+                        className="w-full rounded-2xl border border-dashed border-purple-300 bg-purple-50 px-4 py-4 text-sm"
+                      />
+                    </label>
+                  ) : (
+                    <label className="flex flex-col gap-2">
+                      <span className="text-sm font-black text-slate-700">
+                        YouTube URL
+                      </span>
+
+                      <input
+                        type="url"
+                        value={youtubeUrl}
+                        onChange={(event) =>
+                          setYoutubeUrl(event.target.value)
+                        }
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-red-400"
+                      />
+                    </label>
+                  )}
+                </div>
+
+                <div className="mt-6">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <h3 className="font-black text-slate-900">
+                      Select children
+                    </h3>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedMediaChildIds(
+                          selectedMediaChildIds.length ===
+                            databaseChildren.length
+                            ? []
+                            : databaseChildren.map(
+                                (child) => child.id,
+                              ),
+                        )
+                      }
+                      className="text-xs font-black text-purple-700"
+                    >
+                      {selectedMediaChildIds.length ===
+                      databaseChildren.length
+                        ? 'Clear all'
+                        : 'Select all'}
+                    </button>
+                  </div>
+
+                  {databaseChildren.length === 0 ? (
+                    <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-sm font-bold text-amber-900">
+                      Create a database child profile first.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {databaseChildren.map((child) => {
+                        const selected =
+                          selectedMediaChildIds.includes(
+                            child.id,
+                          );
+
+                        return (
+                          <button
+                            type="button"
+                            key={child.id}
+                            onClick={() =>
+                              toggleMediaChild(child.id)
+                            }
+                            className={`flex items-center gap-3 rounded-2xl border-2 p-3 text-left transition ${
+                              selected
+                                ? 'border-purple-600 bg-purple-50'
+                                : 'border-slate-200 bg-white'
+                            }`}
+                          >
+                            <span className="w-11 h-11 rounded-full bg-sky-100 flex items-center justify-center text-xl shrink-0">
+                              {selected ? '✅' : '👤'}
+                            </span>
+
+                            <span className="min-w-0">
+                              <strong className="block text-sm text-slate-900 truncate">
+                                {child.display_name}
+                              </strong>
+
+                              <small className="text-slate-500">
+                                Age {child.age ?? 'not set'}
+                              </small>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {mediaError && (
+                  <p className="mt-4 rounded-2xl bg-red-50 border border-red-200 p-3 text-sm font-bold text-red-700">
+                    {mediaError}
+                  </p>
+                )}
+
+                {mediaMessage && (
+                  <p className="mt-4 rounded-2xl bg-emerald-50 border border-emerald-200 p-3 text-sm font-bold text-emerald-700">
+                    {mediaMessage}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  disabled={
+                    mediaSaving ||
+                    databaseChildren.length === 0
+                  }
+                  onClick={saveParentMedia}
+                  className="mt-5 w-full rounded-2xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-black py-3.5 px-5"
+                >
+                  {mediaSaving
+                    ? 'Saving...'
+                    : 'Save and Assign Media'}
+                </button>
+              </article>
+            </section>
+          )}
+
           {activeSection === 'profiles' && (
             <section className="profile-management-page">
               <div className="profile-management-heading">
@@ -1235,6 +1660,61 @@ export default function ParentDashboard({
                   {3 + customProfiles.length} profiles
                 </strong>
               </div>
+
+              <article className="bg-white rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6 mb-6">
+                <div className="mb-4">
+                  <h3 className="text-lg font-black text-slate-900">
+                    Database Child Profiles
+                  </h3>
+
+                  <p className="text-sm text-slate-500">
+                    These profiles belong to the logged-in parent account.
+                  </p>
+                </div>
+
+                {databaseChildren.length === 0 ? (
+                  <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                    No database child profiles.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {databaseChildren.map((child) => (
+                      <div
+                        key={child.id}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4 flex items-center gap-3"
+                      >
+                        <div className="w-12 h-12 rounded-full bg-sky-100 flex items-center justify-center text-2xl shrink-0">
+                          👤
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <strong className="block text-slate-900 truncate">
+                            {child.display_name}
+                          </strong>
+
+                          <span className="text-xs text-slate-500">
+                            {child.login_name || 'No login name'}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={
+                            deletingDatabaseChildId === child.id
+                          }
+                          onClick={() =>
+                            removeDatabaseChild(child)
+                          }
+                          className="w-10 h-10 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 flex items-center justify-center disabled:opacity-50"
+                          title={`Delete ${child.display_name}`}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
 
               <div className="profile-management-grid">
                 {[
@@ -1683,6 +2163,7 @@ function MobileHeader({
     section:
       | 'screen-time'
       | 'content-filters'
+      | 'kids-media'
       | 'activity-history'
       | 'profiles'
       | 'settings',
@@ -1694,13 +2175,14 @@ function MobileHeader({
   const sectionTitles: Record<string, string> = {
     'screen-time': 'Screen Time',
     'content-filters': 'Content Filters',
+    'kids-media': 'Kids Media',
     profiles: 'Profiles',
     'activity-history': 'Activity & History',
     settings: 'Settings',
   };
 
   return (
-    <header className="relative z-30 bg-slate-900 text-white border-b border-slate-800 px-4 py-3 md:hidden">
+    <header className="parent-dashboard-mobile-header relative z-30 bg-slate-900 text-white border-b border-slate-800 px-4 py-3 md:hidden">
       <div className="flex items-center justify-between">
         <button
           type="button"
@@ -1746,6 +2228,7 @@ function MobileHeader({
             {[
               { id: 'screen-time', label: 'Screen Time', icon: Clock3 },
               { id: 'content-filters', label: 'Content Filters', icon: Shield },
+              { id: 'kids-media', label: 'Kids Media', icon: Film },
               { id: 'profiles', label: 'Profiles', icon: Users },
               { id: 'activity-history', label: 'Activity & History', icon: BarChart3 },
               { id: 'settings', label: 'Settings', icon: Settings },
@@ -1798,6 +2281,7 @@ function MobileBottomNavigation({
     section:
       | 'screen-time'
       | 'content-filters'
+      | 'kids-media'
       | 'activity-history'
       | 'profiles'
       | 'settings',
@@ -1806,13 +2290,14 @@ function MobileBottomNavigation({
   const tabs = [
     { id: 'screen-time', label: 'Screen', icon: Clock3 },
     { id: 'content-filters', label: 'Filters', icon: Shield },
+    { id: 'kids-media', label: 'Media', icon: Film },
     { id: 'profiles', label: 'Profiles', icon: Users },
     { id: 'activity-history', label: 'Activity', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-slate-900 border-t border-slate-800 px-2 py-1.5 flex items-center justify-around md:hidden shadow-2xl">
+    <nav className="parent-dashboard-bottom-nav fixed bottom-0 left-0 right-0 z-30 bg-slate-900 border-t border-slate-800 px-1 py-1.5 flex items-center justify-around md:hidden shadow-2xl">
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeSection === tab.id;
@@ -1821,7 +2306,7 @@ function MobileBottomNavigation({
             key={tab.id}
             type="button"
             onClick={() => onSelectSection(tab.id as any)}
-            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition ${
+            className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 px-0.5 rounded-xl transition ${
               isActive ? 'text-sky-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >

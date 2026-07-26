@@ -5655,3 +5655,255 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================================
+   Centered kids header and quick navigation
+   ========================================================= */
+
+.kids-video-header.kids-centered-header {
+  display: flex;
+  width: min(1000px, calc(100% - 24px));
+  margin-right: auto;
+  margin-left: auto;
+  padding: 22px 18px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  border-radius: 0 0 32px 32px;
+  text-align: center;
+}
+
+.kids-header-main {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.kids-header-title {
+  width: 100%;
+  text-align: center;
+}
+
+.kids-header-title > span {
+  justify-content: center;
+}
+
+.kids-video-header .kids-header-title h1 {
+  text-align: center;
+}
+
+.topbar-actions.kids-centered-actions {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.kids-centered-actions .icon-button {
+  flex: 0 0 44px;
+}
+
+.kids-centered-actions .kids-parent-btn {
+  flex: 0 0 auto;
+}
+
+.kids-quick-tabs {
+  display: flex;
+  width: min(1000px, calc(100% - 24px));
+  margin: 5px auto 0;
+  padding: 10px 12px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  overflow-x: auto;
+  border-top: 1px solid rgba(221, 214, 254, 0.75);
+  border-bottom: 1px solid rgba(221, 214, 254, 0.75);
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(12px);
+  scrollbar-width: none;
+}
+
+.kids-quick-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.kids-quick-tabs > button {
+  flex: 0 0 auto;
+}
+
+@media (min-width: 700px) {
+  .kids-video-header.kids-centered-header {
+    padding-top: 25px;
+    padding-bottom: 18px;
+  }
+
+  .kids-header-title h1 {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 699px) {
+  .kids-video-header.kids-centered-header {
+    width: 100%;
+    padding: 17px 12px;
+    border-radius: 0 0 25px 25px;
+  }
+
+  .topbar-actions.kids-centered-actions {
+    gap: 8px;
+  }
+
+  .kids-centered-actions .kids-parent-btn {
+    min-height: 44px;
+    padding: 9px 13px;
+    font-size: 12px;
+  }
+
+  .kids-quick-tabs {
+    width: 100%;
+    padding: 9px 10px;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 420px) {
+  .kids-centered-actions .icon-button {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+  }
+
+  .kids-centered-actions .kids-parent-btn {
+    width: auto;
+    min-width: 0;
+    height: 42px;
+    padding: 8px 12px;
+  }
+
+  .kids-centered-actions .kids-parent-btn span {
+    display: inline;
+  }
+}
+
+
+/* ===== Parent dashboard mobile viewport fix ===== */
+@media (max-width: 767px) {
+  .parent-dashboard {
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 100dvh;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .parent-dashboard-mobile-header {
+    position: relative;
+    top: auto;
+    left: auto;
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+    padding-top: max(12px, env(safe-area-inset-top));
+  }
+
+  .parent-dashboard-main {
+    display: block;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+
+  .parent-dashboard-content {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 14px 12px 24px;
+    overflow-x: hidden;
+  }
+
+  .parent-mobile-title {
+    display: none;
+  }
+
+  .parent-dashboard-content > *,
+  .parent-dashboard-content section,
+  .parent-dashboard-content article {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .parent-dashboard-content input,
+  .parent-dashboard-content select,
+  .parent-dashboard-content textarea,
+  .parent-dashboard-content button {
+    max-width: 100%;
+  }
+
+  .parent-dashboard-bottom-nav {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+  }
+
+  .parent-dashboard-bottom-nav button {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .parent-dashboard-bottom-nav button span {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .parent-dashboard .grid {
+    min-width: 0;
+  }
+
+  .parent-dashboard img,
+  .parent-dashboard video,
+  .parent-dashboard iframe {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 390px) {
+  .parent-dashboard-mobile-header {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .parent-dashboard-mobile-header h1 {
+    max-width: 190px;
+    overflow: hidden;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .parent-dashboard-content {
+    padding-right: 9px;
+    padding-left: 9px;
+  }
+}

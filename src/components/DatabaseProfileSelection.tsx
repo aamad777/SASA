@@ -49,6 +49,23 @@ export function getDatabaseProfileColor(
   return colors[Math.abs(childId) % colors.length];
 }
 
+function getSavedChildImage(
+  child: DatabaseChild,
+): string | undefined {
+  if (typeof window !== 'undefined') {
+    const selectedCartoon =
+      localStorage.getItem(
+        `sasa-child-image-${child.id}`,
+      );
+
+    if (selectedCartoon) {
+      return selectedCartoon;
+    }
+  }
+
+  return child.avatar_url || undefined;
+}
+
 export default function DatabaseProfileSelection({
   token,
   children,
@@ -516,9 +533,9 @@ export default function DatabaseProfileSelection({
                     fontSize: 58,
                   }}
                 >
-                  {child.avatar_url ? (
+                  {getSavedChildImage(child) ? (
                     <img
-                      src={child.avatar_url}
+                      src={getSavedChildImage(child)}
                       alt={child.display_name}
                       style={{
                         width: '100%',
@@ -755,9 +772,9 @@ export default function DatabaseProfileSelection({
                 fontSize: 42,
               }}
             >
-              {pendingChild.avatar_url ? (
+              {getSavedChildImage(pendingChild) ? (
                 <img
-                  src={pendingChild.avatar_url}
+                  src={getSavedChildImage(pendingChild)}
                   alt={pendingChild.display_name}
                   style={{
                     width: '100%',
