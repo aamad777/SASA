@@ -368,11 +368,30 @@ function SasaApp() {
   if (!profile && parentToken) {
     return (
       <DatabaseProfileSelection
+        token={parentToken}
         children={databaseChildren}
         loading={databaseChildrenLoading}
         error={databaseChildrenError}
         parentName={parentName}
         onRetry={() => loadDatabaseChildren(parentToken)}
+        onChildCreated={(child) => {
+          setDatabaseChildren((current) => [
+            ...current,
+            child,
+          ]);
+        }}
+        onChildPinChanged={(childId) => {
+          setDatabaseChildren((current) =>
+            current.map((child) =>
+              child.id === childId
+                ? {
+                    ...child,
+                    has_pin: true,
+                  }
+                : child,
+            ),
+          );
+        }}
         onLogout={() => {
           localStorage.removeItem("sasa-parent-token");
           localStorage.removeItem("sasa-parent-name");
@@ -382,12 +401,21 @@ function SasaApp() {
           setProfile(null);
         }}
         onSelectChild={(child) => {
+          const savedImage =
+            child.avatar_url ||
+            localStorage.getItem(
+              `sasa-child-image-${child.id}`,
+            ) ||
+            undefined;
+
           setProfile({
             id: child.id,
             name: child.display_name,
             emoji: getDatabaseProfileEmoji(child.id),
             color: getDatabaseProfileColor(child.id),
+            image: savedImage,
           });
+
           setSelectedKidsVideo(null);
         }}
       />
@@ -410,9 +438,32 @@ function SasaApp() {
         <ProfileSelection
           customProfiles={customProfiles}
           onSelectProfile={(name, emoji, color, id, image) => {
-            setProfile({ id, name, emoji, color, image });
-            if (image) localStorage.setItem("sasa-active-kid-image", image);
-            else localStorage.removeItem("sasa-active-kid-image");
+            const imageStorageKey =
+              `sasa-child-image-${id}`;
+
+            const savedImage =
+              image ||
+              localStorage.getItem(imageStorageKey) ||
+              undefined;
+
+            setProfile({
+              id,
+              name,
+              emoji,
+              color,
+              image: savedImage,
+            });
+
+            if (image) {
+              localStorage.setItem(
+                imageStorageKey,
+                image,
+              );
+            } else if (!savedImage) {
+              localStorage.removeItem(
+                imageStorageKey,
+              );
+            }
             localStorage.setItem("sasa-active-kid-emoji", emoji);
             localStorage.setItem("sasa-active-kid-name", name);
             if (parentControls.screenLimitEnabled) {
@@ -450,6 +501,7 @@ function SasaApp() {
       <KidsVideoHome
         profileName={profile.name}
         profileEmoji={profile.emoji}
+        profileId={profile.id}
         profileImage={profile.image}
         activeTab={homeTab}
         onTabChange={setHomeTab}

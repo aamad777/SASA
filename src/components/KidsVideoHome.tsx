@@ -49,6 +49,7 @@ type KidsVideoHomeProps = {
   key?: string | number;
   profileName: string;
   profileEmoji: string;
+  profileId?: number;
   profileImage?: string;
   initialTab?: KidsHomeTab;
   activeTab?: KidsHomeTab;
@@ -176,6 +177,7 @@ const BANNER_THEMES = [
 export default function KidsVideoHome({
   profileName,
   profileEmoji,
+  profileId,
   profileImage,
   initialTab = 'home',
   activeTab: activeTabProp,
@@ -208,19 +210,34 @@ export default function KidsVideoHome({
   const [activeName, setActiveName] = useState<string>(() => {
     return localStorage.getItem('sasa-active-kid-name') || profileName;
   });
+  const profileImageStorageKey =
+    profileId !== undefined && profileId !== null
+      ? `sasa-child-image-${profileId}`
+      : 'sasa-active-kid-image';
+
   const [activeImage, setActiveImage] = useState<string | undefined>(() => {
-    return profileImage || localStorage.getItem('sasa-active-kid-image') || undefined;
+    return profileImage || localStorage.getItem(profileImageStorageKey) || undefined;
   });
 
   useEffect(() => {
+    const savedImage =
+      profileImage ||
+      localStorage.getItem(profileImageStorageKey) ||
+      undefined;
+
+    setActiveImage(savedImage);
+
     if (profileImage) {
-      setActiveImage(profileImage);
-      localStorage.setItem('sasa-active-kid-image', profileImage);
-    } else if (profileImage === '') {
-      setActiveImage(undefined);
-      localStorage.removeItem('sasa-active-kid-image');
+      localStorage.setItem(
+        profileImageStorageKey,
+        profileImage,
+      );
     }
-  }, [profileImage]);
+  }, [
+    profileId,
+    profileImage,
+    profileImageStorageKey,
+  ]);
 
   useEffect(() => {
     if (profileName) {
@@ -263,10 +280,10 @@ export default function KidsVideoHome({
     localStorage.setItem('sasa-active-kid-emoji', emoji);
     if (imageUrl) {
       setActiveImage(imageUrl);
-      localStorage.setItem('sasa-active-kid-image', imageUrl);
+      localStorage.setItem(profileImageStorageKey, imageUrl);
     } else {
       setActiveImage(undefined);
-      localStorage.removeItem('sasa-active-kid-image');
+      localStorage.removeItem(profileImageStorageKey);
     }
     setShowAvatarPicker(false);
   };

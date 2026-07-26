@@ -174,6 +174,140 @@ export async function getChildren(
 }
 
 
+
+export type CreateChildInput = {
+  display_name: string;
+  login_name: string;
+  age: number | null;
+  pin?: string;
+};
+
+export async function createChild(
+  token: string,
+  input: CreateChildInput,
+): Promise<DatabaseChild> {
+  const response = await fetch(
+    `${API_BASE_URL}/children`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    },
+  );
+
+  const contentType =
+    response.headers.get('content-type') || '';
+
+  if (!contentType.includes('application/json')) {
+    const body = await response.text();
+
+    throw new Error(
+      `Child API returned invalid content ` +
+      `(${response.status}): ${body.slice(0, 100)}`,
+    );
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || 'Unable to create child profile.',
+    );
+  }
+
+  return data;
+}
+
+
+export type ChildLoginResponse = {
+  token: string;
+  child: {
+    id: number;
+    display_name: string;
+    login_name: string;
+    parent_id: number;
+  };
+};
+
+export async function loginChild(
+  loginName: string,
+  pin: string,
+): Promise<ChildLoginResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/auth/kid-login`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        login_name: loginName,
+        pin,
+      }),
+    },
+  );
+
+  const contentType =
+    response.headers.get('content-type') || '';
+
+  if (!contentType.includes('application/json')) {
+    const body = await response.text();
+
+    throw new Error(
+      `Child login returned invalid content ` +
+      `(${response.status}): ${body.slice(0, 100)}`,
+    );
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || 'Child PIN verification failed.',
+    );
+  }
+
+  return data;
+}
+
+
+export async function setChildPin(
+  token: string,
+  childId: number,
+  pin: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/auth/set-kid-pin`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        child_id: childId,
+        pin,
+      }),
+    },
+  );
+
+  const contentType =
+    response.headers.get('content-type') || '';
+
+  const data = contentType.includes('application/json')
+    ? await response.json()
+    : null;
+
+  if (!response.ok) {
+    throw new Error(
+      data?.error || 'Unable to update child PIN.',
+    );
+  }
+}
+
 export type AccountRole = 'parent' | 'admin';
 
 export type AdminParent = {
