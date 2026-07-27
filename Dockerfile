@@ -27,6 +27,10 @@ ENV PORT=3000
 
 COPY --from=builder /app/.output ./.output
 
+# The runtime only needs Node.js. Remove package managers and their
+# bundled dependencies to reduce the production attack surface.
+RUN rm -rf     /usr/local/lib/node_modules/npm     /usr/local/lib/node_modules/corepack     /opt/yarn-*     /usr/local/bin/npm     /usr/local/bin/npx     /usr/local/bin/corepack     /usr/local/bin/yarn     /usr/local/bin/yarnpkg
+
 EXPOSE 3000
 
 USER node
