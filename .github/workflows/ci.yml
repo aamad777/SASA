@@ -53,3 +53,13 @@ jobs:
             --build-arg VITE_API_BASE_URL="${{ vars.VITE_API_BASE_URL }}" \
             -t sasa-ci:${{ github.sha }} \
             .
+
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sasa-ci:latest
+          format: table
+          scanners: vuln
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          exit-code: 1
