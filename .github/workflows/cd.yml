@@ -1,0 +1,35 @@
+name: CD Runner Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runner-test:
+    name: Test Dell deployment runner
+    runs-on: [self-hosted, Linux, X64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show runner information
+        run: |
+          echo "Runner: $RUNNER_NAME"
+          echo "OS: $RUNNER_OS"
+          echo "Architecture: $RUNNER_ARCH"
+          id
+
+      - name: Test Docker access
+        run: |
+          docker version
+          docker info --format 'Docker server: {{.ServerVersion}}'
+
+      - name: Test private registry access
+        run: |
+          curl --fail --silent --show-error \
+            http://192.168.0.101:5050/v2/
+          echo
+          echo "Private registry is reachable."
