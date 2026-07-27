@@ -62,7 +62,7 @@ jobs:
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: sasa-ci:latest
+          image-ref: sasa-ci:${{ github.sha }}
           format: table
           scanners: vuln
           ignore-unfixed: true
