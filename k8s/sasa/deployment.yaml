@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sasa-frontend
+  namespace: sasa
+  labels:
+    app: sasa-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sasa-frontend
+  template:
+    metadata:
+      labels:
+        app: sasa-frontend
+    spec:
+      containers:
+        - name: sasa-frontend
+          image: 192.168.0.101:5050/sasa-frontend:initial
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: HOST
+              value: 0.0.0.0
+            - name: PORT
+              value: "3000"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
