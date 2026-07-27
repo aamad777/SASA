@@ -1,21 +1,91 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Play, Pause, RotateCcw, Award, Music, Volume2, CheckCircle } from 'lucide-react';
-import confetti from 'canvas-confetti';
-import { playPopSound, playSuccessSound, playHeartSound } from '../lib/sound';
-import penguinImg from '../assets/images/penguin_avatar_1784920051288.jpg';
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { Sparkles, Play, Pause, RotateCcw, Award, Music, Volume2, CheckCircle } from "lucide-react";
+import confetti from "canvas-confetti";
+import { playPopSound, playSuccessSound, playHeartSound } from "../lib/sound";
+import penguinImg from "../assets/images/penguin_avatar_1784920051288.jpg";
 
 const numberItems = [
-  { num: 1, word: 'ONE', emoji: '🎈', name: 'Balloons', count: 1, bg: 'from-amber-400 to-rose-400' },
-  { num: 2, word: 'TWO', emoji: '🐥', name: 'Little Ducks', count: 2, bg: 'from-sky-400 to-indigo-400' },
-  { num: 3, word: 'THREE', emoji: '🌟', name: 'Shining Stars', count: 3, bg: 'from-yellow-400 to-amber-500' },
-  { num: 4, word: 'FOUR', emoji: '🍎', name: 'Juicy Apples', count: 4, bg: 'from-emerald-400 to-teal-500' },
-  { num: 5, word: 'FIVE', emoji: '🦋', name: 'Butterflies', count: 5, bg: 'from-pink-400 to-purple-500' },
-  { num: 6, word: 'SIX', emoji: '🚗', name: 'Speedy Cars', count: 6, bg: 'from-blue-400 to-cyan-500' },
-  { num: 7, word: 'SEVEN', emoji: '🚀', name: 'Rockets', count: 7, bg: 'from-indigo-500 to-violet-600' },
-  { num: 8, word: 'EIGHT', emoji: '🍦', name: 'Ice Creams', count: 8, bg: 'from-fuchsia-400 to-pink-500' },
-  { num: 9, word: 'NINE', emoji: '🐬', name: 'Playful Dolphins', count: 9, bg: 'from-sky-500 to-blue-600' },
-  { num: 10, word: 'TEN', emoji: '👑', name: 'Golden Crowns', count: 10, bg: 'from-amber-400 to-yellow-500' },
+  {
+    num: 1,
+    word: "ONE",
+    emoji: "🎈",
+    name: "Balloons",
+    count: 1,
+    bg: "from-amber-400 to-rose-400",
+  },
+  {
+    num: 2,
+    word: "TWO",
+    emoji: "🐥",
+    name: "Little Ducks",
+    count: 2,
+    bg: "from-sky-400 to-indigo-400",
+  },
+  {
+    num: 3,
+    word: "THREE",
+    emoji: "🌟",
+    name: "Shining Stars",
+    count: 3,
+    bg: "from-yellow-400 to-amber-500",
+  },
+  {
+    num: 4,
+    word: "FOUR",
+    emoji: "🍎",
+    name: "Juicy Apples",
+    count: 4,
+    bg: "from-emerald-400 to-teal-500",
+  },
+  {
+    num: 5,
+    word: "FIVE",
+    emoji: "🦋",
+    name: "Butterflies",
+    count: 5,
+    bg: "from-pink-400 to-purple-500",
+  },
+  {
+    num: 6,
+    word: "SIX",
+    emoji: "🚗",
+    name: "Speedy Cars",
+    count: 6,
+    bg: "from-blue-400 to-cyan-500",
+  },
+  {
+    num: 7,
+    word: "SEVEN",
+    emoji: "🚀",
+    name: "Rockets",
+    count: 7,
+    bg: "from-indigo-500 to-violet-600",
+  },
+  {
+    num: 8,
+    word: "EIGHT",
+    emoji: "🍦",
+    name: "Ice Creams",
+    count: 8,
+    bg: "from-fuchsia-400 to-pink-500",
+  },
+  {
+    num: 9,
+    word: "NINE",
+    emoji: "🐬",
+    name: "Playful Dolphins",
+    count: 9,
+    bg: "from-sky-500 to-blue-600",
+  },
+  {
+    num: 10,
+    word: "TEN",
+    emoji: "👑",
+    name: "Golden Crowns",
+    count: 10,
+    bg: "from-amber-400 to-yellow-500",
+  },
 ];
 
 type NumbersLearningVideoProps = {
@@ -94,7 +164,7 @@ export default function NumbersLearningVideo({
               Pippin's Number School 🐧
             </span>
             <span className="text-[10px] text-sky-200 font-bold">
-              {completedAll ? 'Yay! You counted to 10!' : `Counting Number ${activeItem.num}`}
+              {completedAll ? "Yay! You counted to 10!" : `Counting Number ${activeItem.num}`}
             </span>
           </div>
         </div>
@@ -108,8 +178,8 @@ export default function NumbersLearningVideo({
               onClick={() => handleSelectNumber(idx)}
               className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full font-black text-xs sm:text-sm flex items-center justify-center transition cursor-pointer shrink-0 ${
                 currentNumIndex === idx
-                  ? 'bg-amber-400 text-amber-950 scale-110 shadow-lg shadow-amber-400/40 ring-2 ring-white'
-                  : 'bg-white/15 text-white hover:bg-white/30'
+                  ? "bg-amber-400 text-amber-950 scale-110 shadow-lg shadow-amber-400/40 ring-2 ring-white"
+                  : "bg-white/15 text-white hover:bg-white/30"
               }`}
             >
               {item.num}
@@ -198,8 +268,8 @@ export default function NumbersLearningVideo({
                       onClick={() => handleItemTap(idx)}
                       className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shadow-lg border-2 transition cursor-pointer relative ${
                         isTapped
-                          ? 'bg-amber-300/30 border-amber-400 scale-110 shadow-amber-400/20'
-                          : 'bg-white/10 border-white/20 hover:bg-white/20'
+                          ? "bg-amber-300/30 border-amber-400 scale-110 shadow-amber-400/20"
+                          : "bg-white/10 border-white/20 hover:bg-white/20"
                       }`}
                     >
                       {activeItem.emoji}
@@ -226,7 +296,7 @@ export default function NumbersLearningVideo({
             className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
           >
             {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-            <span>{isPlaying ? 'Pause Counting' : 'Play Auto-Count'}</span>
+            <span>{isPlaying ? "Pause Counting" : "Play Auto-Count"}</span>
           </button>
 
           <button

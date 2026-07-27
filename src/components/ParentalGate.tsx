@@ -1,9 +1,9 @@
-import { useState, type MouseEvent } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import confetti from 'canvas-confetti';
-import { playPopSound, playSuccessSound } from '../lib/sound';
-import { Lock, Calculator, Eye, EyeOff, ShieldCheck, Delete, Sparkles } from 'lucide-react';
-import penguinImg from '../assets/images/penguin_avatar_1784920051288.jpg';
+import { useState, type MouseEvent } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import confetti from "canvas-confetti";
+import { playPopSound, playSuccessSound } from "../lib/sound";
+import { Lock, Calculator, Eye, EyeOff, ShieldCheck, Delete, Sparkles } from "lucide-react";
+import penguinImg from "../assets/images/penguin_avatar_1784920051288.jpg";
 
 type ParentalGateProps = {
   onSuccess: () => void;
@@ -17,7 +17,7 @@ function generateMathQuestion() {
   const num1 = Math.floor(Math.random() * 8) + 5; // 5-12
   const num2 = Math.floor(Math.random() * 8) + 4; // 4-11
   const correctAnswer = num1 + num2;
-  
+
   // Wrong answers
   const offset1 = Math.random() > 0.5 ? 2 : -2;
   const offset2 = Math.random() > 0.5 ? 3 : -1;
@@ -35,12 +35,10 @@ export default function ParentalGate({
   parentPin,
   requireParentPin,
 }: ParentalGateProps) {
-  const [gateMode, setGateMode] = useState<'pin' | 'math'>(
-    requireParentPin ? 'pin' : 'math'
-  );
-  const [pin, setPin] = useState('');
+  const [gateMode, setGateMode] = useState<"pin" | "math">(requireParentPin ? "pin" : "math");
+  const [pin, setPin] = useState("");
   const [showPin, setShowPin] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [mathProblem, setMathProblem] = useState(generateMathQuestion);
 
   const triggerSuccess = (e?: MouseEvent) => {
@@ -55,7 +53,7 @@ export default function ParentalGate({
         particleCount: 45,
         spread: 90,
         origin: { x, y },
-        colors: ['#3a86ff', '#8338ec', '#ff006e', '#fb5607', '#ffbe0b'],
+        colors: ["#3a86ff", "#8338ec", "#ff006e", "#fb5607", "#ffbe0b"],
       });
     }
 
@@ -66,7 +64,7 @@ export default function ParentalGate({
 
   const handleKeypadPress = (digit: string) => {
     playPopSound();
-    setError('');
+    setError("");
     if (pin.length < 6) {
       const nextPin = pin + digit;
       setPin(nextPin);
@@ -78,7 +76,7 @@ export default function ParentalGate({
 
   const handleKeypadDelete = () => {
     playPopSound();
-    setError('');
+    setError("");
     setPin((prev) => prev.slice(0, -1));
   };
 
@@ -87,8 +85,8 @@ export default function ParentalGate({
       triggerSuccess(e);
     } else {
       playPopSound();
-      setError('Incorrect PIN. Please try again.');
-      setPin('');
+      setError("Incorrect PIN. Please try again.");
+      setPin("");
     }
   };
 
@@ -97,7 +95,7 @@ export default function ParentalGate({
       triggerSuccess(e);
     } else {
       playPopSound();
-      setError('That answer is incorrect. Try another one!');
+      setError("That answer is incorrect. Try another one!");
       setMathProblem(generateMathQuestion());
     }
   };
@@ -140,13 +138,13 @@ export default function ParentalGate({
           type="button"
           onClick={() => {
             playPopSound();
-            setGateMode('pin');
-            setError('');
+            setGateMode("pin");
+            setError("");
           }}
           className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-black transition-all ${
-            gateMode === 'pin'
-              ? 'bg-white text-sky-800 shadow-md scale-105'
-              : 'text-white hover:bg-white/10'
+            gateMode === "pin"
+              ? "bg-white text-sky-800 shadow-md scale-105"
+              : "text-white hover:bg-white/10"
           }`}
         >
           <Lock size={16} /> Parent PIN
@@ -156,13 +154,13 @@ export default function ParentalGate({
           type="button"
           onClick={() => {
             playPopSound();
-            setGateMode('math');
-            setError('');
+            setGateMode("math");
+            setError("");
           }}
           className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-black transition-all ${
-            gateMode === 'math'
-              ? 'bg-white text-sky-800 shadow-md scale-105'
-              : 'text-white hover:bg-white/10'
+            gateMode === "math"
+              ? "bg-white text-sky-800 shadow-md scale-105"
+              : "text-white hover:bg-white/10"
           }`}
         >
           <Calculator size={16} /> Math Challenge
@@ -174,7 +172,7 @@ export default function ParentalGate({
         {/* Animated Cute Penguin Cartoon Mascot */}
         <motion.div
           animate={{ y: [0, -8, 0], rotate: [0, 2, -2, 0] }}
-          transition={{ repeat: Infinity, duration: 3.5, ease: 'easeInOut' }}
+          transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
           className="relative z-10 -mb-6 flex flex-col items-center pointer-events-none"
         >
           {/* Speech Bubble */}
@@ -194,7 +192,7 @@ export default function ParentalGate({
               alt="Pippin the Cute Penguin Mascot"
               className="w-full h-full object-cover scale-105"
             />
-            
+
             {/* Security Badge Ribbon */}
             <div className="absolute bottom-1 right-1 bg-amber-400 text-amber-950 p-1.5 rounded-full border-2 border-white shadow-md">
               <ShieldCheck size={16} className="stroke-[2.5]" />
@@ -203,7 +201,7 @@ export default function ParentalGate({
         </motion.div>
 
         {/* PIN MODE */}
-        {gateMode === 'pin' ? (
+        {gateMode === "pin" ? (
           <motion.div
             key="pin-box"
             initial={{ opacity: 0, y: 15 }}
@@ -225,9 +223,7 @@ export default function ParentalGate({
                   <span
                     key={i}
                     className={`h-4 w-4 rounded-full transition-all ${
-                      i < pin.length
-                        ? 'bg-sky-500 scale-110 shadow-sm'
-                        : 'bg-slate-300'
+                      i < pin.length ? "bg-sky-500 scale-110 shadow-sm" : "bg-slate-300"
                     }`}
                   />
                 ))}
@@ -237,21 +233,19 @@ export default function ParentalGate({
                 type="button"
                 onClick={() => setShowPin(!showPin)}
                 className="text-slate-400 hover:text-sky-600 p-2"
-                title={showPin ? 'Hide PIN' : 'Show PIN'}
+                title={showPin ? "Hide PIN" : "Show PIN"}
               >
                 {showPin ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
 
             {showPin && pin && (
-              <p className="text-lg font-mono font-bold text-sky-600 tracking-widest my-1">
-                {pin}
-              </p>
+              <p className="text-lg font-mono font-bold text-sky-600 tracking-widest my-1">{pin}</p>
             )}
 
             {/* Touch Keypad */}
             <div className="grid grid-cols-3 gap-2.5 max-w-xs mx-auto mt-4">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
                 <motion.button
                   key={digit}
                   whileHover={{ scale: 1.05 }}
@@ -269,8 +263,8 @@ export default function ParentalGate({
                 type="button"
                 onClick={() => {
                   playPopSound();
-                  setPin('');
-                  setError('');
+                  setPin("");
+                  setError("");
                 }}
                 className="h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 font-bold text-xs text-slate-600 flex items-center justify-center"
               >
@@ -281,7 +275,7 @@ export default function ParentalGate({
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.92 }}
                 type="button"
-                onClick={() => handleKeypadPress('0')}
+                onClick={() => handleKeypadPress("0")}
                 className="h-12 rounded-2xl bg-sky-50 hover:bg-sky-100 font-black text-xl text-sky-800 shadow-sm border border-sky-100 flex items-center justify-center"
               >
                 0

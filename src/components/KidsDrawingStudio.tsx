@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, type MouseEvent, type TouchEvent } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useState, useRef, useEffect, type MouseEvent, type TouchEvent } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   Paintbrush,
   Eraser,
@@ -11,46 +11,46 @@ import {
   Check,
   Undo2,
   Image as ImageIcon,
-} from 'lucide-react';
-import confetti from 'canvas-confetti';
-import { playPopSound, playSuccessSound, playHeartSound } from '../lib/sound';
-import penguinImg from '../assets/images/penguin_avatar_1784920051288.jpg';
+} from "lucide-react";
+import confetti from "canvas-confetti";
+import { playPopSound, playSuccessSound, playHeartSound } from "../lib/sound";
+import penguinImg from "../assets/images/penguin_avatar_1784920051288.jpg";
 
 const BRUSH_COLORS = [
-  '#f43f5e', // Red
-  '#fb923c', // Orange
-  '#facc15', // Yellow
-  '#4ade80', // Green
-  '#38bdf8', // Blue
-  '#a855f7', // Purple
-  '#f472b6', // Pink
-  '#0f172a', // Black
-  '#ffffff', // White
-  '#eab308', // Gold
+  "#f43f5e", // Red
+  "#fb923c", // Orange
+  "#facc15", // Yellow
+  "#4ade80", // Green
+  "#38bdf8", // Blue
+  "#a855f7", // Purple
+  "#f472b6", // Pink
+  "#0f172a", // Black
+  "#ffffff", // White
+  "#eab308", // Gold
 ];
 
-const STAMPS = ['🐧', '🌟', '🎈', '🐶', '👑', '🌈', '🎨', '🚀', '🐥', '🦄'];
+const STAMPS = ["🐧", "🌟", "🎈", "🐶", "👑", "🌈", "🎨", "🚀", "🐥", "🦄"];
 
 const BG_COLORS = [
-  { name: 'White Canvas', value: '#ffffff' },
-  { name: 'Sky Blue', value: '#e0f2fe' },
-  { name: 'Pastel Pink', value: '#fce7f3' },
-  { name: 'Mint Green', value: '#d1fae5' },
-  { name: 'Night Sky', value: '#0f172a' },
+  { name: "White Canvas", value: "#ffffff" },
+  { name: "Sky Blue", value: "#e0f2fe" },
+  { name: "Pastel Pink", value: "#fce7f3" },
+  { name: "Mint Green", value: "#d1fae5" },
+  { name: "Night Sky", value: "#0f172a" },
 ];
 
 export default function KidsDrawingStudio() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [selectedColor, setSelectedColor] = useState(BRUSH_COLORS[0]);
   const [brushSize, setBrushSize] = useState(12);
-  const [tool, setTool] = useState<'brush' | 'eraser' | 'stamp'>('brush');
+  const [tool, setTool] = useState<"brush" | "eraser" | "stamp">("brush");
   const [selectedStamp, setSelectedStamp] = useState(STAMPS[0]);
   const [canvasBg, setCanvasBg] = useState(BG_COLORS[0].value);
   const [isDrawing, setIsDrawing] = useState(false);
   const [history, setHistory] = useState<ImageData[]>([]);
   const [gallery, setGallery] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem('sasa-kids-artworks');
+      const saved = localStorage.getItem("sasa-kids-artworks");
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -62,7 +62,7 @@ export default function KidsDrawingStudio() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     // Set high resolution display
@@ -85,7 +85,7 @@ export default function KidsDrawingStudio() {
     setCanvasBg(color);
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
@@ -97,7 +97,7 @@ export default function KidsDrawingStudio() {
   const saveState = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     setHistory((prev) => [...prev.slice(-10), imageData]); // Keep last 10 states
@@ -108,7 +108,7 @@ export default function KidsDrawingStudio() {
     playPopSound();
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const newHistory = [...history];
@@ -126,10 +126,10 @@ export default function KidsDrawingStudio() {
     let clientX = 0;
     let clientY = 0;
 
-    if ('touches' in e && e.touches.length > 0) {
+    if ("touches" in e && e.touches.length > 0) {
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
-    } else if ('clientX' in e) {
+    } else if ("clientX" in e) {
       clientX = e.clientX;
       clientY = e.clientY;
     }
@@ -144,20 +144,25 @@ export default function KidsDrawingStudio() {
     const { x, y } = getCanvasCoords(e);
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    if (tool === 'stamp') {
+    if (tool === "stamp") {
       playHeartSound();
       ctx.font = `${brushSize * 3.5}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
       ctx.fillText(selectedStamp, x, y);
       saveState();
       confetti({
         particleCount: 15,
         spread: 40,
-        origin: { x: e.type.includes('touch') ? 0.5 : (e as MouseEvent<HTMLCanvasElement>).clientX / window.innerWidth, y: (e as MouseEvent<HTMLCanvasElement>).clientY / window.innerHeight },
+        origin: {
+          x: e.type.includes("touch")
+            ? 0.5
+            : (e as MouseEvent<HTMLCanvasElement>).clientX / window.innerWidth,
+          y: (e as MouseEvent<HTMLCanvasElement>).clientY / window.innerHeight,
+        },
       });
       return;
     }
@@ -165,18 +170,18 @@ export default function KidsDrawingStudio() {
     setIsDrawing(true);
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = tool === 'eraser' ? canvasBg : selectedColor;
-    ctx.lineWidth = tool === 'eraser' ? brushSize * 2 : brushSize;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = tool === "eraser" ? canvasBg : selectedColor;
+    ctx.lineWidth = tool === "eraser" ? brushSize * 2 : brushSize;
   };
 
   const draw = (e: MouseEvent<HTMLCanvasElement> | TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || tool === 'stamp') return;
+    if (!isDrawing || tool === "stamp") return;
     const { x, y } = getCanvasCoords(e);
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     ctx.lineTo(x, y);
@@ -194,7 +199,7 @@ export default function KidsDrawingStudio() {
     playPopSound();
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
@@ -208,15 +213,15 @@ export default function KidsDrawingStudio() {
     if (!canvas) return;
 
     playSuccessSound();
-    const imageURL = canvas.toDataURL('image/png');
+    const imageURL = canvas.toDataURL("image/png");
 
     // Save to local gallery
     const updatedGallery = [imageURL, ...gallery.slice(0, 11)];
     setGallery(updatedGallery);
-    localStorage.setItem('sasa-kids-artworks', JSON.stringify(updatedGallery));
+    localStorage.setItem("sasa-kids-artworks", JSON.stringify(updatedGallery));
 
     // Download file
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.download = `pippin_drawing_${Date.now()}.png`;
     link.href = imageURL;
     link.click();
@@ -339,13 +344,22 @@ export default function KidsDrawingStudio() {
                 <div className="my-auto text-center text-slate-300">
                   <p className="text-4xl mb-2">🖼️</p>
                   <p className="font-bold text-sm">No drawings saved yet!</p>
-                  <p className="text-xs text-slate-400">Draw something and tap "Save Picture" above!</p>
+                  <p className="text-xs text-slate-400">
+                    Draw something and tap "Save Picture" above!
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {gallery.map((img, idx) => (
-                    <div key={idx} className="relative rounded-2xl overflow-hidden border-2 border-white/20 group">
-                      <img src={img} alt={`Artwork ${idx}`} className="w-full h-32 object-cover bg-white" />
+                    <div
+                      key={idx}
+                      className="relative rounded-2xl overflow-hidden border-2 border-white/20 group"
+                    >
+                      <img
+                        src={img}
+                        alt={`Artwork ${idx}`}
+                        className="w-full h-32 object-cover bg-white"
+                      />
                       <a
                         href={img}
                         download={`pippin_art_${idx}.png`}
@@ -370,12 +384,12 @@ export default function KidsDrawingStudio() {
             type="button"
             onClick={() => {
               playPopSound();
-              setTool('brush');
+              setTool("brush");
             }}
             className={`flex-1 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition ${
-              tool === 'brush'
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'text-purple-900 hover:bg-purple-100'
+              tool === "brush"
+                ? "bg-purple-600 text-white shadow-md"
+                : "text-purple-900 hover:bg-purple-100"
             }`}
           >
             <Paintbrush size={16} />
@@ -386,12 +400,12 @@ export default function KidsDrawingStudio() {
             type="button"
             onClick={() => {
               playPopSound();
-              setTool('stamp');
+              setTool("stamp");
             }}
             className={`flex-1 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition ${
-              tool === 'stamp'
-                ? 'bg-amber-500 text-white shadow-md'
-                : 'text-amber-900 hover:bg-amber-100'
+              tool === "stamp"
+                ? "bg-amber-500 text-white shadow-md"
+                : "text-amber-900 hover:bg-amber-100"
             }`}
           >
             <Smile size={16} />
@@ -402,12 +416,12 @@ export default function KidsDrawingStudio() {
             type="button"
             onClick={() => {
               playPopSound();
-              setTool('eraser');
+              setTool("eraser");
             }}
             className={`flex-1 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition ${
-              tool === 'eraser'
-                ? 'bg-rose-500 text-white shadow-md'
-                : 'text-rose-900 hover:bg-rose-100'
+              tool === "eraser"
+                ? "bg-rose-500 text-white shadow-md"
+                : "text-rose-900 hover:bg-rose-100"
             }`}
           >
             <Eraser size={16} />
@@ -417,7 +431,7 @@ export default function KidsDrawingStudio() {
 
         {/* Colors / Stickers Palette */}
         <div className="md:col-span-8 flex flex-col justify-center gap-2">
-          {tool === 'stamp' ? (
+          {tool === "stamp" ? (
             <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
               <span className="text-xs font-black text-amber-900 shrink-0">Sticker:</span>
               {STAMPS.map((stamp) => (
@@ -430,8 +444,8 @@ export default function KidsDrawingStudio() {
                   }}
                   className={`w-9 h-9 text-2xl rounded-xl flex items-center justify-center shrink-0 transition ${
                     selectedStamp === stamp
-                      ? 'bg-amber-200 border-2 border-amber-500 scale-110 shadow-sm'
-                      : 'bg-slate-100 hover:bg-slate-200'
+                      ? "bg-amber-200 border-2 border-amber-500 scale-110 shadow-sm"
+                      : "bg-slate-100 hover:bg-slate-200"
                   }`}
                 >
                   {stamp}
@@ -448,13 +462,13 @@ export default function KidsDrawingStudio() {
                   onClick={() => {
                     playPopSound();
                     setSelectedColor(color);
-                    if (tool === 'eraser') setTool('brush');
+                    if (tool === "eraser") setTool("brush");
                   }}
                   style={{ backgroundColor: color }}
                   className={`w-8 h-8 rounded-full shrink-0 transition border-2 ${
-                    selectedColor === color && tool === 'brush'
-                      ? 'ring-4 ring-purple-400 scale-110 border-white shadow-md'
-                      : 'border-slate-300 hover:scale-105'
+                    selectedColor === color && tool === "brush"
+                      ? "ring-4 ring-purple-400 scale-110 border-white shadow-md"
+                      : "border-slate-300 hover:scale-105"
                   }`}
                 />
               ))}
@@ -473,11 +487,11 @@ export default function KidsDrawingStudio() {
                   onClick={() => setBrushSize(size)}
                   className={`w-7 h-7 rounded-full font-black text-xs flex items-center justify-center border transition ${
                     brushSize === size
-                      ? 'bg-purple-600 text-white border-purple-600 scale-110'
-                      : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                      ? "bg-purple-600 text-white border-purple-600 scale-110"
+                      : "bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200"
                   }`}
                 >
-                  {size < 12 ? '•' : size < 22 ? '●' : '🔴'}
+                  {size < 12 ? "•" : size < 22 ? "●" : "🔴"}
                 </button>
               ))}
             </div>
@@ -492,7 +506,7 @@ export default function KidsDrawingStudio() {
                   onClick={() => handleChangeBg(bg.value)}
                   style={{ backgroundColor: bg.value }}
                   className={`w-5 h-5 rounded-md border shadow-2xl transition ${
-                    canvasBg === bg.value ? 'ring-2 ring-purple-600 scale-110' : 'border-slate-300'
+                    canvasBg === bg.value ? "ring-2 ring-purple-600 scale-110" : "border-slate-300"
                   }`}
                   title={bg.name}
                 />

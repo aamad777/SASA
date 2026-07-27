@@ -38,7 +38,9 @@ function PhotosPage() {
           </Link>
           <div>
             <h1 className="font-heading text-3xl font-extrabold text-foreground">See Photos</h1>
-            <p className="text-sm font-medium text-muted-foreground">Tap a picture to say its name</p>
+            <p className="text-sm font-medium text-muted-foreground">
+              Tap a picture to say its name
+            </p>
           </div>
         </header>
 

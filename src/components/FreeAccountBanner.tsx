@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, UserPlus, X, ArrowRight } from 'lucide-react';
-import { playPopSound, playSuccessSound } from '../lib/sound';
+import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { Sparkles, UserPlus, X, ArrowRight } from "lucide-react";
+import { playPopSound, playSuccessSound } from "../lib/sound";
 
 type FreeAccountBannerProps = {
   onCreateAccount: () => void;
@@ -10,7 +10,7 @@ type FreeAccountBannerProps = {
 
 export default function FreeAccountBanner({
   onCreateAccount,
-  className = '',
+  className = "",
 }: FreeAccountBannerProps) {
   const [dismissed, setDismissed] = useState(false);
 
@@ -80,4 +80,3 @@ export default function FreeAccountBanner({
     </AnimatePresence>
   );
 }
-

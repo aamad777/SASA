@@ -1,14 +1,20 @@
-FROM oven/bun:1 AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json bun.lock bunfig.toml ./
-RUN bun install --frozen-lockfile
+COPY package.json package-lock.json ./
+
+RUN npm ci
 
 COPY . .
-RUN NITRO_PRESET=node-server bun run build
 
-RUN test -f .output/server/index.mjs
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
+RUN test -n "$VITE_API_BASE_URL" || \
+    (echo "ERROR: VITE_API_BASE_URL is required" && exit 1)
+
+RUN npm run build
 
 
 FROM node:22-alpine AS runner

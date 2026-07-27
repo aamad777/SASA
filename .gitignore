@@ -13,12 +13,32 @@ coverage/
 .env.*.local
 
 # Keep environment template
-!.env.example
 
 # Temporary backups
 *.before-*
-*.log
 
 # Dependencies and builds
+
+# Generated build output
+.output/
+.wrangler/
+
+# Dependencies and local environment
+.env.*
+
+# Local backup files
+*.backup
+*.bak
+
+# Logs
+
+# Node dependencies
 node_modules/
-dist/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Temporary source backups
+*.before-*

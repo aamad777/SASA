@@ -4,8 +4,15 @@ node_modules
 .output
 dist
 .wrangler
+
+.env
+.env.*
+!.env.example
+
 *.log
 *.before-*
-.env.local
+*.backup
+*.bak
+
 Dockerfile.before-*
 nginx.conf

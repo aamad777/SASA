@@ -78,10 +78,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Little Explorers" },
-      { name: "description", content: "A safe, cheerful place for toddlers to watch videos, look at photos, and play & learn." },
+      {
+        name: "description",
+        content:
+          "A safe, cheerful place for toddlers to watch videos, look at photos, and play & learn.",
+      },
       { name: "author", content: "Little Explorers" },
       { property: "og:title", content: "Little Explorers" },
-      { property: "og:description", content: "A safe, cheerful place for toddlers to watch videos, look at photos, and play & learn." },
+      {
+        property: "og:description",
+        content:
+          "A safe, cheerful place for toddlers to watch videos, look at photos, and play & learn.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@LittleExplorers" },

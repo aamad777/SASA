@@ -72,13 +72,26 @@ export function AnimatedHero() {
           {/* Nose */}
           <ellipse cx="0" cy="-11" rx="2.5" ry="2" fill="#2b2b3d" />
           {/* Mouth */}
-          <path d="M -4 -6 Q 0 -3 4 -6" stroke="#2b2b3d" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          <path
+            d="M -4 -6 Q 0 -3 4 -6"
+            stroke="#2b2b3d"
+            strokeWidth="1.5"
+            fill="none"
+            strokeLinecap="round"
+          />
           {/* Cheeks */}
           <circle cx="-12" cy="-12" r="3" fill="oklch(0.82 0.11 25)" opacity="0.6" />
           <circle cx="12" cy="-12" r="3" fill="oklch(0.82 0.11 25)" opacity="0.6" />
           {/* Arm waving */}
           <g className="bear-wave" style={{ transformOrigin: "22px -4px" }}>
-            <ellipse cx="30" cy="-14" rx="6" ry="10" fill="oklch(0.68 0.08 60)" transform="rotate(20 22 -4)" />
+            <ellipse
+              cx="30"
+              cy="-14"
+              rx="6"
+              ry="10"
+              fill="oklch(0.68 0.08 60)"
+              transform="rotate(20 22 -4)"
+            />
           </g>
         </g>
 
@@ -99,7 +112,13 @@ export function AnimatedHero() {
           {/* Nose */}
           <path d="M -2 -13 L 2 -13 L 0 -10 Z" fill="oklch(0.82 0.11 25)" />
           {/* Mouth */}
-          <path d="M 0 -10 L 0 -7 M 0 -7 Q -3 -5 -4 -7 M 0 -7 Q 3 -5 4 -7" stroke="#2b2b3d" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+          <path
+            d="M 0 -10 L 0 -7 M 0 -7 Q -3 -5 -4 -7 M 0 -7 Q 3 -5 4 -7"
+            stroke="#2b2b3d"
+            strokeWidth="1.2"
+            fill="none"
+            strokeLinecap="round"
+          />
           {/* Cheeks */}
           <circle cx="-10" cy="-14" r="2.5" fill="oklch(0.82 0.11 25)" opacity="0.6" />
           <circle cx="10" cy="-14" r="2.5" fill="oklch(0.82 0.11 25)" opacity="0.6" />

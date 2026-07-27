@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from 'react';
+import { useState, type MouseEvent } from "react";
 import {
   ArrowLeft,
   BookOpen,
@@ -14,20 +14,20 @@ import {
   Radio,
   X,
   Volume2,
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import confetti from 'canvas-confetti';
-import { playHeartSound, playPopSound, playSuccessSound } from '../lib/sound';
-import type { KidsVideoItem } from './KidsVideoHome';
-import { kidsVideos } from './KidsVideoHome';
-import WatchPartyModal, { type WatchPartyBuddy } from './WatchPartyModal';
-import NumbersLearningVideo from './NumbersLearningVideo';
+} from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import confetti from "canvas-confetti";
+import { playHeartSound, playPopSound, playSuccessSound } from "../lib/sound";
+import type { KidsVideoItem } from "./KidsVideoHome";
+import { kidsVideos } from "./KidsVideoHome";
+import WatchPartyModal, { type WatchPartyBuddy } from "./WatchPartyModal";
+import NumbersLearningVideo from "./NumbersLearningVideo";
 
-import puppyImg from '../assets/images/puppy_avatar_1784920038818.jpg';
-import penguinImg from '../assets/images/penguin_avatar_1784920051288.jpg';
-import kittyImg from '../assets/images/kitty_avatar_1784920065128.jpg';
-import monkeyImg from '../assets/images/monkey_avatar_1784920076703.jpg';
-import koalaImg from '../assets/images/koala_avatar_1784920089417.jpg';
+import puppyImg from "../assets/images/puppy_avatar_1784920038818.jpg";
+import penguinImg from "../assets/images/penguin_avatar_1784920051288.jpg";
+import kittyImg from "../assets/images/kitty_avatar_1784920065128.jpg";
+import monkeyImg from "../assets/images/monkey_avatar_1784920076703.jpg";
+import koalaImg from "../assets/images/koala_avatar_1784920089417.jpg";
 
 type CustomProfileProp = {
   id: number;
@@ -46,98 +46,96 @@ type KidsVideoPlayerProps = {
   customProfiles?: CustomProfileProp[];
   onBack: () => void;
   onOpenVideo: (video: KidsVideoItem) => void;
-  onOpenHomeTab: (
-    tab: 'home' | 'search' | 'library',
-  ) => void;
+  onOpenHomeTab: (tab: "home" | "search" | "library") => void;
   onChangeProfile: () => void;
 };
 
 const defaultBuddies: WatchPartyBuddy[] = [
   {
     id: 101,
-    name: 'Leo',
-    emoji: '🦁',
-    color: '#ffa62b',
+    name: "Leo",
+    emoji: "🦁",
+    color: "#ffa62b",
     image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBXKmBbTEschT2fVlXzamCeETx0M3rctPouvJQ6jyWboczUe-WXt302CDJtMx5T_L9-zEaxhM_vxlITgSZt9_ApPXqHF9Vx39tEHo5gDXRFuGHRZ_rrEz6fOH5KlalMKiv82rUKm_4IRONsQ-wF064xYk_0ZIzAijLaovdE2H-qhe86S9qU1K70VcVvqOQ7GxR9ujHTTCg5GPHGI4VYoTLTPpwFitUSQ7JP8kSUjWRij6OOEIBXNKbLcaKkBrH4y-J_4PM1zmklxnA',
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBXKmBbTEschT2fVlXzamCeETx0M3rctPouvJQ6jyWboczUe-WXt302CDJtMx5T_L9-zEaxhM_vxlITgSZt9_ApPXqHF9Vx39tEHo5gDXRFuGHRZ_rrEz6fOH5KlalMKiv82rUKm_4IRONsQ-wF064xYk_0ZIzAijLaovdE2H-qhe86S9qU1K70VcVvqOQ7GxR9ujHTTCg5GPHGI4VYoTLTPpwFitUSQ7JP8kSUjWRij6OOEIBXNKbLcaKkBrH4y-J_4PM1zmklxnA",
   },
   {
     id: 102,
-    name: 'Poppy',
-    emoji: '🐼',
-    color: '#95d5b2',
+    name: "Poppy",
+    emoji: "🐼",
+    color: "#95d5b2",
     image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCONd4umMhgrulZ5f-ZZt2Uuy9-ach-KvWVrVKGmgiL58eNixQ0RjTvy4dEfDeZ1J7AjEKiLqrUKdXuuqdwFo-IF87mvFkdWZwpDs4hfs2FGU19CtmN6-k04UQXX4ibVERtYQS4ejdOmmIu6QKvrqVw2lGKdJHCiNNzzQGpdSP3Zir5sHO0B2Dt0_hf7PLpsbxeTuzJbU0-bxuCDZ2egbgYTHvpvt7p7Nl-GMz8P2cZlpqKbDqaybqBQFAYBqN6KlDGvQr8Yd7diDQ',
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuCONd4umMhgrulZ5f-ZZt2Uuy9-ach-KvWVrVKGmgiL58eNixQ0RjTvy4dEfDeZ1J7AjEKiLqrUKdXuuqdwFo-IF87mvFkdWZwpDs4hfs2FGU19CtmN6-k04UQXX4ibVERtYQS4ejdOmmIu6QKvrqVw2lGKdJHCiNNzzQGpdSP3Zir5sHO0B2Dt0_hf7PLpsbxeTuzJbU0-bxuCDZ2egbgYTHvpvt7p7Nl-GMz8P2cZlpqKbDqaybqBQFAYBqN6KlDGvQr8Yd7diDQ",
   },
   {
     id: 103,
-    name: 'Ruby',
-    emoji: '🐰',
-    color: '#ff8fa3',
+    name: "Ruby",
+    emoji: "🐰",
+    color: "#ff8fa3",
     image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBSpgsSIXN0d0LIyQMwB5SQbDUf6iitsVRQwTNbcaYYxamCvTLMt2omcQa9RPFVNaWlGDX2OTgHS9ZHHumfzn4jTOqF8IM0wzwTvI6lEkYLR5e4j1moqa0_Wrartxg-46lIyoXuBdsEFX9pa7gJgLs0L0SshcnaM8a_OnasZM-Uogwwpf5DOLftEcb2sg4fUl5uLX5o-g-g9wxt8QgqtmJ1Zii35Iibp-f7PH3ACFzlM57Cuf4m8MVAwA0J5c_n1YsiT4-gFfBgNg0',
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBSpgsSIXN0d0LIyQMwB5SQbDUf6iitsVRQwTNbcaYYxamCvTLMt2omcQa9RPFVNaWlGDX2OTgHS9ZHHumfzn4jTOqF8IM0wzwTvI6lEkYLR5e4j1moqa0_Wrartxg-46lIyoXuBdsEFX9pa7gJgLs0L0SshcnaM8a_OnasZM-Uogwwpf5DOLftEcb2sg4fUl5uLX5o-g-g9wxt8QgqtmJ1Zii35Iibp-f7PH3ACFzlM57Cuf4m8MVAwA0J5c_n1YsiT4-gFfBgNg0",
   },
   {
     id: 104,
-    name: 'Percy Puppy',
-    emoji: '🐶',
-    color: '#fdb813',
+    name: "Percy Puppy",
+    emoji: "🐶",
+    color: "#fdb813",
     image: puppyImg,
   },
   {
     id: 105,
-    name: 'Pippin Penguin',
-    emoji: '🐧',
-    color: '#38bdf8',
+    name: "Pippin Penguin",
+    emoji: "🐧",
+    color: "#38bdf8",
     image: penguinImg,
   },
   {
     id: 106,
-    name: 'Cleo Kitty',
-    emoji: '🐱',
-    color: '#f472b6',
+    name: "Cleo Kitty",
+    emoji: "🐱",
+    color: "#f472b6",
     image: kittyImg,
   },
   {
     id: 107,
-    name: 'Milo Monkey',
-    emoji: '🐵',
-    color: '#fb923c',
+    name: "Milo Monkey",
+    emoji: "🐵",
+    color: "#fb923c",
     image: monkeyImg,
   },
   {
     id: 108,
-    name: 'Kiki Koala',
-    emoji: '🐨',
-    color: '#a7f3d0',
+    name: "Kiki Koala",
+    emoji: "🐨",
+    color: "#a7f3d0",
     image: koalaImg,
   },
 ];
 
 const reactions = [
   {
-    id: 'love',
-    label: 'Love it',
-    emoji: '❤️',
-    className: 'love',
+    id: "love",
+    label: "Love it",
+    emoji: "❤️",
+    className: "love",
   },
   {
-    id: 'super',
-    label: 'Super',
-    emoji: '⭐',
-    className: 'super',
+    id: "super",
+    label: "Super",
+    emoji: "⭐",
+    className: "super",
   },
   {
-    id: 'funny',
-    label: 'Funny',
-    emoji: '😂',
-    className: 'funny',
+    id: "funny",
+    label: "Funny",
+    emoji: "😂",
+    className: "funny",
   },
   {
-    id: 'wow',
-    label: 'Wow',
-    emoji: '😲',
-    className: 'wow',
+    id: "wow",
+    label: "Wow",
+    emoji: "😲",
+    className: "wow",
   },
 ];
 
@@ -150,8 +148,8 @@ type FloatingEmoji = {
 
 export default function KidsVideoPlayer({
   video,
-  profileName = 'Leo',
-  profileEmoji = '🦁',
+  profileName = "Leo",
+  profileEmoji = "🦁",
   customProfiles = [],
   onBack,
   onOpenVideo,
@@ -165,11 +163,7 @@ export default function KidsVideoPlayer({
   const [syncToast, setSyncToast] = useState<string | null>(null);
   const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
   const [reaction, setReaction] = useState(() => {
-    return (
-      localStorage.getItem(
-        `sasa-video-reaction-${video.id}`,
-      ) ?? ''
-    );
+    return localStorage.getItem(`sasa-video-reaction-${video.id}`) ?? "";
   });
 
   const upNext = kidsVideos
@@ -202,7 +196,7 @@ export default function KidsVideoPlayer({
       showToast(
         nextState
           ? `Synced! Playing for ${profileName} & ${activeWatchPartyBuddy.name}`
-          : `Synced! Paused for both profiles`
+          : `Synced! Paused for both profiles`,
       );
     }
   };
@@ -227,7 +221,7 @@ export default function KidsVideoPlayer({
   };
 
   const handleReactionClick = (id: string, e: MouseEvent) => {
-    const updated = reaction === id ? '' : id;
+    const updated = reaction === id ? "" : id;
     setReaction(updated);
 
     if (updated) {
@@ -242,11 +236,11 @@ export default function KidsVideoPlayer({
         particleCount: 30,
         spread: 70,
         origin: { x, y },
-        colors: ['#ff72aa', '#ffd166', '#06d6a0', '#118ab2', '#8338ec'],
+        colors: ["#ff72aa", "#ffd166", "#06d6a0", "#118ab2", "#8338ec"],
       });
 
       if (activeWatchPartyBuddy) {
-        handleSendEmojiReaction(reactions.find((r) => r.id === id)?.emoji || '❤️');
+        handleSendEmojiReaction(reactions.find((r) => r.id === id)?.emoji || "❤️");
       }
     } else {
       localStorage.removeItem(`sasa-video-reaction-${video.id}`);
@@ -291,12 +285,12 @@ export default function KidsVideoPlayer({
           }}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black transition-all shadow-sm cursor-pointer ${
             activeWatchPartyBuddy
-              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-emerald-500/20'
-              : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+              ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-emerald-500/20"
+              : "bg-purple-100 text-purple-700 hover:bg-purple-200"
           }`}
         >
           <Users size={15} />
-          <span>{activeWatchPartyBuddy ? 'Watch Party Active' : 'Invite to Watch'}</span>
+          <span>{activeWatchPartyBuddy ? "Watch Party Active" : "Invite to Watch"}</span>
           {activeWatchPartyBuddy && (
             <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
           )}
@@ -333,7 +327,7 @@ export default function KidsVideoPlayer({
                 </div>
                 <div
                   className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-sm shadow overflow-hidden"
-                  style={{ backgroundColor: activeWatchPartyBuddy.color || '#bae6fd' }}
+                  style={{ backgroundColor: activeWatchPartyBuddy.color || "#bae6fd" }}
                 >
                   {activeWatchPartyBuddy.avatarUrl || activeWatchPartyBuddy.image ? (
                     <img
@@ -360,7 +354,7 @@ export default function KidsVideoPlayer({
 
             <div className="flex items-center gap-1.5">
               {/* Quick Party Reactions */}
-              {['🍿', '🎉', '💖', '👏'].map((emoji) => (
+              {["🍿", "🎉", "💖", "👏"].map((emoji) => (
                 <button
                   key={emoji}
                   type="button"
@@ -386,8 +380,7 @@ export default function KidsVideoPlayer({
           </motion.div>
         )}
 
-        {video.sourceType === 'youtube' &&
-        video.youtubeVideoId ? (
+        {video.sourceType === "youtube" && video.youtubeVideoId ? (
           <section className="kids-player-hero relative rounded-3xl overflow-hidden shadow-xl bg-black aspect-video">
             <iframe
               className="absolute inset-0 w-full h-full"
@@ -397,8 +390,15 @@ export default function KidsVideoPlayer({
               allowFullScreen
             />
           </section>
-        ) : video.sourceType === 'upload' &&
-          video.sourceUrl ? (
+        ) : video.sourceType === "photo" && video.sourceUrl ? (
+          <section className="kids-player-hero relative rounded-3xl overflow-hidden shadow-xl bg-slate-950 min-h-[300px] sm:min-h-[480px] flex items-center justify-center">
+            <img
+              className="w-full h-full max-h-[72vh] object-contain bg-slate-950"
+              src={video.sourceUrl}
+              alt={video.title}
+            />
+          </section>
+        ) : video.sourceType === "upload" && video.sourceUrl ? (
           <section className="kids-player-hero relative rounded-3xl overflow-hidden shadow-xl bg-black aspect-video">
             <video
               className="w-full h-full object-contain bg-black"
@@ -411,12 +411,8 @@ export default function KidsVideoPlayer({
               Your browser does not support video playback.
             </video>
           </section>
-        ) : video.id === 7 ||
-          video.category === 'Numbers' ? (
-          <NumbersLearningVideo
-            isPlaying={playing}
-            onTogglePlay={handleTogglePlay}
-          />
+        ) : video.id === 7 || video.category === "Numbers" ? (
+          <NumbersLearningVideo isPlaying={playing} onTogglePlay={handleTogglePlay} />
         ) : (
           <section className="kids-player-hero relative group rounded-3xl overflow-hidden shadow-xl">
             <img src={video.image} alt={video.title} />
@@ -430,7 +426,7 @@ export default function KidsVideoPlayer({
                     initial={{ opacity: 1, y: 160, scale: 0.5 }}
                     animate={{ opacity: 0, y: -100, scale: 1.8 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 1.8, ease: 'easeOut' }}
+                    transition={{ duration: 1.8, ease: "easeOut" }}
                     style={{ left: `${item.left}%` }}
                     className="absolute bottom-10 text-4xl filter drop-shadow-lg flex flex-col items-center"
                   >
@@ -449,7 +445,7 @@ export default function KidsVideoPlayer({
               type="button"
               className="kids-player-play-button shadow-2xl z-30"
               onClick={handleTogglePlay}
-              aria-label={playing ? 'Pause video' : 'Play video'}
+              aria-label={playing ? "Pause video" : "Play video"}
             >
               {playing ? (
                 <Pause size={42} fill="currentColor" />
@@ -460,14 +456,16 @@ export default function KidsVideoPlayer({
           </section>
         )}
 
-        <div className="kids-player-progress rounded-full overflow-hidden mt-3">
-          <motion.span
-            className="bg-gradient-to-r from-pink-500 to-purple-500 h-full block"
-            initial={{ width: '0%' }}
-            animate={{ width: playing ? '65%' : '40%' }}
-            transition={{ duration: 0.5 }}
-          />
-        </div>
+        {video.sourceType !== "photo" && (
+          <div className="kids-player-progress rounded-full overflow-hidden mt-3">
+            <motion.span
+              className="bg-gradient-to-r from-pink-500 to-purple-500 h-full block"
+              initial={{ width: "0%" }}
+              animate={{ width: playing ? "65%" : "40%" }}
+              transition={{ duration: 0.5 }}
+            />
+          </div>
+        )}
 
         <section className="kids-player-info mt-4">
           <div className="flex items-start justify-between gap-3">
@@ -510,21 +508,17 @@ export default function KidsVideoPlayer({
                     whileTap={{ scale: 0.9 }}
                     type="button"
                     className={[
-                      'kids-reaction-choice',
+                      "kids-reaction-choice",
                       item.className,
-                      selected ? 'selected ring-4 ring-purple-400' : '',
+                      selected ? "selected ring-4 ring-purple-400" : "",
                     ]
                       .filter(Boolean)
-                      .join(' ')}
+                      .join(" ")}
                     onClick={(e) => handleReactionClick(item.id, e)}
                     aria-pressed={selected}
                   >
-                    <span className="kids-reaction-face text-3xl">
-                      {item.emoji}
-                    </span>
-                    <span className="kids-reaction-label font-bold">
-                      {item.label}
-                    </span>
+                    <span className="kids-reaction-face text-3xl">{item.emoji}</span>
+                    <span className="kids-reaction-label font-bold">{item.label}</span>
                   </motion.button>
                 );
               })}
@@ -543,7 +537,7 @@ export default function KidsVideoPlayer({
                 setShowAll((value) => !value);
               }}
             >
-              {showAll ? 'Show Less' : 'See All'}
+              {showAll ? "Show Less" : "See All"}
             </motion.button>
           </div>
 
@@ -562,15 +556,11 @@ export default function KidsVideoPlayer({
                   onClick={() => {
                     playPopSound();
                     setPlaying(false);
-                    setReaction(
-                      localStorage.getItem(
-                        `sasa-video-reaction-${item.id}`,
-                      ) ?? '',
-                    );
+                    setReaction(localStorage.getItem(`sasa-video-reaction-${item.id}`) ?? "");
                     onOpenVideo(item);
                     window.scrollTo({
                       top: 0,
-                      behavior: 'smooth',
+                      behavior: "smooth",
                     });
                   }}
                 >
@@ -614,7 +604,7 @@ export default function KidsVideoPlayer({
           className="active"
           onClick={() => {
             playPopSound();
-            onOpenHomeTab('home');
+            onOpenHomeTab("home");
           }}
         >
           <Home size={24} />
@@ -626,7 +616,7 @@ export default function KidsVideoPlayer({
           type="button"
           onClick={() => {
             playPopSound();
-            onOpenHomeTab('search');
+            onOpenHomeTab("search");
           }}
         >
           <Search size={24} />
@@ -638,7 +628,7 @@ export default function KidsVideoPlayer({
           type="button"
           onClick={() => {
             playPopSound();
-            onOpenHomeTab('library');
+            onOpenHomeTab("library");
           }}
         >
           <BookOpen size={24} />
@@ -660,5 +650,3 @@ export default function KidsVideoPlayer({
     </motion.div>
   );
 }
-
-

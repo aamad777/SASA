@@ -1,30 +1,30 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Sparkles, RotateCcw, Award, Star, Gamepad2, CheckCircle2 } from 'lucide-react';
-import confetti from 'canvas-confetti';
-import { playPopSound, playSuccessSound, playHeartSound } from '../lib/sound';
-import penguinImg from '../assets/images/penguin_avatar_1784920051288.jpg';
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { Trophy, Sparkles, RotateCcw, Award, Star, Gamepad2, CheckCircle2 } from "lucide-react";
+import confetti from "canvas-confetti";
+import { playPopSound, playSuccessSound, playHeartSound } from "../lib/sound";
+import penguinImg from "../assets/images/penguin_avatar_1784920051288.jpg";
 
 type MemoryCard = {
   id: number;
   value: string | number;
   matchKey: number;
-  type: 'num' | 'items';
+  type: "num" | "items";
   isFlipped: boolean;
   isMatched: boolean;
 };
 
 const CARDS_DATA = [
-  { num: 1, label: '1', items: '🎈' },
-  { num: 2, label: '2', items: '🐥🐥' },
-  { num: 3, label: '3', items: '🌟🌟🌟' },
-  { num: 4, label: '4', items: '🍎🍎🍎🍎' },
-  { num: 5, label: '5', items: '🦋🦋🦋🦋🦋' },
-  { num: 6, label: '6', items: '🚗🚗🚗🚗🚗🚗' },
+  { num: 1, label: "1", items: "🎈" },
+  { num: 2, label: "2", items: "🐥🐥" },
+  { num: 3, label: "3", items: "🌟🌟🌟" },
+  { num: 4, label: "4", items: "🍎🍎🍎🍎" },
+  { num: 5, label: "5", items: "🦋🦋🦋🦋🦋" },
+  { num: 6, label: "6", items: "🚗🚗🚗🚗🚗🚗" },
 ];
 
 export default function KidsGamesStudio() {
-  const [activeGame, setActiveGame] = useState<'memory' | 'quiz'>('memory');
+  const [activeGame, setActiveGame] = useState<"memory" | "quiz">("memory");
   const [cards, setCards] = useState<MemoryCard[]>([]);
   const [flippedCards, setFlippedCards] = useState<number[]>([]);
   const [score, setScore] = useState(0);
@@ -37,28 +37,28 @@ export default function KidsGamesStudio() {
 
   const quizQuestions = [
     {
-      question: 'Which number comes after 4?',
-      options: ['3', '5', '7'],
-      answer: '5',
-      emoji: '🔢',
+      question: "Which number comes after 4?",
+      options: ["3", "5", "7"],
+      answer: "5",
+      emoji: "🔢",
     },
     {
-      question: 'How many stars are here? 🌟 🌟 🌟',
-      options: ['2', '3', '4'],
-      answer: '3',
-      emoji: '⭐',
+      question: "How many stars are here? 🌟 🌟 🌟",
+      options: ["2", "3", "4"],
+      answer: "3",
+      emoji: "⭐",
     },
     {
-      question: 'Which animal swims in the ice with Pippin? 🐧',
-      options: ['Penguin', 'Monkey', 'Koala'],
-      answer: 'Penguin',
-      emoji: '❄️',
+      question: "Which animal swims in the ice with Pippin? 🐧",
+      options: ["Penguin", "Monkey", "Koala"],
+      answer: "Penguin",
+      emoji: "❄️",
     },
     {
-      question: 'Count the apples: 🍎 🍎 🍎 🍎 🍎',
-      options: ['5', '6', '4'],
-      answer: '5',
-      emoji: '🍎',
+      question: "Count the apples: 🍎 🍎 🍎 🍎 🍎",
+      options: ["5", "6", "4"],
+      answer: "5",
+      emoji: "🍎",
     },
   ];
 
@@ -73,7 +73,7 @@ export default function KidsGamesStudio() {
         id: idCounter++,
         value: item.label,
         matchKey: item.num,
-        type: 'num',
+        type: "num",
         isFlipped: false,
         isMatched: false,
       });
@@ -82,7 +82,7 @@ export default function KidsGamesStudio() {
         id: idCounter++,
         value: item.items,
         matchKey: item.num,
-        type: 'items',
+        type: "items",
         isFlipped: false,
         isMatched: false,
       });
@@ -130,7 +130,9 @@ export default function KidsGamesStudio() {
           setStreak((st) => st + 1);
 
           // Check if all matched
-          const remaining = updated.filter((c) => !c.isMatched && c.matchKey !== firstCard.matchKey);
+          const remaining = updated.filter(
+            (c) => !c.isMatched && c.matchKey !== firstCard.matchKey,
+          );
           if (remaining.length === 0) {
             setGameWon(true);
             confetti({ particleCount: 100, spread: 80, origin: { y: 0.6 } });
@@ -140,7 +142,9 @@ export default function KidsGamesStudio() {
         // NO MATCH
         setTimeout(() => {
           setCards((prev) =>
-            prev.map((c) => (c.id === newFlipped[0] || c.id === newFlipped[1] ? { ...c, isFlipped: false } : c)),
+            prev.map((c) =>
+              c.id === newFlipped[0] || c.id === newFlipped[1] ? { ...c, isFlipped: false } : c,
+            ),
           );
           setFlippedCards([]);
           setStreak(0);
@@ -191,13 +195,13 @@ export default function KidsGamesStudio() {
             type="button"
             onClick={() => {
               playPopSound();
-              setActiveGame('memory');
+              setActiveGame("memory");
               setGameWon(false);
             }}
             className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
-              activeGame === 'memory'
-                ? 'bg-amber-400 text-amber-950 shadow-md'
-                : 'text-slate-300 hover:text-white'
+              activeGame === "memory"
+                ? "bg-amber-400 text-amber-950 shadow-md"
+                : "text-slate-300 hover:text-white"
             }`}
           >
             🧩 Number Match
@@ -206,15 +210,15 @@ export default function KidsGamesStudio() {
             type="button"
             onClick={() => {
               playPopSound();
-              setActiveGame('quiz');
+              setActiveGame("quiz");
               setQuizQuestionIndex(0);
               setQuizScore(0);
               setGameWon(false);
             }}
             className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
-              activeGame === 'quiz'
-                ? 'bg-amber-400 text-amber-950 shadow-md'
-                : 'text-slate-300 hover:text-white'
+              activeGame === "quiz"
+                ? "bg-amber-400 text-amber-950 shadow-md"
+                : "text-slate-300 hover:text-white"
             }`}
           >
             ⭐ Kids Quiz
@@ -237,14 +241,12 @@ export default function KidsGamesStudio() {
             <p className="text-xs text-sky-100 mt-1 font-medium">
               Pippin is super proud of you! You earned 3 Gold Stars!
             </p>
-            <div className="flex items-center justify-center gap-2 my-4 text-3xl">
-              ⭐ ⭐ ⭐
-            </div>
+            <div className="flex items-center justify-center gap-2 my-4 text-3xl">⭐ ⭐ ⭐</div>
 
             <button
               type="button"
               onClick={() => {
-                if (activeGame === 'memory') initMemoryGame();
+                if (activeGame === "memory") initMemoryGame();
                 else {
                   setQuizQuestionIndex(0);
                   setQuizScore(0);
@@ -257,7 +259,7 @@ export default function KidsGamesStudio() {
               <span>Play Again</span>
             </button>
           </motion.div>
-        ) : activeGame === 'memory' ? (
+        ) : activeGame === "memory" ? (
           <div className="w-full flex flex-col items-center">
             {/* Memory Cards Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-xl w-full">
@@ -272,10 +274,10 @@ export default function KidsGamesStudio() {
                     onClick={() => handleCardClick(card.id)}
                     className={`h-28 sm:h-32 rounded-2xl border-4 font-black text-2xl sm:text-3xl flex flex-col items-center justify-center transition shadow-xl cursor-pointer ${
                       card.isMatched
-                        ? 'bg-emerald-500/30 border-emerald-400 text-emerald-200 opacity-60'
+                        ? "bg-emerald-500/30 border-emerald-400 text-emerald-200 opacity-60"
                         : showContent
-                        ? 'bg-amber-400 text-amber-950 border-white'
-                        : 'bg-sky-700 hover:bg-sky-600 border-sky-400 text-sky-200'
+                          ? "bg-amber-400 text-amber-950 border-white"
+                          : "bg-sky-700 hover:bg-sky-600 border-sky-400 text-sky-200"
                     }`}
                   >
                     {showContent ? (

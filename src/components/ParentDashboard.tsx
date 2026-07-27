@@ -1,13 +1,19 @@
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { playPopSound, playSuccessSound } from '../lib/sound';
-import { kidsVideos } from './KidsVideoHome';
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { playPopSound, playSuccessSound } from "../lib/sound";
+import { kidsVideos } from "./KidsVideoHome";
 import {
   addParentYoutubeVideo,
   deleteChild,
+  deleteParentMedia,
+  getApiAssetUrl,
+  getParentMedia,
+  updateParentMedia,
+  updateParentMediaAccess,
   uploadParentVideo,
   type DatabaseChild,
-} from '../lib/api';
+  type ParentMediaItem,
+} from "../lib/api";
 import {
   BarChart3,
   Bed,
@@ -36,7 +42,7 @@ import {
   UserCircle,
   Users,
   X,
-} from 'lucide-react';
+} from "lucide-react";
 
 export type BlockedChannel = {
   id: number;
@@ -80,6 +86,14 @@ type ManagedCustomProfile = {
   isProtected?: boolean;
 };
 
+type ParentSection =
+  | "screen-time"
+  | "content-filters"
+  | "kids-media"
+  | "activity-history"
+  | "profiles"
+  | "settings";
+
 type ParentDashboardProps = {
   parentToken: string;
   databaseChildren: DatabaseChild[];
@@ -98,24 +112,24 @@ type ParentDashboardProps = {
 const historyItems = [
   {
     id: 1,
-    title: 'Peppa Pig: Muddy Puddles',
-    watched: '10m ago',
+    title: "Peppa Pig: Muddy Puddles",
+    watched: "10m ago",
     image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuA_XNMAxsUTBKZmh1ejMzKmmL6hQC4jFZvo7bTnfsSFPA1yOt7GLpxsTbjU_SkjawV0GVfdd79-an-CEi5yzse3mVw_P8M4_XITJiGupnCSkqt4vTPs1gIz-HZ7wyLgHEm6W1KJG-20vFJ7oj9hwuyRqG-bjqgOFUEI7XJTUwfoY_XSc_9zOqtrWyANG9mymfvev6_34tfeT1MzYDwgDAzDN4CWqjld4CwpT5rO2MSfQ97aaB63TC1XVVKxN2rxilt6u67kXSJVtR8',
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuA_XNMAxsUTBKZmh1ejMzKmmL6hQC4jFZvo7bTnfsSFPA1yOt7GLpxsTbjU_SkjawV0GVfdd79-an-CEi5yzse3mVw_P8M4_XITJiGupnCSkqt4vTPs1gIz-HZ7wyLgHEm6W1KJG-20vFJ7oj9hwuyRqG-bjqgOFUEI7XJTUwfoY_XSc_9zOqtrWyANG9mymfvev6_34tfeT1MzYDwgDAzDN4CWqjld4CwpT5rO2MSfQ97aaB63TC1XVVKxN2rxilt6u67kXSJVtR8",
   },
   {
     id: 2,
-    title: 'Cocomelon: Bath Song',
-    watched: '25m ago',
+    title: "Cocomelon: Bath Song",
+    watched: "25m ago",
     image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuA-wiB4yWnYIg2a7UXCzWONngOSx0l07EKXMERr7wyfA_kqrh4ih2vP24rYFAevIKp6MoMJSfzLS9fXg_jCGPwvjOJTUJZkUBulJ2I4fVuuDsyIgvGBv8N9TTnTw1yUUmsEL56hGWdi9gV4iPMbcfEiDe8xGxEeWAgfgTJFUhc4lFqXXGOSx_3_j_A7g6Hjil2Mz2azQJYapIIfsmQalLyDwYaukUE5ZdbvPfIDFNBkxsD6ZXBuv4nlnxZCijrqUNKsVc18I3Iq7DU',
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuA-wiB4yWnYIg2a7UXCzWONngOSx0l07EKXMERr7wyfA_kqrh4ih2vP24rYFAevIKp6MoMJSfzLS9fXg_jCGPwvjOJTUJZkUBulJ2I4fVuuDsyIgvGBv8N9TTnTw1yUUmsEL56hGWdi9gV4iPMbcfEiDe8xGxEeWAgfgTJFUhc4lFqXXGOSx_3_j_A7g6Hjil2Mz2azQJYapIIfsmQalLyDwYaukUE5ZdbvPfIDFNBkxsD6ZXBuv4nlnxZCijrqUNKsVc18I3Iq7DU",
   },
   {
     id: 3,
-    title: 'Bluey: The Pooch',
-    watched: '1h ago',
+    title: "Bluey: The Pooch",
+    watched: "1h ago",
     image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCqHn6Ilvqma_Z7cukIpg63qFn-VYpUefNCOE1ti4X4jZ_oNszZQ6mfHbuIzTRxGsS-ylmNqjnBZNANPt_hHJ3Z3CDRpz66DRzfAB0Iq_XA_pK3WORC-42sFaW8K_vxftFft19mzEUv5xyWkblVhpU1Zqi_fpPKsRqrzcmK65z5mZYKn9mPi5llp3L6FIsr-Sdl8t7G9g84oTJf4jpCWy63IAcU4t7MpWiSbyQHoFKdhXfOrluR53c7MZ4oVyUoFVibFTiCtfBO0-o',
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuCqHn6Ilvqma_Z7cukIpg63qFn-VYpUefNCOE1ti4X4jZ_oNszZQ6mfHbuIzTRxGsS-ylmNqjnBZNANPt_hHJ3Z3CDRpz66DRzfAB0Iq_XA_pK3WORC-42sFaW8K_vxftFft19mzEUv5xyWkblVhpU1Zqi_fpPKsRqrzcmK65z5mZYKn9mPi5llp3L6FIsr-Sdl8t7G9g84oTJf4jpCWy63IAcU4t7MpWiSbyQHoFKdhXfOrluR53c7MZ4oVyUoFVibFTiCtfBO0-o",
   },
 ];
 
@@ -124,13 +138,13 @@ export const initialBlockedChannels: BlockedChannel[] = [
     id: 1,
     name: "Ryan's World",
     image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuC8h0FQFA_8laRvvyvA_y-9UW7CQCVYZOXp05jh6hY9RzIIKuCFjHFgJF2sH0mJJu-6QAScLVnpDSc5Qqt45FLvRuiEXkfhW1f0PUdmLaaNfdUg_ETpRcasrArWIqd6UAJaTlS23T7Xv6FHJl52qK_Ne18bS5vRBf-KECJGXoDXJ4m-V9mntUPZNU3IP0JMQaKBcpNgGfMPal72INZ-nZsV3kxwWmQR7qQ7YATvoFfENLw6vuo4rNCjM36opXdBDeGzbxH-q86bZpA',
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuC8h0FQFA_8laRvvyvA_y-9UW7CQCVYZOXp05jh6hY9RzIIKuCFjHFgJF2sH0mJJu-6QAScLVnpDSc5Qqt45FLvRuiEXkfhW1f0PUdmLaaNfdUg_ETpRcasrArWIqd6UAJaTlS23T7Xv6FHJl52qK_Ne18bS5vRBf-KECJGXoDXJ4m-V9mntUPZNU3IP0JMQaKBcpNgGfMPal72INZ-nZsV3kxwWmQR7qQ7YATvoFfENLw6vuo4rNCjM36opXdBDeGzbxH-q86bZpA",
   },
   {
     id: 2,
-    name: 'Blippi',
+    name: "Blippi",
     image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuAkKQ_iYk7Pblor4K10ZrejHUaTmoJnbg6Pa_8p0N8Kh1_HY5N6jEQylBbiKVesLm5D9ZqpWOk1TGxkHOv4jf8BhTWyzLUhPiiPMJshxPRcje4ql5BAcBA_6aLmBjZY2Ttrt8ALso9NkjDxG4qOQXNLviIcsop8vKUfhsgDxXnnQcl2i9s8bkPYe2ViG02TUee_njZ2YpkOchFJOzTBZAba1wAOAg0_G-8Brw1oDxW6s3jqU-4LRZOS-SCOX14oRefpl7S09zyQvAc',
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuAkKQ_iYk7Pblor4K10ZrejHUaTmoJnbg6Pa_8p0N8Kh1_HY5N6jEQylBbiKVesLm5D9ZqpWOk1TGxkHOv4jf8BhTWyzLUhPiiPMJshxPRcje4ql5BAcBA_6aLmBjZY2Ttrt8ALso9NkjDxG4qOQXNLviIcsop8vKUfhsgDxXnnQcl2i9s8bkPYe2ViG02TUee_njZ2YpkOchFJOzTBZAba1wAOAg0_G-8Brw1oDxW6s3jqU-4LRZOS-SCOX14oRefpl7S09zyQvAc",
   },
 ];
 
@@ -138,23 +152,23 @@ export const defaultParentControlSettings: ParentControlSettings = {
   screenLimitEnabled: true,
   screenMinutes: 90,
   bedtimeEnabled: true,
-  bedtimeStart: '20:00',
-  bedtimeEnd: '07:00',
+  bedtimeStart: "20:00",
+  bedtimeEnd: "07:00",
   deviceLocked: false,
   blockedChannels: initialBlockedChannels,
   blockedVideoIds: [],
-  parentPin: '1234',
+  parentPin: "1234",
   requireParentPin: true,
 };
 
 const chartData = [
-  { day: 'Mon', videos: 10, games: 40, reading: 30 },
-  { day: 'Tue', videos: 20, games: 50, reading: 20 },
-  { day: 'Wed', videos: 15, games: 30, reading: 40 },
-  { day: 'Thu', videos: 10, games: 60, reading: 10 },
-  { day: 'Fri', videos: 25, games: 40, reading: 30 },
-  { day: 'Sat', videos: 5, games: 20, reading: 50 },
-  { day: 'Sun', videos: 15, games: 35, reading: 25 },
+  { day: "Mon", videos: 10, games: 40, reading: 30 },
+  { day: "Tue", videos: 20, games: 50, reading: 20 },
+  { day: "Wed", videos: 15, games: 30, reading: 40 },
+  { day: "Thu", videos: 10, games: 60, reading: 10 },
+  { day: "Fri", videos: 25, games: 40, reading: 30 },
+  { day: "Sat", videos: 5, games: 20, reading: 50 },
+  { day: "Sun", videos: 15, games: 35, reading: 25 },
 ];
 
 export default function ParentDashboard({
@@ -171,82 +185,61 @@ export default function ParentDashboard({
   onToggleProfileProtection,
   onSettingsChange,
 }: ParentDashboardProps) {
-  const [activeSection, setActiveSection] =
-    useState<
-      'screen-time' |
-      'content-filters' |
-      'activity-history' |
-      'kids-media' |
-      'profiles' |
-      'settings'
-    >('screen-time');
+  const [activeSection, setActiveSection] = useState<ParentSection>("screen-time");
 
-  const [mediaMode, setMediaMode] =
-    useState<'upload' | 'youtube'>('upload');
+  const [mediaMode, setMediaMode] = useState<"upload" | "youtube">("upload");
 
-  const [mediaTitle, setMediaTitle] =
-    useState('');
+  const [mediaTitle, setMediaTitle] = useState("");
 
-  const [mediaCategory, setMediaCategory] =
-    useState('Parent Upload');
+  const [mediaCategory, setMediaCategory] = useState("Parent Upload");
 
-  const [youtubeUrl, setYoutubeUrl] =
-    useState('');
+  const [youtubeUrl, setYoutubeUrl] = useState("");
 
-  const [videoFile, setVideoFile] =
-    useState<File | null>(null);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
 
-  const [selectedMediaChildIds, setSelectedMediaChildIds] =
-    useState<number[]>([]);
+  const [selectedMediaChildIds, setSelectedMediaChildIds] = useState<number[]>([]);
 
-  const [mediaSaving, setMediaSaving] =
-    useState(false);
+  const [mediaSaving, setMediaSaving] = useState(false);
 
-  const [mediaMessage, setMediaMessage] =
-    useState('');
+  const [mediaMessage, setMediaMessage] = useState("");
 
-  const [mediaError, setMediaError] =
-    useState('');
+  const [mediaError, setMediaError] = useState("");
 
-  const [deletingDatabaseChildId, setDeletingDatabaseChildId] =
-    useState<number | null>(null);
+  const [parentMediaItems, setParentMediaItems] = useState<ParentMediaItem[]>([]);
 
-  const [newBlockedChannel, setNewBlockedChannel] = useState('');
-  const [videoFilterQuery, setVideoFilterQuery] = useState('');
-  const [filterCategory, setFilterCategory] = useState('All');
+  const [parentMediaLoading, setParentMediaLoading] = useState(false);
 
-  const [newParentPin, setNewParentPin] =
-    useState(settings.parentPin || '1234');
+  const [parentMediaActionId, setParentMediaActionId] = useState<number | null>(null);
 
-  const [settingsMessage, setSettingsMessage] =
-    useState('');
+  const [editingMediaId, setEditingMediaId] = useState<number | null>(null);
 
-  const [editingProfileId, setEditingProfileId] =
-    useState<number | null>(null);
+  const [editingMediaTitle, setEditingMediaTitle] = useState("");
 
-  const [editProfileName, setEditProfileName] =
-    useState('');
+  const [editingMediaCategory, setEditingMediaCategory] = useState("");
 
-  const [editProfileAge, setEditProfileAge] =
-    useState(5);
+  const [deletingDatabaseChildId, setDeletingDatabaseChildId] = useState<number | null>(null);
 
-  const [editProfileEmoji, setEditProfileEmoji] =
-    useState('🦁');
+  const [newBlockedChannel, setNewBlockedChannel] = useState("");
+  const [videoFilterQuery, setVideoFilterQuery] = useState("");
+  const [filterCategory, setFilterCategory] = useState("All");
 
-  const [editProfileColor, setEditProfileColor] =
-    useState('#ffb703');
+  const [newParentPin, setNewParentPin] = useState(settings.parentPin || "1234");
 
-  const profileAvatarOptions = [
-    '🦁',
-    '🐼',
-    '🐰',
-    '🐻',
-    '🦊',
-  ];
+  const [settingsMessage, setSettingsMessage] = useState("");
 
-  const startEditingProfile = (
-    child: ManagedCustomProfile,
-  ) => {
+  const [editingProfileId, setEditingProfileId] = useState<number | null>(null);
+
+  const [editProfileName, setEditProfileName] = useState("");
+
+  const [editProfileAge, setEditProfileAge] = useState(5);
+
+  const [editProfileEmoji, setEditProfileEmoji] = useState("🦁");
+
+  const [editProfileColor, setEditProfileColor] = useState("#ffb703");
+
+  const profileAvatarOptions = ["🦁", "🐼", "🐰", "🐻", "🦊"];
+
+  const startEditingProfile = (child: ManagedCustomProfile) => {
     setEditingProfileId(child.id);
     setEditProfileName(child.name);
     setEditProfileAge(child.age ?? 5);
@@ -258,15 +251,11 @@ export default function ParentDashboard({
     setEditingProfileId(null);
   };
 
-  const saveEditedProfile = (
-    child: ManagedCustomProfile,
-  ) => {
+  const saveEditedProfile = (child: ManagedCustomProfile) => {
     const cleanName = editProfileName.trim();
 
     if (cleanName.length < 2) {
-      window.alert(
-        'Profile name must contain at least 2 characters.',
-      );
+      window.alert("Profile name must contain at least 2 characters.");
       return;
     }
 
@@ -283,9 +272,7 @@ export default function ParentDashboard({
 
   const loadWatchHistory = (): WatchHistoryItem[] => {
     try {
-      const saved = localStorage.getItem(
-        'sasa-watch-history',
-      );
+      const saved = localStorage.getItem("sasa-watch-history");
 
       if (!saved) {
         return [];
@@ -298,17 +285,14 @@ export default function ParentDashboard({
       }
 
       return parsed.filter(
-        (item): item is WatchHistoryItem =>
-          item &&
-          Number(item.profileId) === Number(profileId),
+        (item): item is WatchHistoryItem => item && Number(item.profileId) === Number(profileId),
       );
     } catch {
       return [];
     }
   };
 
-  const [watchHistory, setWatchHistory] =
-    useState<WatchHistoryItem[]>([]);
+  const [watchHistory, setWatchHistory] = useState<WatchHistoryItem[]>([]);
 
   useEffect(() => {
     setWatchHistory(loadWatchHistory());
@@ -322,13 +306,11 @@ export default function ParentDashboard({
     deviceLocked,
     blockedChannels,
     blockedVideoIds = [],
-    parentPin = '1234',
+    parentPin = "1234",
     requireParentPin = true,
   } = settings;
 
-  const updateSettings = (
-    changes: Partial<ParentControlSettings>,
-  ) => {
+  const updateSettings = (changes: Partial<ParentControlSettings>) => {
     onSettingsChange({
       ...settings,
       ...changes,
@@ -339,9 +321,7 @@ export default function ParentDashboard({
 
   const unblockChannel = (channelId: number) => {
     updateSettings({
-      blockedChannels: blockedChannels.filter(
-        (channel) => channel.id !== channelId,
-      ),
+      blockedChannels: blockedChannels.filter((channel) => channel.id !== channelId),
     });
   };
 
@@ -353,12 +333,11 @@ export default function ParentDashboard({
     }
 
     const alreadyBlocked = blockedChannels.some(
-      (channel) =>
-        channel.name.toLowerCase() === name.toLowerCase(),
+      (channel) => channel.name.toLowerCase() === name.toLowerCase(),
     );
 
     if (alreadyBlocked) {
-      setNewBlockedChannel('');
+      setNewBlockedChannel("");
       return;
     }
 
@@ -384,7 +363,7 @@ export default function ParentDashboard({
       ],
     });
 
-    setNewBlockedChannel('');
+    setNewBlockedChannel("");
   };
 
   const toggleVideoBlock = (videoId: number) => {
@@ -401,9 +380,7 @@ export default function ParentDashboard({
     const cleanPin = newParentPin.trim();
 
     if (!/^\d{4,6}$/.test(cleanPin)) {
-      setSettingsMessage(
-        'PIN must contain 4 to 6 numbers.',
-      );
+      setSettingsMessage("PIN must contain 4 to 6 numbers.");
       return;
     }
 
@@ -411,28 +388,21 @@ export default function ParentDashboard({
       parentPin: cleanPin,
     });
 
-    setSettingsMessage('Parent PIN saved.');
+    setSettingsMessage("Parent PIN saved.");
   };
 
   const resetScreenTimer = () => {
     if (profileId !== null) {
-      const expiryKey =
-        `sasa-screen-expiry-${profileId}`;
+      const expiryKey = `sasa-screen-expiry-${profileId}`;
 
       if (screenLimitEnabled) {
-        localStorage.setItem(
-          expiryKey,
-          String(
-            Date.now() +
-              screenMinutes * 60 * 1000,
-          ),
-        );
+        localStorage.setItem(expiryKey, String(Date.now() + screenMinutes * 60 * 1000));
       } else {
         localStorage.removeItem(expiryKey);
       }
     }
 
-    setSettingsMessage('Screen-time timer restarted.');
+    setSettingsMessage("Screen-time timer restarted.");
   };
 
   const resetAllParentSettings = () => {
@@ -445,36 +415,22 @@ export default function ParentDashboard({
     setNewParentPin(resetSettings.parentPin);
 
     if (profileId !== null) {
-      localStorage.removeItem(
-        `sasa-screen-expiry-${profileId}`,
-      );
+      localStorage.removeItem(`sasa-screen-expiry-${profileId}`);
     }
 
-    setSettingsMessage(
-      'Parental settings restored to defaults.',
-    );
+    setSettingsMessage("Parental settings restored to defaults.");
   };
 
   const clearWatchHistory = () => {
     try {
-      const saved = localStorage.getItem(
-        'sasa-watch-history',
-      );
+      const saved = localStorage.getItem("sasa-watch-history");
 
       const parsed = saved ? JSON.parse(saved) : [];
-      const allHistory = Array.isArray(parsed)
-        ? parsed
-        : [];
+      const allHistory = Array.isArray(parsed) ? parsed : [];
 
-      const remaining = allHistory.filter(
-        (item) =>
-          Number(item.profileId) !== Number(profileId),
-      );
+      const remaining = allHistory.filter((item) => Number(item.profileId) !== Number(profileId));
 
-      localStorage.setItem(
-        'sasa-watch-history',
-        JSON.stringify(remaining),
-      );
+      localStorage.setItem("sasa-watch-history", JSON.stringify(remaining));
 
       setWatchHistory([]);
     } catch {
@@ -484,112 +440,188 @@ export default function ParentDashboard({
 
   const toggleMediaChild = (childId: number) => {
     setSelectedMediaChildIds((current) =>
-      current.includes(childId)
-        ? current.filter((id) => id !== childId)
-        : [...current, childId],
+      current.includes(childId) ? current.filter((id) => id !== childId) : [...current, childId],
     );
   };
 
   const saveParentMedia = async () => {
-    setMediaError('');
-    setMediaMessage('');
+    setMediaError("");
+    setMediaMessage("");
 
     if (selectedMediaChildIds.length === 0) {
-      setMediaError(
-        'Select at least one child.',
-      );
+      setMediaError("Select at least one child.");
       return;
     }
 
     if (!mediaTitle.trim()) {
-      setMediaError(
-        'Enter a title.',
-      );
+      setMediaError("Enter a title.");
       return;
     }
 
-    if (mediaMode === 'upload' && !videoFile) {
-      setMediaError(
-        'Select a video file.',
-      );
+    if (mediaMode === "upload" && !mediaFile) {
+      setMediaError("Select a photo or video file.");
       return;
     }
 
-    if (
-      mediaMode === 'youtube' &&
-      !youtubeUrl.trim()
-    ) {
-      setMediaError(
-        'Enter a YouTube link.',
-      );
+    if (mediaMode === "youtube" && !youtubeUrl.trim()) {
+      setMediaError("Enter a YouTube link.");
       return;
     }
 
     setMediaSaving(true);
 
     try {
-      if (mediaMode === 'upload' && videoFile) {
-        await uploadParentVideo(
-          parentToken,
-          videoFile,
-          {
-            title: mediaTitle.trim(),
-            category:
-              mediaCategory.trim() ||
-              'Parent Upload',
-            childIds: selectedMediaChildIds,
-          },
-        );
+      if (mediaMode === "upload" && mediaFile) {
+        await uploadParentVideo(parentToken, mediaFile, {
+          title: mediaTitle.trim(),
+          category: mediaCategory.trim() || "Parent Upload",
+          childIds: selectedMediaChildIds,
+        });
       } else {
-        await addParentYoutubeVideo(
-          parentToken,
-          {
-            url: youtubeUrl.trim(),
-            title: mediaTitle.trim(),
-            category:
-              mediaCategory.trim() ||
-              'Parent Upload',
-            childIds: selectedMediaChildIds,
-          },
-        );
+        await addParentYoutubeVideo(parentToken, {
+          url: youtubeUrl.trim(),
+          title: mediaTitle.trim(),
+          category: mediaCategory.trim() || "Parent Upload",
+          childIds: selectedMediaChildIds,
+        });
       }
 
-      setMediaMessage(
-        `Media assigned to ${selectedMediaChildIds.length} child profile(s).`,
-      );
+      setMediaMessage(`Media assigned to ${selectedMediaChildIds.length} child profile(s).`);
 
-      setMediaTitle('');
-      setYoutubeUrl('');
-      setVideoFile(null);
+      setMediaTitle("");
+      setYoutubeUrl("");
+      setMediaFile(null);
       setSelectedMediaChildIds([]);
 
-      const fileInput =
-        document.getElementById(
-          'parent-video-file',
-        ) as HTMLInputElement | null;
+      await loadParentMedia();
+
+      const fileInput = document.getElementById("parent-media-file") as HTMLInputElement | null;
 
       if (fileInput) {
-        fileInput.value = '';
+        fileInput.value = "";
       }
 
       playSuccessSound();
     } catch (error) {
-      setMediaError(
-        error instanceof Error
-          ? error.message
-          : 'Unable to save media.',
-      );
+      setMediaError(error instanceof Error ? error.message : "Unable to save media.");
     } finally {
       setMediaSaving(false);
     }
   };
 
-  const removeDatabaseChild = async (
-    child: DatabaseChild,
-  ) => {
+  const loadParentMedia = async () => {
+    setParentMediaLoading(true);
+
+    try {
+      const items = await getParentMedia(parentToken);
+      setParentMediaItems(items);
+    } catch (error) {
+      setMediaError(error instanceof Error ? error.message : "Unable to load your media.");
+    } finally {
+      setParentMediaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSection === "kids-media" || activeSection === "content-filters") {
+      loadParentMedia();
+    }
+  }, [activeSection, parentToken]);
+
+  const startEditingParentMedia = (item: ParentMediaItem) => {
+    setEditingMediaId(item.id);
+    setEditingMediaTitle(item.title || item.original_name || "");
+    setEditingMediaCategory(item.category || "Parent Upload");
+    setMediaError("");
+    setMediaMessage("");
+  };
+
+  const saveParentMediaDetails = async (item: ParentMediaItem) => {
+    if (!editingMediaTitle.trim()) {
+      setMediaError("Enter a media title.");
+      return;
+    }
+
+    setParentMediaActionId(item.id);
+    setMediaError("");
+    setMediaMessage("");
+
+    try {
+      await updateParentMedia(parentToken, item.id, {
+        title: editingMediaTitle.trim(),
+        category: editingMediaCategory.trim() || "Parent Upload",
+      });
+
+      setEditingMediaId(null);
+      setMediaMessage("Media details updated.");
+      await loadParentMedia();
+      playSuccessSound();
+    } catch (error) {
+      setMediaError(error instanceof Error ? error.message : "Unable to update media.");
+    } finally {
+      setParentMediaActionId(null);
+    }
+  };
+
+  const setParentMediaChildren = async (item: ParentMediaItem, childIds: number[]) => {
+    setParentMediaActionId(item.id);
+    setMediaError("");
+    setMediaMessage("");
+
+    try {
+      await updateParentMediaAccess(parentToken, item.id, childIds);
+
+      setMediaMessage(
+        childIds.length > 0
+          ? `Media assigned to ${childIds.length} child profile(s).`
+          : "Media blocked from all children.",
+      );
+
+      await loadParentMedia();
+      playSuccessSound();
+    } catch (error) {
+      setMediaError(error instanceof Error ? error.message : "Unable to update child access.");
+    } finally {
+      setParentMediaActionId(null);
+    }
+  };
+
+  const toggleParentMediaChild = async (item: ParentMediaItem, childId: number) => {
+    const currentIds = item.access.map((entry) => Number(entry.child_id));
+
+    const nextIds = currentIds.includes(childId)
+      ? currentIds.filter((id) => id !== childId)
+      : [...currentIds, childId];
+
+    await setParentMediaChildren(item, nextIds);
+  };
+
+  const removeParentMediaItem = async (item: ParentMediaItem) => {
     const confirmed = window.confirm(
-      `Delete ${child.display_name}'s profile permanently?`,
+      `Delete "${item.title || item.original_name || "this media"}" permanently?`,
     );
+
+    if (!confirmed) return;
+
+    setParentMediaActionId(item.id);
+    setMediaError("");
+    setMediaMessage("");
+
+    try {
+      await deleteParentMedia(parentToken, item.id);
+
+      setMediaMessage("Media deleted.");
+      await loadParentMedia();
+      playSuccessSound();
+    } catch (error) {
+      setMediaError(error instanceof Error ? error.message : "Unable to delete media.");
+    } finally {
+      setParentMediaActionId(null);
+    }
+  };
+
+  const removeDatabaseChild = async (child: DatabaseChild) => {
+    const confirmed = window.confirm(`Delete ${child.display_name}'s profile permanently?`);
 
     if (!confirmed) {
       return;
@@ -598,31 +630,68 @@ export default function ParentDashboard({
     setDeletingDatabaseChildId(child.id);
 
     try {
-      await deleteChild(
-        parentToken,
-        child.id,
-      );
+      await deleteChild(parentToken, child.id);
 
-      localStorage.removeItem(
-        `sasa-child-image-${child.id}`,
-      );
+      localStorage.removeItem(`sasa-child-image-${child.id}`);
 
-      localStorage.removeItem(
-        `sasa-screen-expiry-${child.id}`,
-      );
+      localStorage.removeItem(`sasa-screen-expiry-${child.id}`);
 
       onDatabaseChildDeleted(child.id);
       playSuccessSound();
     } catch (error) {
-      window.alert(
-        error instanceof Error
-          ? error.message
-          : 'Unable to delete child profile.',
-      );
+      window.alert(error instanceof Error ? error.message : "Unable to delete child profile.");
     } finally {
       setDeletingDatabaseChildId(null);
     }
   };
+
+  const uploadedContentFilterItems = parentMediaItems.map((item) => {
+    const sourceValue = item.public_url || item.storage_path || "";
+
+    const youtubeMatch = sourceValue.match(
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{6,20})/,
+    );
+
+    const youtubeVideoId = youtubeMatch?.[1];
+
+    const assetUrl = getApiAssetUrl(sourceValue);
+
+    const videoPlaceholder = `data:image/svg+xml,${encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">
+            <defs>
+              <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#7c3aed"/>
+                <stop offset="100%" stop-color="#2563eb"/>
+              </linearGradient>
+            </defs>
+            <rect width="640" height="360" fill="url(#g)"/>
+            <circle cx="320" cy="170" r="62" fill="white" fill-opacity="0.95"/>
+            <polygon points="300,132 300,208 365,170" fill="#7c3aed"/>
+            <text x="320" y="292" text-anchor="middle"
+              font-family="Arial" font-size="28" font-weight="700"
+              fill="white">Uploaded Video</text>
+          </svg>
+        `)}`;
+
+    return {
+      id: 1000000 + Number(item.id),
+      title: item.title || item.original_name || "Uploaded Media",
+      category: item.category || (item.media_type === "photo" ? "Photos" : "Videos"),
+      image: youtubeVideoId
+        ? `https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg`
+        : item.media_type === "photo"
+          ? assetUrl
+          : videoPlaceholder,
+      duration: youtubeVideoId ? "YouTube" : item.media_type === "photo" ? "Photo" : "Video",
+    };
+  });
+
+  const contentFilterItems = [...uploadedContentFilterItems, ...kidsVideos];
+
+  const contentFilterCategories = [
+    "All",
+    ...Array.from(new Set(contentFilterItems.map((item) => item.category).filter(Boolean))),
+  ];
 
   return (
     <div className="parent-dashboard">
@@ -642,13 +711,11 @@ export default function ParentDashboard({
           <button
             type="button"
             className={
-              activeSection === 'screen-time'
-                ? 'parent-nav-item active'
-                : 'parent-nav-item'
+              activeSection === "screen-time" ? "parent-nav-item active" : "parent-nav-item"
             }
             onClick={() => {
               playPopSound();
-              setActiveSection('screen-time');
+              setActiveSection("screen-time");
             }}
           >
             <Clock3 size={26} />
@@ -658,13 +725,11 @@ export default function ParentDashboard({
           <button
             type="button"
             className={
-              activeSection === 'content-filters'
-                ? 'parent-nav-item active'
-                : 'parent-nav-item'
+              activeSection === "content-filters" ? "parent-nav-item active" : "parent-nav-item"
             }
             onClick={() => {
               playPopSound();
-              setActiveSection('content-filters');
+              setActiveSection("content-filters");
             }}
           >
             <Shield size={26} />
@@ -674,13 +739,11 @@ export default function ParentDashboard({
           <button
             type="button"
             className={
-              activeSection === 'kids-media'
-                ? 'parent-nav-item active'
-                : 'parent-nav-item'
+              activeSection === "kids-media" ? "parent-nav-item active" : "parent-nav-item"
             }
             onClick={() => {
               playPopSound();
-              setActiveSection('kids-media');
+              setActiveSection("kids-media");
             }}
           >
             <Film size={26} />
@@ -689,14 +752,10 @@ export default function ParentDashboard({
 
           <button
             type="button"
-            className={
-              activeSection === 'profiles'
-                ? 'parent-nav-item active'
-                : 'parent-nav-item'
-            }
+            className={activeSection === "profiles" ? "parent-nav-item active" : "parent-nav-item"}
             onClick={() => {
               playPopSound();
-              setActiveSection('profiles');
+              setActiveSection("profiles");
             }}
           >
             <span className="parent-nav-emoji">👨‍👩‍👧</span>
@@ -706,13 +765,11 @@ export default function ParentDashboard({
           <button
             type="button"
             className={
-              activeSection === 'activity-history'
-                ? 'parent-nav-item active'
-                : 'parent-nav-item'
+              activeSection === "activity-history" ? "parent-nav-item active" : "parent-nav-item"
             }
             onClick={() => {
               playPopSound();
-              setActiveSection('activity-history');
+              setActiveSection("activity-history");
             }}
           >
             <BarChart3 size={26} />
@@ -724,13 +781,13 @@ export default function ParentDashboard({
           <button
             type="button"
             className={
-              activeSection === 'settings'
-                ? 'parent-settings-button active'
-                : 'parent-settings-button'
+              activeSection === "settings"
+                ? "parent-settings-button active"
+                : "parent-settings-button"
             }
             onClick={() => {
               playPopSound();
-              setActiveSection('settings');
+              setActiveSection("settings");
             }}
           >
             <Settings size={21} />
@@ -753,17 +810,17 @@ export default function ParentDashboard({
       <main className="parent-dashboard-main">
         <header className="parent-desktop-header">
           <h1>
-            {activeSection === 'screen-time'
-              ? 'Screen Time Dashboard'
-              : activeSection === 'content-filters'
-                ? 'Content Filters'
-                : activeSection === 'activity-history'
-                  ? 'Activity & History'
-                  : activeSection === 'kids-media'
-                    ? 'Kids Media'
-                    : activeSection === 'profiles'
-                      ? 'Profile Management'
-                      : 'Parent Settings'}
+            {activeSection === "screen-time"
+              ? "Screen Time Dashboard"
+              : activeSection === "content-filters"
+                ? "Content Filters"
+                : activeSection === "activity-history"
+                  ? "Activity & History"
+                  : activeSection === "kids-media"
+                    ? "Kids Media"
+                    : activeSection === "profiles"
+                      ? "Profile Management"
+                      : "Parent Settings"}
           </h1>
 
           <div className="parent-account-area">
@@ -784,20 +841,20 @@ export default function ParentDashboard({
 
         <div className="parent-dashboard-content">
           <h2 className="parent-mobile-title">
-            {activeSection === 'screen-time'
-              ? 'Screen Time'
-              : activeSection === 'content-filters'
-                ? 'Content Filters'
-                : activeSection === 'activity-history'
-                  ? 'Activity & History'
-                  : activeSection === 'kids-media'
-                    ? 'Kids Media'
-                    : activeSection === 'profiles'
-                      ? 'Profiles'
-                      : 'Parent Settings'}
+            {activeSection === "screen-time"
+              ? "Screen Time"
+              : activeSection === "content-filters"
+                ? "Content Filters"
+                : activeSection === "activity-history"
+                  ? "Activity & History"
+                  : activeSection === "kids-media"
+                    ? "Kids Media"
+                    : activeSection === "profiles"
+                      ? "Profiles"
+                      : "Parent Settings"}
           </h2>
 
-          {activeSection === 'screen-time' && (
+          {activeSection === "screen-time" && (
             <div className="space-y-6 max-w-6xl mx-auto">
               {/* Daily Screen Time Control Card */}
               <section className="bg-white rounded-3xl p-6 sm:p-8 shadow-md border border-slate-100">
@@ -810,7 +867,8 @@ export default function ParentDashboard({
                       </h3>
                     </div>
                     <p className="text-slate-500 text-sm font-medium mt-1">
-                      Set maximum viewing time per day. App locks automatically when limit is reached.
+                      Set maximum viewing time per day. App locks automatically when limit is
+                      reached.
                     </p>
                   </div>
 
@@ -818,11 +876,11 @@ export default function ParentDashboard({
                     <span
                       className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${
                         screenLimitEnabled
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                          : 'bg-slate-100 text-slate-600 border border-slate-200'
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                          : "bg-slate-100 text-slate-600 border border-slate-200"
                       }`}
                     >
-                      {screenLimitEnabled ? `Active: ${formattedTime}` : 'Limit Disabled'}
+                      {screenLimitEnabled ? `Active: ${formattedTime}` : "Limit Disabled"}
                     </span>
 
                     <button
@@ -834,13 +892,13 @@ export default function ParentDashboard({
                         });
                       }}
                       className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        screenLimitEnabled ? 'bg-sky-500' : 'bg-slate-300'
+                        screenLimitEnabled ? "bg-sky-500" : "bg-slate-300"
                       }`}
                       aria-label="Toggle screen limit"
                     >
                       <span
                         className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                          screenLimitEnabled ? 'translate-x-6' : 'translate-x-0'
+                          screenLimitEnabled ? "translate-x-6" : "translate-x-0"
                         }`}
                       />
                     </button>
@@ -855,7 +913,7 @@ export default function ParentDashboard({
                         Target Daily Limit
                       </span>
                       <div className="text-4xl font-black text-sky-950 mt-0.5">
-                        {screenLimitEnabled ? formattedTime : 'Unlimited'}
+                        {screenLimitEnabled ? formattedTime : "Unlimited"}
                       </div>
                     </div>
 
@@ -928,8 +986,8 @@ export default function ParentDashboard({
                           type="button"
                           className={`py-2.5 px-3 rounded-xl font-extrabold text-xs sm:text-sm border transition-all ${
                             screenLimitEnabled && screenMinutes === minutes
-                              ? 'bg-sky-500 text-white border-sky-600 shadow-md scale-105'
-                              : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                              ? "bg-sky-500 text-white border-sky-600 shadow-md scale-105"
+                              : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
                           }`}
                           onClick={() => {
                             playPopSound();
@@ -942,8 +1000,8 @@ export default function ParentDashboard({
                           {minutes < 60
                             ? `${minutes} min`
                             : minutes === 60
-                              ? '1 hour'
-                              : `${Math.floor(minutes / 60)}h ${minutes % 60 ? (minutes % 60) + 'm' : ''}`}
+                              ? "1 hour"
+                              : `${Math.floor(minutes / 60)}h ${minutes % 60 ? (minutes % 60) + "m" : ""}`}
                         </button>
                       ))}
                     </div>
@@ -953,7 +1011,8 @@ export default function ParentDashboard({
                 <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 flex items-start gap-3">
                   <Info className="text-amber-600 shrink-0 mt-0.5" size={18} />
                   <p className="text-xs text-amber-900 font-medium">
-                    <strong>Timer behavior:</strong> The daily countdown activates when your child enters the kid profile and pauses when returning to the parent dashboard.
+                    <strong>Timer behavior:</strong> The daily countdown activates when your child
+                    enters the kid profile and pauses when returning to the parent dashboard.
                   </p>
                 </div>
               </section>
@@ -965,7 +1024,9 @@ export default function ParentDashboard({
                   <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
                     <div>
                       <h3 className="text-xl font-black text-slate-800">Weekly Usage Overview</h3>
-                      <p className="text-xs text-slate-500 font-medium">Total watch & play activity this week</p>
+                      <p className="text-xs text-slate-500 font-medium">
+                        Total watch & play activity this week
+                      </p>
                     </div>
                     <span className="px-3 py-1 bg-sky-50 text-sky-700 font-bold text-xs rounded-full border border-sky-200">
                       14h 25m total
@@ -1033,17 +1094,19 @@ export default function ParentDashboard({
                         }}
                         className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase transition ${
                           bedtimeEnabled
-                            ? 'bg-indigo-500 text-white'
-                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            ? "bg-indigo-500 text-white"
+                            : "bg-slate-800 text-slate-400 border border-slate-700"
                         }`}
                       >
-                        {bedtimeEnabled ? 'ACTIVE' : 'OFF'}
+                        {bedtimeEnabled ? "ACTIVE" : "OFF"}
                       </button>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 my-4">
                       <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700">
-                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Curfew Starts</span>
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase">
+                          Curfew Starts
+                        </span>
                         <input
                           type="time"
                           value={bedtimeStart}
@@ -1057,7 +1120,9 @@ export default function ParentDashboard({
                       </div>
 
                       <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700">
-                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Curfew Ends</span>
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase">
+                          Curfew Ends
+                        </span>
                         <input
                           type="time"
                           value={bedtimeEnd}
@@ -1084,12 +1149,15 @@ export default function ParentDashboard({
                       </div>
                       <div>
                         <h3 className="text-lg font-black text-rose-950">Dinner / Study Break</h3>
-                        <p className="text-xs text-rose-700 font-medium">Instantly lock app anytime</p>
+                        <p className="text-xs text-rose-700 font-medium">
+                          Instantly lock app anytime
+                        </p>
                       </div>
                     </div>
 
                     <p className="text-xs text-slate-600 mb-4 font-medium leading-relaxed">
-                      Need immediate attention for dinner, homework, or bedtime? Tap below to lock the video player instantly.
+                      Need immediate attention for dinner, homework, or bedtime? Tap below to lock
+                      the video player instantly.
                     </p>
 
                     <button
@@ -1100,8 +1168,8 @@ export default function ParentDashboard({
                       }}
                       className={`w-full py-3 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-md transition-all ${
                         deviceLocked
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                          : 'bg-rose-600 hover:bg-rose-700 text-white'
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          : "bg-rose-600 hover:bg-rose-700 text-white"
                       }`}
                     >
                       {deviceLocked ? (
@@ -1120,21 +1188,16 @@ export default function ParentDashboard({
             </div>
           )}
 
-          {activeSection === 'content-filters' && (
+          {activeSection === "content-filters" && (
             <section className="parent-content-filter-page">
               <article className="content-filter-card">
                 <div className="content-filter-card-heading">
                   <div>
                     <h2>Blocked Channels</h2>
-                    <p>
-                      Restricted channels will not appear
-                      in the child&apos;s view.
-                    </p>
+                    <p>Restricted channels will not appear in the child&apos;s view.</p>
                   </div>
 
-                  <strong>
-                    {blockedChannels.length} blocked
-                  </strong>
+                  <strong>{blockedChannels.length} blocked</strong>
                 </div>
 
                 <div className="channel-block-form">
@@ -1142,61 +1205,39 @@ export default function ParentDashboard({
                     type="text"
                     value={newBlockedChannel}
                     placeholder="Enter channel name to block"
-                    onChange={(event) =>
-                      setNewBlockedChannel(
-                        event.target.value,
-                      )
-                    }
+                    onChange={(event) => setNewBlockedChannel(event.target.value)}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
+                      if (event.key === "Enter") {
                         blockChannel();
                       }
                     }}
                   />
 
-                  <button
-                    type="button"
-                    onClick={blockChannel}
-                  >
+                  <button type="button" onClick={blockChannel}>
                     + Block
                   </button>
                 </div>
 
                 <div className="content-blocked-list">
                   {blockedChannels.map((channel) => (
-                    <div
-                      className="content-blocked-row"
-                      key={channel.id}
-                    >
+                    <div className="content-blocked-row" key={channel.id}>
                       <div className="content-blocked-info">
-                        <img
-                          src={channel.image}
-                          alt={channel.name}
-                        />
+                        <img src={channel.image} alt={channel.name} />
 
                         <div>
                           <h3>{channel.name}</h3>
-                          <span>
-                            Restricted by Parent
-                          </span>
+                          <span>Restricted by Parent</span>
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          unblockChannel(channel.id)
-                        }
-                      >
+                      <button type="button" onClick={() => unblockChannel(channel.id)}>
                         Unblock
                       </button>
                     </div>
                   ))}
 
                   {blockedChannels.length === 0 && (
-                    <div className="content-filter-empty">
-                      No channels are currently blocked.
-                    </div>
+                    <div className="content-filter-empty">No channels are currently blocked.</div>
                   )}
                 </div>
               </article>
@@ -1205,9 +1246,7 @@ export default function ParentDashboard({
                 <div className="content-filter-card-heading">
                   <div>
                     <h2>Video Catalog Management</h2>
-                    <p>
-                      Toggle block or allow status for individual cartoons & shows.
-                    </p>
+                    <p>Toggle block or allow status for individual cartoons & shows.</p>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1253,7 +1292,7 @@ export default function ParentDashboard({
                   </div>
 
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-                    {['All', 'Cartoons', 'Learning', 'Songs', 'Stories'].map((cat) => (
+                    {contentFilterCategories.map((cat) => (
                       <button
                         key={cat}
                         type="button"
@@ -1263,8 +1302,8 @@ export default function ParentDashboard({
                         }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
                           filterCategory === cat
-                            ? 'bg-sky-500 text-white shadow-sm'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? "bg-sky-500 text-white shadow-sm"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         }`}
                       >
                         {cat}
@@ -1274,13 +1313,13 @@ export default function ParentDashboard({
                 </div>
 
                 <div className="video-filter-grid">
-                  {kidsVideos
+                  {contentFilterItems
                     .filter((video) => {
                       const matchesSearch = video.title
                         .toLowerCase()
                         .includes(videoFilterQuery.toLowerCase());
                       const matchesCategory =
-                        filterCategory === 'All' ||
+                        filterCategory === "All" ||
                         video.category.toLowerCase().includes(filterCategory.toLowerCase());
                       return matchesSearch && matchesCategory;
                     })
@@ -1289,17 +1328,10 @@ export default function ParentDashboard({
 
                       return (
                         <div
-                          className={
-                            blocked
-                              ? 'video-filter-item blocked'
-                              : 'video-filter-item'
-                          }
+                          className={blocked ? "video-filter-item blocked" : "video-filter-item"}
                           key={video.id}
                         >
-                          <img
-                            src={video.image}
-                            alt={video.title}
-                          />
+                          <img src={video.image} alt={video.title} />
 
                           <div className="video-filter-details">
                             <h3>{video.title}</h3>
@@ -1308,17 +1340,13 @@ export default function ParentDashboard({
 
                           <button
                             type="button"
-                            className={
-                              blocked
-                                ? 'allow-video-button'
-                                : 'block-video-button'
-                            }
+                            className={blocked ? "allow-video-button" : "block-video-button"}
                             onClick={() => {
                               playPopSound();
                               toggleVideoBlock(video.id);
                             }}
                           >
-                            {blocked ? 'Allow' : 'Block'}
+                            {blocked ? "Allow" : "Block"}
                           </button>
                         </div>
                       );
@@ -1328,7 +1356,7 @@ export default function ParentDashboard({
             </section>
           )}
 
-          {activeSection === 'activity-history' && (
+          {activeSection === "activity-history" && (
             <section className="activity-history-page">
               <div className="activity-summary-grid">
                 <article className="activity-summary-card">
@@ -1342,15 +1370,7 @@ export default function ParentDashboard({
                 <article className="activity-summary-card">
                   <span>🎬</span>
                   <div>
-                    <strong>
-                      {
-                        new Set(
-                          watchHistory.map(
-                            (item) => item.videoId,
-                          ),
-                        ).size
-                      }
-                    </strong>
+                    <strong>{new Set(watchHistory.map((item) => item.videoId)).size}</strong>
                     <p>Unique videos</p>
                   </div>
                 </article>
@@ -1368,9 +1388,7 @@ export default function ParentDashboard({
                 <div className="activity-history-heading">
                   <div>
                     <h2>Watch History</h2>
-                    <p>
-                      Videos opened by {profileName}.
-                    </p>
+                    <p>Videos opened by {profileName}.</p>
                   </div>
 
                   <button
@@ -1386,22 +1404,13 @@ export default function ParentDashboard({
                   <div className="activity-history-empty">
                     <span>📺</span>
                     <h3>No watch history yet</h3>
-                    <p>
-                      Videos will appear here after the
-                      child opens them.
-                    </p>
+                    <p>Videos will appear here after the child opens them.</p>
                   </div>
                 ) : (
                   <div className="activity-history-list">
                     {watchHistory.map((item) => (
-                      <article
-                        className="activity-history-row"
-                        key={item.historyId}
-                      >
-                        <img
-                          src={item.image}
-                          alt={item.title}
-                        />
+                      <article className="activity-history-row" key={item.historyId}>
+                        <img src={item.image} alt={item.title} />
 
                         <div className="activity-history-details">
                           <h3>{item.title}</h3>
@@ -1412,11 +1421,7 @@ export default function ParentDashboard({
                           </div>
                         </div>
 
-                        <time>
-                          {new Date(
-                            item.watchedAt,
-                          ).toLocaleString()}
-                        </time>
+                        <time>{new Date(item.watchedAt).toLocaleString()}</time>
                       </article>
                     ))}
                   </div>
@@ -1425,7 +1430,7 @@ export default function ParentDashboard({
             </section>
           )}
 
-          {activeSection === 'kids-media' && (
+          {activeSection === "kids-media" && (
             <section className="max-w-5xl mx-auto space-y-6">
               <article className="bg-white rounded-3xl border border-slate-200 shadow-md p-4 sm:p-7">
                 <div className="flex flex-col gap-2 mb-6">
@@ -1440,7 +1445,7 @@ export default function ParentDashboard({
                       </h2>
 
                       <p className="text-sm text-slate-500 font-medium">
-                        Upload a video or add a YouTube link, then select who can see it.
+                        Upload a photo or video, or add a YouTube link, then select who can see it.
                       </p>
                     </div>
                   </div>
@@ -1449,23 +1454,23 @@ export default function ParentDashboard({
                 <div className="flex gap-2 mb-5">
                   <button
                     type="button"
-                    onClick={() => setMediaMode('upload')}
+                    onClick={() => setMediaMode("upload")}
                     className={`flex-1 py-3 px-4 rounded-2xl font-black text-sm transition ${
-                      mediaMode === 'upload'
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-slate-100 text-slate-700'
+                      mediaMode === "upload"
+                        ? "bg-purple-600 text-white"
+                        : "bg-slate-100 text-slate-700"
                     }`}
                   >
-                    Upload Video
+                    Upload Photo or Video
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setMediaMode('youtube')}
+                    onClick={() => setMediaMode("youtube")}
                     className={`flex-1 py-3 px-4 rounded-2xl font-black text-sm transition ${
-                      mediaMode === 'youtube'
-                        ? 'bg-red-600 text-white'
-                        : 'bg-slate-100 text-slate-700'
+                      mediaMode === "youtube"
+                        ? "bg-red-600 text-white"
+                        : "bg-slate-100 text-slate-700"
                     }`}
                   >
                     YouTube Link
@@ -1474,69 +1479,89 @@ export default function ParentDashboard({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="flex flex-col gap-2">
-                    <span className="text-sm font-black text-slate-700">
-                      Title
-                    </span>
+                    <span className="text-sm font-black text-slate-700">Title</span>
 
                     <input
                       type="text"
                       value={mediaTitle}
-                      onChange={(event) =>
-                        setMediaTitle(event.target.value)
-                      }
+                      onChange={(event) => setMediaTitle(event.target.value)}
                       placeholder="My child video"
                       className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-purple-400"
                     />
                   </label>
 
                   <label className="flex flex-col gap-2">
-                    <span className="text-sm font-black text-slate-700">
-                      Category
-                    </span>
+                    <span className="text-sm font-black text-slate-700">Category</span>
 
                     <input
                       type="text"
+                      list="parent-media-categories"
                       value={mediaCategory}
-                      onChange={(event) =>
-                        setMediaCategory(event.target.value)
-                      }
-                      placeholder="Parent Upload"
+                      onChange={(event) => setMediaCategory(event.target.value)}
+                      placeholder="Family, Learning, Holiday..."
                       className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-purple-400"
                     />
+
+                    <datalist id="parent-media-categories">
+                      <option value="Family" />
+                      <option value="Learning" />
+                      <option value="Holidays" />
+                      <option value="Cartoons" />
+                      <option value="Photos" />
+                      <option value="Videos" />
+                      <option value="Music" />
+                      <option value="Stories" />
+                    </datalist>
+
+                    <div className="flex flex-wrap gap-2">
+                      {["Family", "Learning", "Holidays", "Cartoons", "Photos", "Videos"].map(
+                        (category) => (
+                          <button
+                            key={category}
+                            type="button"
+                            onClick={() => {
+                              playPopSound();
+                              setMediaCategory(category);
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-xs font-black transition ${
+                              mediaCategory === category
+                                ? "bg-purple-600 text-white"
+                                : "bg-purple-100 text-purple-700 hover:bg-purple-200"
+                            }`}
+                          >
+                            {category}
+                          </button>
+                        ),
+                      )}
+                    </div>
                   </label>
                 </div>
 
                 <div className="mt-4">
-                  {mediaMode === 'upload' ? (
+                  {mediaMode === "upload" ? (
                     <label className="flex flex-col gap-2">
-                      <span className="text-sm font-black text-slate-700">
-                        Video file
-                      </span>
+                      <span className="text-sm font-black text-slate-700">Photo or video file</span>
 
                       <input
-                        id="parent-video-file"
+                        id="parent-media-file"
                         type="file"
-                        accept="video/*"
-                        onChange={(event) =>
-                          setVideoFile(
-                            event.target.files?.[0] || null,
-                          )
-                        }
+                        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+                        onChange={(event) => setMediaFile(event.target.files?.[0] || null)}
                         className="w-full rounded-2xl border border-dashed border-purple-300 bg-purple-50 px-4 py-4 text-sm"
                       />
+
+                      <span className="text-xs font-semibold text-slate-500">
+                        Photos: JPG, PNG, WEBP, GIF. Videos: MP4, WEBM, MOV.
+                      </span>
                     </label>
                   ) : (
                     <label className="flex flex-col gap-2">
-                      <span className="text-sm font-black text-slate-700">
-                        YouTube URL
-                      </span>
+                      <span className="text-sm font-black text-slate-700">YouTube URL</span>
 
                       <input
                         type="url"
                         value={youtubeUrl}
-                        onChange={(event) =>
-                          setYoutubeUrl(event.target.value)
-                        }
+                        onChange={(event) => setYoutubeUrl(event.target.value)}
                         placeholder="https://www.youtube.com/watch?v=..."
                         className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-red-400"
                       />
@@ -1546,28 +1571,22 @@ export default function ParentDashboard({
 
                 <div className="mt-6">
                   <div className="flex items-center justify-between gap-3 mb-3">
-                    <h3 className="font-black text-slate-900">
-                      Select children
-                    </h3>
+                    <h3 className="font-black text-slate-900">Select children</h3>
 
                     <button
                       type="button"
                       onClick={() =>
                         setSelectedMediaChildIds(
-                          selectedMediaChildIds.length ===
-                            databaseChildren.length
+                          selectedMediaChildIds.length === databaseChildren.length
                             ? []
-                            : databaseChildren.map(
-                                (child) => child.id,
-                              ),
+                            : databaseChildren.map((child) => child.id),
                         )
                       }
                       className="text-xs font-black text-purple-700"
                     >
-                      {selectedMediaChildIds.length ===
-                      databaseChildren.length
-                        ? 'Clear all'
-                        : 'Select all'}
+                      {selectedMediaChildIds.length === databaseChildren.length
+                        ? "Clear all"
+                        : "Select all"}
                     </button>
                   </div>
 
@@ -1578,26 +1597,21 @@ export default function ParentDashboard({
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {databaseChildren.map((child) => {
-                        const selected =
-                          selectedMediaChildIds.includes(
-                            child.id,
-                          );
+                        const selected = selectedMediaChildIds.includes(child.id);
 
                         return (
                           <button
                             type="button"
                             key={child.id}
-                            onClick={() =>
-                              toggleMediaChild(child.id)
-                            }
+                            onClick={() => toggleMediaChild(child.id)}
                             className={`flex items-center gap-3 rounded-2xl border-2 p-3 text-left transition ${
                               selected
-                                ? 'border-purple-600 bg-purple-50'
-                                : 'border-slate-200 bg-white'
+                                ? "border-purple-600 bg-purple-50"
+                                : "border-slate-200 bg-white"
                             }`}
                           >
                             <span className="w-11 h-11 rounded-full bg-sky-100 flex items-center justify-center text-xl shrink-0">
-                              {selected ? '✅' : '👤'}
+                              {selected ? "✅" : "👤"}
                             </span>
 
                             <span className="min-w-0">
@@ -1605,9 +1619,7 @@ export default function ParentDashboard({
                                 {child.display_name}
                               </strong>
 
-                              <small className="text-slate-500">
-                                Age {child.age ?? 'not set'}
-                              </small>
+                              <small className="text-slate-500">Age {child.age ?? "not set"}</small>
                             </span>
                           </button>
                         );
@@ -1630,42 +1642,253 @@ export default function ParentDashboard({
 
                 <button
                   type="button"
-                  disabled={
-                    mediaSaving ||
-                    databaseChildren.length === 0
-                  }
+                  disabled={mediaSaving || databaseChildren.length === 0}
                   onClick={saveParentMedia}
                   className="mt-5 w-full rounded-2xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-black py-3.5 px-5"
                 >
-                  {mediaSaving
-                    ? 'Saving...'
-                    : 'Save and Assign Media'}
+                  {mediaSaving ? "Saving..." : "Save and Assign Media"}
                 </button>
+              </article>
+
+              <article className="bg-white rounded-3xl border border-slate-200 shadow-md p-4 sm:p-7">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-900">
+                      My Uploaded Media
+                    </h2>
+
+                    <p className="text-sm text-slate-500 font-medium mt-1">
+                      Preview, edit, assign, block, or delete photos and videos you uploaded.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={parentMediaLoading}
+                    onClick={loadParentMedia}
+                    className="rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-50 px-4 py-2 text-sm font-black text-slate-700"
+                  >
+                    {parentMediaLoading ? "Refreshing..." : "Refresh"}
+                  </button>
+                </div>
+
+                {parentMediaLoading && parentMediaItems.length === 0 ? (
+                  <div className="rounded-2xl bg-slate-50 p-6 text-center font-bold text-slate-500">
+                    Loading your media...
+                  </div>
+                ) : parentMediaItems.length === 0 ? (
+                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-6 text-center">
+                    <span className="text-4xl">🖼️</span>
+                    <h3 className="mt-2 font-black text-slate-800">No uploaded media yet</h3>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Upload a photo, video, or YouTube link above.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {parentMediaItems.map((item) => {
+                      const assetValue = item.public_url || item.storage_path || "";
+
+                      const assetUrl = getApiAssetUrl(assetValue);
+
+                      const youtubeMatch = assetValue.match(
+                        /(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{6,20})/,
+                      );
+
+                      const youtubeVideoId = youtubeMatch?.[1];
+
+                      const assignedIds = item.access.map((entry) => Number(entry.child_id));
+
+                      const isBusy = parentMediaActionId === item.id;
+
+                      const isEditing = editingMediaId === item.id;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="rounded-3xl border border-slate-200 bg-slate-50 overflow-hidden"
+                        >
+                          <div className="aspect-video bg-slate-950 flex items-center justify-center overflow-hidden">
+                            {youtubeVideoId ? (
+                              <iframe
+                                className="w-full h-full"
+                                src={`https://www.youtube-nocookie.com/embed/${youtubeVideoId}?rel=0`}
+                                title={item.title || "YouTube video"}
+                                allowFullScreen
+                              />
+                            ) : item.media_type === "photo" ? (
+                              <img
+                                src={assetUrl}
+                                alt={item.title || item.original_name || "Uploaded photo"}
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <video
+                                src={assetUrl}
+                                controls
+                                playsInline
+                                preload="metadata"
+                                className="w-full h-full object-contain"
+                              >
+                                Your browser does not support video playback.
+                              </video>
+                            )}
+                          </div>
+
+                          <div className="p-4 space-y-4">
+                            {isEditing ? (
+                              <div className="space-y-3">
+                                <label className="block">
+                                  <span className="text-xs font-black text-slate-600">Title</span>
+                                  <input
+                                    type="text"
+                                    value={editingMediaTitle}
+                                    onChange={(event) => setEditingMediaTitle(event.target.value)}
+                                    className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-purple-400"
+                                  />
+                                </label>
+
+                                <label className="block">
+                                  <span className="text-xs font-black text-slate-600">
+                                    Category
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={editingMediaCategory}
+                                    onChange={(event) =>
+                                      setEditingMediaCategory(event.target.value)
+                                    }
+                                    className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-purple-400"
+                                  />
+                                </label>
+
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() => saveParentMediaDetails(item)}
+                                    className="flex-1 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-black py-2.5"
+                                  >
+                                    Save Details
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() => setEditingMediaId(null)}
+                                    className="rounded-xl bg-slate-200 hover:bg-slate-300 px-4 py-2.5 font-black text-slate-700"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <h3 className="font-black text-slate-900 truncate">
+                                      {item.title || item.original_name || "Untitled media"}
+                                    </h3>
+
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                      <span className="rounded-full bg-purple-100 text-purple-700 px-2.5 py-1 text-xs font-black">
+                                        {item.category || "Uncategorized"}
+                                      </span>
+
+                                      <span className="rounded-full bg-sky-100 text-sky-700 px-2.5 py-1 text-xs font-black capitalize">
+                                        {youtubeVideoId ? "YouTube" : item.media_type}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() => startEditingParentMedia(item)}
+                                    className="shrink-0 rounded-xl bg-slate-200 hover:bg-slate-300 px-3 py-2 text-xs font-black text-slate-700"
+                                  >
+                                    Edit
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            <div>
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <h4 className="text-sm font-black text-slate-800">Child Access</h4>
+
+                                <span className="text-xs font-bold text-slate-500">
+                                  {assignedIds.length} assigned
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {databaseChildren.map((child) => {
+                                  const assigned = assignedIds.includes(child.id);
+
+                                  return (
+                                    <button
+                                      key={child.id}
+                                      type="button"
+                                      disabled={isBusy}
+                                      onClick={() => toggleParentMediaChild(item, child.id)}
+                                      className={`rounded-xl border-2 px-3 py-2 text-left text-sm font-black transition disabled:opacity-50 ${
+                                        assigned
+                                          ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+                                          : "border-slate-200 bg-white text-slate-600"
+                                      }`}
+                                    >
+                                      {assigned ? "✅ " : "🚫 "}
+                                      {child.display_name}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {assignedIds.length > 0 && (
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => setParentMediaChildren(item, [])}
+                                  className="mt-3 w-full rounded-xl bg-amber-100 hover:bg-amber-200 disabled:opacity-50 text-amber-900 font-black py-2.5 text-sm"
+                                >
+                                  Block From All Children
+                                </button>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => removeParentMediaItem(item)}
+                              className="w-full rounded-xl bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 font-black py-2.5 text-sm"
+                            >
+                              {isBusy ? "Working..." : "Delete Media"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </article>
             </section>
           )}
 
-          {activeSection === 'profiles' && (
+          {activeSection === "profiles" && (
             <section className="profile-management-page">
               <div className="profile-management-heading">
                 <div>
                   <h2>Child Profiles</h2>
-                  <p>
-                    View built-in profiles and manage
-                    profiles created by the parent.
-                  </p>
+                  <p>View built-in profiles and manage profiles created by the parent.</p>
                 </div>
 
-                <strong>
-                  {3 + customProfiles.length} profiles
-                </strong>
+                <strong>{3 + customProfiles.length} profiles</strong>
               </div>
 
               <article className="bg-white rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6 mb-6">
                 <div className="mb-4">
-                  <h3 className="text-lg font-black text-slate-900">
-                    Database Child Profiles
-                  </h3>
+                  <h3 className="text-lg font-black text-slate-900">Database Child Profiles</h3>
 
                   <p className="text-sm text-slate-500">
                     These profiles belong to the logged-in parent account.
@@ -1693,18 +1916,14 @@ export default function ParentDashboard({
                           </strong>
 
                           <span className="text-xs text-slate-500">
-                            {child.login_name || 'No login name'}
+                            {child.login_name || "No login name"}
                           </span>
                         </div>
 
                         <button
                           type="button"
-                          disabled={
-                            deletingDatabaseChildId === child.id
-                          }
-                          onClick={() =>
-                            removeDatabaseChild(child)
-                          }
+                          disabled={deletingDatabaseChildId === child.id}
+                          onClick={() => removeDatabaseChild(child)}
                           className="w-10 h-10 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 flex items-center justify-center disabled:opacity-50"
                           title={`Delete ${child.display_name}`}
                         >
@@ -1720,33 +1939,30 @@ export default function ParentDashboard({
                 {[
                   {
                     id: 1,
-                    name: 'Leo',
-                    emoji: '🦁',
-                    color: '#ffa62b',
+                    name: "Leo",
+                    emoji: "🦁",
+                    color: "#ffa62b",
                     image:
-                      'https://lh3.googleusercontent.com/aida-public/AB6AXuBXKmBbTEschT2fVlXzamCeETx0M3rctPouvJQ6jyWboczUe-WXt302CDJtMx5T_L9-zEaxhM_vxlITgSZt9_ApPXqHF9Vx39tEHo5gDXRFuGHRZ_rrEz6fOH5KlalMKiv82rUKm_4IRONsQ-wF064xYk_0ZIzAijLaovdE2H-qhe86S9qU1K70VcVvqOQ7GxR9ujHTTCg5GPHGI4VYoTLTPpwFitUSQ7JP8kSUjWRij6OOEIBXNKbLcaKkBrH4y-J_4PM1zmklxnA',
+                      "https://lh3.googleusercontent.com/aida-public/AB6AXuBXKmBbTEschT2fVlXzamCeETx0M3rctPouvJQ6jyWboczUe-WXt302CDJtMx5T_L9-zEaxhM_vxlITgSZt9_ApPXqHF9Vx39tEHo5gDXRFuGHRZ_rrEz6fOH5KlalMKiv82rUKm_4IRONsQ-wF064xYk_0ZIzAijLaovdE2H-qhe86S9qU1K70VcVvqOQ7GxR9ujHTTCg5GPHGI4VYoTLTPpwFitUSQ7JP8kSUjWRij6OOEIBXNKbLcaKkBrH4y-J_4PM1zmklxnA",
                   },
                   {
                     id: 2,
-                    name: 'Poppy',
-                    emoji: '🐼',
-                    color: '#95d5b2',
+                    name: "Poppy",
+                    emoji: "🐼",
+                    color: "#95d5b2",
                     image:
-                      'https://lh3.googleusercontent.com/aida-public/AB6AXuCONd4umMhgrulZ5f-ZZt2Uuy9-ach-KvWVrVKGmgiL58eNixQ0RjTvy4dEfDeZ1J7AjEKiLqrUKdXuuqdwFo-IF87mvFkdWZwpDs4hfs2FGU19CtmN6-k04UQXX4ibVERtYQS4ejdOmmIu6QKvrqVw2lGKdJHCiNNzzQGpdSP3Zir5sHO0B2Dt0_hf7PLpsbxeTuzJbU0-bxuCDZ2egbgYTHvpvt7p7Nl-GMz8P2cZlpqKbDqaybqBQFAYBqN6KlDGvQr8Yd7diDQ',
+                      "https://lh3.googleusercontent.com/aida-public/AB6AXuCONd4umMhgrulZ5f-ZZt2Uuy9-ach-KvWVrVKGmgiL58eNixQ0RjTvy4dEfDeZ1J7AjEKiLqrUKdXuuqdwFo-IF87mvFkdWZwpDs4hfs2FGU19CtmN6-k04UQXX4ibVERtYQS4ejdOmmIu6QKvrqVw2lGKdJHCiNNzzQGpdSP3Zir5sHO0B2Dt0_hf7PLpsbxeTuzJbU0-bxuCDZ2egbgYTHvpvt7p7Nl-GMz8P2cZlpqKbDqaybqBQFAYBqN6KlDGvQr8Yd7diDQ",
                   },
                   {
                     id: 3,
-                    name: 'Ruby',
-                    emoji: '🐰',
-                    color: '#ff8fa3',
+                    name: "Ruby",
+                    emoji: "🐰",
+                    color: "#ff8fa3",
                     image:
-                      'https://lh3.googleusercontent.com/aida-public/AB6AXuBSpgsSIXN0d0LIyQMwB5SQbDUf6iitsVRQwTNbcaYYxamCvTLMt2omcQa9RPFVNaWlGDX2OTgHS9ZHHumfzn4jTOqF8IM0wzwTvI6lEkYLR5e4j1moqa0_Wrartxg-46lIyoXuBdsEFX9pa7gJgLs0L0SshcnaM8a_OnasZM-Uogwwpf5DOLftEcb2sg4fUl5uLX5o-g-g9wxt8QgqtmJ1Zii35Iibp-f7PH3ACFzlM57Cuf4m8MVAwA0J5c_n1YsiT4-gFfBgNg0',
+                      "https://lh3.googleusercontent.com/aida-public/AB6AXuBSpgsSIXN0d0LIyQMwB5SQbDUf6iitsVRQwTNbcaYYxamCvTLMt2omcQa9RPFVNaWlGDX2OTgHS9ZHHumfzn4jTOqF8IM0wzwTvI6lEkYLR5e4j1moqa0_Wrartxg-46lIyoXuBdsEFX9pa7gJgLs0L0SshcnaM8a_OnasZM-Uogwwpf5DOLftEcb2sg4fUl5uLX5o-g-g9wxt8QgqtmJ1Zii35Iibp-f7PH3ACFzlM57Cuf4m8MVAwA0J5c_n1YsiT4-gFfBgNg0",
                   },
                 ].map((child) => (
-                  <article
-                    key={child.id}
-                    className="profile-management-card"
-                  >
+                  <article key={child.id} className="profile-management-card">
                     <div
                       className="profile-management-avatar overflow-hidden"
                       style={{
@@ -1769,24 +1985,21 @@ export default function ParentDashboard({
                       <p>Built-in profile</p>
                     </div>
 
-                    <span className="profile-protected-badge">
-                      Protected
-                    </span>
+                    <span className="profile-protected-badge">Protected</span>
                   </article>
                 ))}
 
                 {customProfiles.map((child) => {
-                  const isEditing =
-                    editingProfileId === child.id;
-                  const photoUrl = child.avatarUrl || (child as any).image;
+                  const isEditing = editingProfileId === child.id;
+                  const photoUrl = child.avatarUrl || child.image;
 
                   return (
                     <article
                       key={child.id}
                       className={
                         child.isProtected
-                          ? 'profile-management-card protected'
-                          : 'profile-management-card'
+                          ? "profile-management-card protected"
+                          : "profile-management-card"
                       }
                     >
                       {isEditing ? (
@@ -1795,9 +2008,8 @@ export default function ParentDashboard({
                             <div
                               className="profile-management-avatar overflow-hidden"
                               style={{
-                                backgroundColor:
-                                  editProfileColor,
-                                }}
+                                backgroundColor: editProfileColor,
+                              }}
                             >
                               {photoUrl ? (
                                 <img
@@ -1817,11 +2029,7 @@ export default function ParentDashboard({
                               type="text"
                               maxLength={20}
                               value={editProfileName}
-                              onChange={(event) =>
-                                setEditProfileName(
-                                  event.target.value,
-                                )
-                              }
+                              onChange={(event) => setEditProfileName(event.target.value)}
                             />
                           </label>
 
@@ -1834,42 +2042,23 @@ export default function ParentDashboard({
                               value={editProfileAge}
                               onChange={(event) =>
                                 setEditProfileAge(
-                                  Math.min(
-                                    17,
-                                    Math.max(
-                                      2,
-                                      Number(
-                                        event.target.value,
-                                      ),
-                                    ),
-                                  ),
+                                  Math.min(17, Math.max(2, Number(event.target.value))),
                                 )
                               }
                             />
                           </label>
 
                           <div className="profile-edit-avatars">
-                            {profileAvatarOptions.map(
-                              (emoji) => (
-                                <button
-                                  key={emoji}
-                                  type="button"
-                                  className={
-                                    editProfileEmoji ===
-                                    emoji
-                                      ? 'selected'
-                                      : ''
-                                  }
-                                  onClick={() =>
-                                    setEditProfileEmoji(
-                                      emoji,
-                                    )
-                                  }
-                                >
-                                  {emoji}
-                                </button>
-                              ),
-                            )}
+                            {profileAvatarOptions.map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                className={editProfileEmoji === emoji ? "selected" : ""}
+                                onClick={() => setEditProfileEmoji(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
                           </div>
 
                           <label>
@@ -1877,11 +2066,7 @@ export default function ParentDashboard({
                             <input
                               type="color"
                               value={editProfileColor}
-                              onChange={(event) =>
-                                setEditProfileColor(
-                                  event.target.value,
-                                )
-                              }
+                              onChange={(event) => setEditProfileColor(event.target.value)}
                             />
                           </label>
 
@@ -1889,9 +2074,7 @@ export default function ParentDashboard({
                             <button
                               type="button"
                               className="profile-save-button"
-                              onClick={() =>
-                                saveEditedProfile(child)
-                              }
+                              onClick={() => saveEditedProfile(child)}
                             >
                               Save
                             </button>
@@ -1910,8 +2093,7 @@ export default function ParentDashboard({
                           <div
                             className="profile-management-avatar overflow-hidden"
                             style={{
-                              backgroundColor:
-                                child.color,
+                              backgroundColor: child.color,
                             }}
                           >
                             {photoUrl ? (
@@ -1929,31 +2111,20 @@ export default function ParentDashboard({
                             <h3>
                               {child.name}
                               {child.isProtected && (
-                                <span
-                                  className="profile-lock-icon"
-                                  title="Protected profile"
-                                >
+                                <span className="profile-lock-icon" title="Protected profile">
                                   🔒
                                 </span>
                               )}
                             </h3>
 
-                            <p>
-                              {child.age
-                                ? `Age ${child.age}`
-                                : 'Custom profile'}
-                            </p>
+                            <p>{child.age ? `Age ${child.age}` : "Custom profile"}</p>
                           </div>
 
                           <div className="profile-management-actions">
                             <button
                               type="button"
                               className="profile-edit-button"
-                              onClick={() =>
-                                startEditingProfile(
-                                  child,
-                                )
-                              }
+                              onClick={() => startEditingProfile(child)}
                             >
                               Edit
                             </button>
@@ -1961,39 +2132,24 @@ export default function ParentDashboard({
                             <button
                               type="button"
                               className="profile-protect-button"
-                              onClick={() =>
-                                onToggleProfileProtection(
-                                  child.id,
-                                )
-                              }
+                              onClick={() => onToggleProfileProtection(child.id)}
                             >
-                              {child.isProtected
-                                ? 'Unprotect'
-                                : 'Protect'}
+                              {child.isProtected ? "Unprotect" : "Protect"}
                             </button>
 
                             <button
                               type="button"
                               className="profile-delete-button"
-                              disabled={
-                                child.isProtected
-                              }
+                              disabled={child.isProtected}
                               onClick={() => {
-                                if (
-                                  child.isProtected
-                                ) {
+                                if (child.isProtected) {
                                   return;
                                 }
 
-                                const confirmed =
-                                  window.confirm(
-                                    `Delete ${child.name}'s profile?`,
-                                  );
+                                const confirmed = window.confirm(`Delete ${child.name}'s profile?`);
 
                                 if (confirmed) {
-                                  onDeleteCustomProfile(
-                                    child.id,
-                                  );
+                                  onDeleteCustomProfile(child.id);
                                 }
                               }}
                             >
@@ -2011,48 +2167,34 @@ export default function ParentDashboard({
                 <div className="profile-management-empty">
                   <span>➕</span>
                   <h3>No custom profiles yet</h3>
-                  <p>
-                    Custom profiles created from the
-                    profile-selection page will appear here.
-                  </p>
+                  <p>Custom profiles created from the profile-selection page will appear here.</p>
                 </div>
               )}
             </section>
           )}
 
-          {activeSection === 'settings' && (
+          {activeSection === "settings" && (
             <section className="parent-settings-page">
               <article className="parent-settings-card">
                 <div className="parent-settings-heading">
                   <div>
                     <h2>Parent Access</h2>
-                    <p>
-                      Protect parental controls with a
-                      private numeric PIN.
-                    </p>
+                    <p>Protect parental controls with a private numeric PIN.</p>
                   </div>
                 </div>
 
                 <label className="parent-settings-toggle-row">
                   <div>
                     <strong>Require Parent PIN</strong>
-                    <span>
-                      Ask for the PIN before opening the
-                      parent dashboard.
-                    </span>
+                    <span>Ask for the PIN before opening the parent dashboard.</span>
                   </div>
 
                   <button
                     type="button"
-                    className={
-                      requireParentPin
-                        ? 'parent-switch enabled'
-                        : 'parent-switch'
-                    }
+                    className={requireParentPin ? "parent-switch enabled" : "parent-switch"}
                     onClick={() =>
                       updateSettings({
-                        requireParentPin:
-                          !requireParentPin,
+                        requireParentPin: !requireParentPin,
                       })
                     }
                   >
@@ -2070,23 +2212,15 @@ export default function ParentDashboard({
                       maxLength={6}
                       value={newParentPin}
                       onChange={(event) => {
-                        setNewParentPin(
-                          event.target.value.replace(
-                            /\D/g,
-                            '',
-                          ),
-                        );
+                        setNewParentPin(event.target.value.replace(/\D/g, ""));
 
-                        setSettingsMessage('');
+                        setSettingsMessage("");
                       }}
                       placeholder="4 to 6 numbers"
                     />
                   </label>
 
-                  <button
-                    type="button"
-                    onClick={saveParentPin}
-                  >
+                  <button type="button" onClick={saveParentPin}>
                     Save PIN
                   </button>
                 </div>
@@ -2096,10 +2230,7 @@ export default function ParentDashboard({
                 <div className="parent-settings-heading">
                   <div>
                     <h2>Screen-Time Tools</h2>
-                    <p>
-                      Restart the current child&apos;s
-                      screen-time allowance.
-                    </p>
+                    <p>Restart the current child&apos;s screen-time allowance.</p>
                   </div>
                 </div>
 
@@ -2116,10 +2247,7 @@ export default function ParentDashboard({
                 <div className="parent-settings-heading">
                   <div>
                     <h2>Reset Parental Settings</h2>
-                    <p>
-                      Restore screen time, bedtime,
-                      filters and PIN to their defaults.
-                    </p>
+                    <p>Restore screen time, bedtime, filters and PIN to their defaults.</p>
                   </div>
                 </div>
 
@@ -2132,11 +2260,7 @@ export default function ParentDashboard({
                 </button>
               </article>
 
-              {settingsMessage && (
-                <div className="parent-settings-message">
-                  {settingsMessage}
-                </div>
-              )}
+              {settingsMessage && <div className="parent-settings-message">{settingsMessage}</div>}
             </section>
           )}
         </div>
@@ -2158,27 +2282,19 @@ function MobileHeader({
   onSelectSection,
   onClose,
 }: {
-  activeSection: string;
-  onSelectSection: (
-    section:
-      | 'screen-time'
-      | 'content-filters'
-      | 'kids-media'
-      | 'activity-history'
-      | 'profiles'
-      | 'settings',
-  ) => void;
+  activeSection: ParentSection;
+  onSelectSection: (section: ParentSection) => void;
   onClose: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const sectionTitles: Record<string, string> = {
-    'screen-time': 'Screen Time',
-    'content-filters': 'Content Filters',
-    'kids-media': 'Kids Media',
-    profiles: 'Profiles',
-    'activity-history': 'Activity & History',
-    settings: 'Settings',
+    "screen-time": "Screen Time",
+    "content-filters": "Content Filters",
+    "kids-media": "Kids Media",
+    profiles: "Profiles",
+    "activity-history": "Activity & History",
+    settings: "Settings",
   };
 
   return (
@@ -2199,7 +2315,7 @@ function MobileHeader({
         <div className="flex items-center gap-2">
           <Shield className="text-sky-400" size={20} />
           <h1 className="text-base font-black tracking-tight text-white">
-            {sectionTitles[activeSection] || 'Parent Dashboard'}
+            {sectionTitles[activeSection] || "Parent Dashboard"}
           </h1>
         </div>
 
@@ -2221,18 +2337,24 @@ function MobileHeader({
         {menuOpen && (
           <motion.nav
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+            animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden mt-3 pt-3 border-t border-slate-800 space-y-1"
           >
-            {[
-              { id: 'screen-time', label: 'Screen Time', icon: Clock3 },
-              { id: 'content-filters', label: 'Content Filters', icon: Shield },
-              { id: 'kids-media', label: 'Kids Media', icon: Film },
-              { id: 'profiles', label: 'Profiles', icon: Users },
-              { id: 'activity-history', label: 'Activity & History', icon: BarChart3 },
-              { id: 'settings', label: 'Settings', icon: Settings },
-            ].map((tab) => {
+            {(
+              [
+                { id: "screen-time", label: "Screen Time", icon: Clock3 },
+                { id: "content-filters", label: "Content Filters", icon: Shield },
+                { id: "kids-media", label: "Kids Media", icon: Film },
+                { id: "profiles", label: "Profiles", icon: Users },
+                { id: "activity-history", label: "Activity & History", icon: BarChart3 },
+                { id: "settings", label: "Settings", icon: Settings },
+              ] satisfies Array<{
+                id: ParentSection;
+                label: string;
+                icon: typeof Clock3;
+              }>
+            ).map((tab) => {
               const Icon = tab.icon;
               const isActive = activeSection === tab.id;
               return (
@@ -2240,13 +2362,13 @@ function MobileHeader({
                   key={tab.id}
                   type="button"
                   onClick={() => {
-                    onSelectSection(tab.id as any);
+                    onSelectSection(tab.id);
                     setMenuOpen(false);
                   }}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition ${
                     isActive
-                      ? 'bg-sky-500 text-white shadow-md'
-                      : 'text-slate-300 hover:bg-slate-800'
+                      ? "bg-sky-500 text-white shadow-md"
+                      : "text-slate-300 hover:bg-slate-800"
                   }`}
                 >
                   <Icon size={18} />
@@ -2276,25 +2398,21 @@ function MobileBottomNavigation({
   activeSection,
   onSelectSection,
 }: {
-  activeSection: string;
-  onSelectSection: (
-    section:
-      | 'screen-time'
-      | 'content-filters'
-      | 'kids-media'
-      | 'activity-history'
-      | 'profiles'
-      | 'settings',
-  ) => void;
+  activeSection: ParentSection;
+  onSelectSection: (section: ParentSection) => void;
 }) {
   const tabs = [
-    { id: 'screen-time', label: 'Screen', icon: Clock3 },
-    { id: 'content-filters', label: 'Filters', icon: Shield },
-    { id: 'kids-media', label: 'Media', icon: Film },
-    { id: 'profiles', label: 'Profiles', icon: Users },
-    { id: 'activity-history', label: 'Activity', icon: BarChart3 },
-    { id: 'settings', label: 'Settings', icon: Settings },
-  ];
+    { id: "screen-time", label: "Screen", icon: Clock3 },
+    { id: "content-filters", label: "Filters", icon: Shield },
+    { id: "kids-media", label: "Media", icon: Film },
+    { id: "profiles", label: "Profiles", icon: Users },
+    { id: "activity-history", label: "Activity", icon: BarChart3 },
+    { id: "settings", label: "Settings", icon: Settings },
+  ] satisfies Array<{
+    id: ParentSection;
+    label: string;
+    icon: typeof Clock3;
+  }>;
 
   return (
     <nav className="parent-dashboard-bottom-nav fixed bottom-0 left-0 right-0 z-30 bg-slate-900 border-t border-slate-800 px-1 py-1.5 flex items-center justify-around md:hidden shadow-2xl">
@@ -2305,12 +2423,12 @@ function MobileBottomNavigation({
           <button
             key={tab.id}
             type="button"
-            onClick={() => onSelectSection(tab.id as any)}
+            onClick={() => onSelectSection(tab.id)}
             className={`min-w-0 flex-1 flex flex-col items-center justify-center py-1 px-0.5 rounded-xl transition ${
-              isActive ? 'text-sky-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
+              isActive ? "text-sky-400 font-extrabold" : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            <Icon size={20} className={isActive ? 'scale-110' : ''} />
+            <Icon size={20} className={isActive ? "scale-110" : ""} />
             <span className="text-[10px] mt-0.5 tracking-tight">{tab.label}</span>
           </button>
         );
@@ -2319,13 +2437,7 @@ function MobileBottomNavigation({
   );
 }
 
-function Legend({
-  colorClass,
-  label,
-}: {
-  colorClass: string;
-  label: string;
-}) {
+function Legend({ colorClass, label }: { colorClass: string; label: string }) {
   return (
     <div>
       <span className={`legend-color ${colorClass}`} />

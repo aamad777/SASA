@@ -1,7 +1,7 @@
-import { useState, type ReactNode, type MouseEvent } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import confetti from 'canvas-confetti';
-import { playPopSound, playSuccessSound } from '../lib/sound';
+import { useState, type ReactNode, type MouseEvent } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import confetti from "canvas-confetti";
+import { playPopSound, playSuccessSound } from "../lib/sound";
 
 type CustomProfile = {
   id: number;
@@ -15,13 +15,7 @@ type CustomProfile = {
 
 type ProfileSelectionProps = {
   customProfiles: CustomProfile[];
-  onSelectProfile: (
-    name: string,
-    emoji: string,
-    color: string,
-    id: number,
-    image?: string,
-  ) => void;
+  onSelectProfile: (name: string, emoji: string, color: string, id: number, image?: string) => void;
   onOpenParentalControls: () => void;
   onAddProfile: () => void;
 };
@@ -29,33 +23,33 @@ type ProfileSelectionProps = {
 const profiles = [
   {
     id: 1,
-    name: 'Leo',
-    emoji: '🦁',
-    color: '#ffa62b',
-    background: 'bg-orange-100',
-    nameColor: 'text-[#ffa62b]',
+    name: "Leo",
+    emoji: "🦁",
+    color: "#ffa62b",
+    background: "bg-orange-100",
+    nameColor: "text-[#ffa62b]",
     image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBXKmBbTEschT2fVlXzamCeETx0M3rctPouvJQ6jyWboczUe-WXt302CDJtMx5T_L9-zEaxhM_vxlITgSZt9_ApPXqHF9Vx39tEHo5gDXRFuGHRZ_rrEz6fOH5KlalMKiv82rUKm_4IRONsQ-wF064xYk_0ZIzAijLaovdE2H-qhe86S9qU1K70VcVvqOQ7GxR9ujHTTCg5GPHGI4VYoTLTPpwFitUSQ7JP8kSUjWRij6OOEIBXNKbLcaKkBrH4y-J_4PM1zmklxnA',
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBXKmBbTEschT2fVlXzamCeETx0M3rctPouvJQ6jyWboczUe-WXt302CDJtMx5T_L9-zEaxhM_vxlITgSZt9_ApPXqHF9Vx39tEHo5gDXRFuGHRZ_rrEz6fOH5KlalMKiv82rUKm_4IRONsQ-wF064xYk_0ZIzAijLaovdE2H-qhe86S9qU1K70VcVvqOQ7GxR9ujHTTCg5GPHGI4VYoTLTPpwFitUSQ7JP8kSUjWRij6OOEIBXNKbLcaKkBrH4y-J_4PM1zmklxnA",
   },
   {
     id: 2,
-    name: 'Poppy',
-    emoji: '🐼',
-    color: '#95d5b2',
-    background: 'bg-green-100',
-    nameColor: 'text-white',
+    name: "Poppy",
+    emoji: "🐼",
+    color: "#95d5b2",
+    background: "bg-green-100",
+    nameColor: "text-white",
     image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCONd4umMhgrulZ5f-ZZt2Uuy9-ach-KvWVrVKGmgiL58eNixQ0RjTvy4dEfDeZ1J7AjEKiLqrUKdXuuqdwFo-IF87mvFkdWZwpDs4hfs2FGU19CtmN6-k04UQXX4ibVERtYQS4ejdOmmIu6QKvrqVw2lGKdJHCiNNzzQGpdSP3Zir5sHO0B2Dt0_hf7PLpsbxeTuzJbU0-bxuCDZ2egbgYTHvpvt7p7Nl-GMz8P2cZlpqKbDqaybqBQFAYBqN6KlDGvQr8Yd7diDQ',
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuCONd4umMhgrulZ5f-ZZt2Uuy9-ach-KvWVrVKGmgiL58eNixQ0RjTvy4dEfDeZ1J7AjEKiLqrUKdXuuqdwFo-IF87mvFkdWZwpDs4hfs2FGU19CtmN6-k04UQXX4ibVERtYQS4ejdOmmIu6QKvrqVw2lGKdJHCiNNzzQGpdSP3Zir5sHO0B2Dt0_hf7PLpsbxeTuzJbU0-bxuCDZ2egbgYTHvpvt7p7Nl-GMz8P2cZlpqKbDqaybqBQFAYBqN6KlDGvQr8Yd7diDQ",
   },
   {
     id: 3,
-    name: 'Ruby',
-    emoji: '🐰',
-    color: '#ff8fa3',
-    background: 'bg-pink-100',
-    nameColor: 'text-[#ff8fa3]',
+    name: "Ruby",
+    emoji: "🐰",
+    color: "#ff8fa3",
+    background: "bg-pink-100",
+    nameColor: "text-[#ff8fa3]",
     image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBSpgsSIXN0d0LIyQMwB5SQbDUf6iitsVRQwTNbcaYYxamCvTLMt2omcQa9RPFVNaWlGDX2OTgHS9ZHHumfzn4jTOqF8IM0wzwTvI6lEkYLR5e4j1moqa0_Wrartxg-46lIyoXuBdsEFX9pa7gJgLs0L0SshcnaM8a_OnasZM-Uogwwpf5DOLftEcb2sg4fUl5uLX5o-g-g9wxt8QgqtmJ1Zii35Iibp-f7PH3ACFzlM57Cuf4m8MVAwA0J5c_n1YsiT4-gFfBgNg0',
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBSpgsSIXN0d0LIyQMwB5SQbDUf6iitsVRQwTNbcaYYxamCvTLMt2omcQa9RPFVNaWlGDX2OTgHS9ZHHumfzn4jTOqF8IM0wzwTvI6lEkYLR5e4j1moqa0_Wrartxg-46lIyoXuBdsEFX9pa7gJgLs0L0SshcnaM8a_OnasZM-Uogwwpf5DOLftEcb2sg4fUl5uLX5o-g-g9wxt8QgqtmJ1Zii35Iibp-f7PH3ACFzlM57Cuf4m8MVAwA0J5c_n1YsiT4-gFfBgNg0",
   },
 ];
 
@@ -88,10 +82,10 @@ export default function ProfileSelection({
       particleCount: 45,
       spread: 85,
       origin: { x, y },
-      colors: ['#ff8fa3', '#ffa62b', '#ffde59', '#95d5b2', '#8ecae6'],
+      colors: ["#ff8fa3", "#ffa62b", "#ffde59", "#95d5b2", "#8ecae6"],
     });
 
-    const numericId = typeof id === 'number' ? id : Number(id) || 0;
+    const numericId = typeof id === "number" ? id : Number(id) || 0;
 
     setTimeout(() => {
       onSelectProfile(name, emoji, color, numericId, image);
@@ -104,7 +98,7 @@ export default function ProfileSelection({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.4, ease: 'easeOut' }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
     >
       <div className="cloud cloud-one" />
       <div className="cloud cloud-two" />
@@ -163,9 +157,7 @@ export default function ProfileSelection({
           transition={{ duration: 0.3 }}
         >
           <h1 className="flex flex-col items-center text-5xl font-extrabold md:text-6xl">
-            <span className="kids-title-text -mb-2 text-[#8ecae6]">
-              Who&apos;s
-            </span>
+            <span className="kids-title-text -mb-2 text-[#8ecae6]">Who&apos;s</span>
 
             <span className="flex">
               <span className="kids-title-text text-[#ff8fa3]">W</span>
@@ -194,15 +186,17 @@ export default function ProfileSelection({
                   isSelected
                     ? { opacity: 1, scale: 1.18, y: -10 }
                     : isOtherSelected
-                    ? { opacity: 0.15, scale: 0.8, y: 10 }
-                    : { opacity: 1, scale: 1, y: 0 }
+                      ? { opacity: 0.15, scale: 0.8, y: 10 }
+                      : { opacity: 1, scale: 1, y: 0 }
                 }
                 transition={
                   isSelected
-                    ? { type: 'spring', stiffness: 320, damping: 22 }
-                    : { duration: 0.3, ease: 'easeInOut', delay: idx * 0.06 }
+                    ? { type: "spring", stiffness: 320, damping: 22 }
+                    : { duration: 0.3, ease: "easeInOut", delay: idx * 0.06 }
                 }
-                whileHover={selectingId === null ? { scale: 1.1, rotate: idx % 2 === 0 ? 3 : -3 } : undefined}
+                whileHover={
+                  selectingId === null ? { scale: 1.1, rotate: idx % 2 === 0 ? 3 : -3 } : undefined
+                }
                 whileTap={selectingId === null ? { scale: 0.92 } : undefined}
                 type="button"
                 className="group flex flex-col items-center gap-3 relative cursor-pointer"
@@ -218,12 +212,20 @@ export default function ProfileSelection({
                 }
               >
                 <div className="relative">
-                  {(profile.name === 'Leo' || isSelected) && (
+                  {(profile.name === "Leo" || isSelected) && (
                     <motion.div
-                      animate={isSelected ? { scale: [1, 1.3, 1.18], opacity: [0.6, 1, 0.8] } : { scale: 1.1, opacity: 0.5 }}
-                      transition={isSelected ? { repeat: Infinity, duration: 1.2, ease: 'easeInOut' } : { duration: 0.3 }}
+                      animate={
+                        isSelected
+                          ? { scale: [1, 1.3, 1.18], opacity: [0.6, 1, 0.8] }
+                          : { scale: 1.1, opacity: 0.5 }
+                      }
+                      transition={
+                        isSelected
+                          ? { repeat: Infinity, duration: 1.2, ease: "easeInOut" }
+                          : { duration: 0.3 }
+                      }
                       className={`leo-halo absolute inset-0 rounded-full blur-md ${
-                        isSelected ? 'bg-amber-400 scale-125' : 'bg-amber-200/50 scale-110'
+                        isSelected ? "bg-amber-400 scale-125" : "bg-amber-200/50 scale-110"
                       }`}
                     />
                   )}
@@ -231,8 +233,8 @@ export default function ProfileSelection({
                   <div
                     className={`relative z-10 h-24 w-24 sm:h-32 sm:w-32 overflow-hidden rounded-full border-4 ${
                       isSelected
-                        ? 'border-amber-300 shadow-[0_0_35px_rgba(251,191,36,0.9)] ring-4 ring-amber-400/50'
-                        : 'border-white shadow-xl'
+                        ? "border-amber-300 shadow-[0_0_35px_rgba(251,191,36,0.9)] ring-4 ring-amber-400/50"
+                        : "border-white shadow-xl"
                     } transition-all duration-300 ${profile.background}`}
                   >
                     <img
@@ -265,13 +267,13 @@ export default function ProfileSelection({
                   isSelected
                     ? { opacity: 1, scale: 1.18, y: -10 }
                     : isOtherSelected
-                    ? { opacity: 0.15, scale: 0.8, y: 10 }
-                    : { opacity: 1, scale: 1, y: 0 }
+                      ? { opacity: 0.15, scale: 0.8, y: 10 }
+                      : { opacity: 1, scale: 1, y: 0 }
                 }
                 transition={
                   isSelected
-                    ? { type: 'spring', stiffness: 320, damping: 22 }
-                    : { duration: 0.3, ease: 'easeInOut', delay: (profiles.length + idx) * 0.06 }
+                    ? { type: "spring", stiffness: 320, damping: 22 }
+                    : { duration: 0.3, ease: "easeInOut", delay: (profiles.length + idx) * 0.06 }
                 }
                 whileHover={selectingId === null ? { scale: 1.1, rotate: -2 } : undefined}
                 whileTap={selectingId === null ? { scale: 0.92 } : undefined}
@@ -292,7 +294,7 @@ export default function ProfileSelection({
                   {isSelected && (
                     <motion.div
                       animate={{ scale: [1, 1.3, 1.18], opacity: [0.6, 1, 0.8] }}
-                      transition={{ repeat: Infinity, duration: 1.2, ease: 'easeInOut' }}
+                      transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
                       className="absolute inset-0 rounded-full blur-md bg-purple-400 scale-125"
                     />
                   )}
@@ -300,8 +302,8 @@ export default function ProfileSelection({
                   <div
                     className={`relative z-10 grid h-24 w-24 sm:h-32 sm:w-32 place-items-center overflow-hidden rounded-full border-4 ${
                       isSelected
-                        ? 'border-amber-300 shadow-[0_0_35px_rgba(251,191,36,0.9)] ring-4 ring-amber-400/50'
-                        : 'border-white shadow-xl'
+                        ? "border-amber-300 shadow-[0_0_35px_rgba(251,191,36,0.9)] ring-4 ring-amber-400/50"
+                        : "border-white shadow-xl"
                     } transition-all duration-300`}
                     style={{ backgroundColor: profile.color }}
                   >
@@ -334,7 +336,11 @@ export default function ProfileSelection({
                 ? { opacity: 0.15, scale: 0.8, y: 10 }
                 : { opacity: 1, scale: 1, y: 0 }
             }
-            transition={{ duration: 0.3, ease: 'easeInOut', delay: (profiles.length + customProfiles.length) * 0.06 }}
+            transition={{
+              duration: 0.3,
+              ease: "easeInOut",
+              delay: (profiles.length + customProfiles.length) * 0.06,
+            }}
             whileHover={selectingId === null ? { scale: 1.08 } : undefined}
             whileTap={selectingId === null ? { scale: 0.92 } : undefined}
             type="button"
@@ -409,11 +415,7 @@ function BottomNavigation() {
       </NavigationItem>
 
       <NavigationItem label="Profile" color="text-[#ffa62b]" active>
-        <svg
-          className="h-7 w-7"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg className="h-7 w-7" fill="currentColor" viewBox="0 0 24 24">
           <path
             fillRule="evenodd"
             clipRule="evenodd"
@@ -438,18 +440,12 @@ function NavigationItem({
 }) {
   return (
     <button type="button" className="flex flex-col items-center gap-1">
-      <div
-        className={`${color} ${
-          active ? 'rounded-full ring-4 ring-[#ffa62b]/20' : ''
-        }`}
-      >
+      <div className={`${color} ${active ? "rounded-full ring-4 ring-[#ffa62b]/20" : ""}`}>
         {children}
       </div>
 
       <span
-        className={`text-xs font-bold uppercase ${
-          active ? 'text-[#ffa62b]' : 'text-[#9a9a9a]'
-        }`}
+        className={`text-xs font-bold uppercase ${active ? "text-[#ffa62b]" : "text-[#9a9a9a]"}`}
       >
         {label}
       </span>

@@ -2,7 +2,7 @@
 let audioCtx: AudioContext | null = null;
 
 function getAudioContext(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
   if (!audioCtx) {
     const AudioContextClass =
       window.AudioContext ||
@@ -11,7 +11,7 @@ function getAudioContext(): AudioContext | null {
       audioCtx = new AudioContextClass();
     }
   }
-  if (audioCtx && audioCtx.state === 'suspended') {
+  if (audioCtx && audioCtx.state === "suspended") {
     audioCtx.resume().catch(() => {});
   }
   return audioCtx;
@@ -19,7 +19,7 @@ function getAudioContext(): AudioContext | null {
 
 export function isSoundEnabled(): boolean {
   try {
-    return localStorage.getItem('sasa-sound-enabled') !== 'false';
+    return localStorage.getItem("sasa-sound-enabled") !== "false";
   } catch {
     return true;
   }
@@ -27,7 +27,7 @@ export function isSoundEnabled(): boolean {
 
 export function setSoundEnabled(enabled: boolean): void {
   try {
-    localStorage.setItem('sasa-sound-enabled', String(enabled));
+    localStorage.setItem("sasa-sound-enabled", String(enabled));
   } catch {
     // Ignore storage error
   }
@@ -43,7 +43,7 @@ export function playPopSound(): void {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
-    osc.type = 'sine';
+    osc.type = "sine";
     const now = ctx.currentTime;
     osc.frequency.setValueAtTime(320, now);
     osc.frequency.exponentialRampToValueAtTime(780, now + 0.08);
@@ -72,7 +72,7 @@ export function playHeartSound(): void {
     [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'triangle';
+      osc.type = "triangle";
       osc.frequency.setValueAtTime(freq, now + i * 0.05);
 
       gain.gain.setValueAtTime(0.15, now + i * 0.05);
@@ -100,7 +100,7 @@ export function playSuccessSound(): void {
     [440, 554.37, 659.25, 880].forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'sine';
+      osc.type = "sine";
       osc.frequency.setValueAtTime(freq, now + i * 0.07);
 
       gain.gain.setValueAtTime(0.2, now + i * 0.07);

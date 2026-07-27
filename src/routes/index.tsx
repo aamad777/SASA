@@ -1,18 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import AddProfile, {
-  type CreatedProfile,
-} from "@/components/AddProfile";
+import AddProfile, { type CreatedProfile } from "@/components/AddProfile";
 import DeviceLocked from "@/components/DeviceLocked";
 import DatabaseProfileSelection, {
   getDatabaseProfileColor,
   getDatabaseProfileEmoji,
 } from "@/components/DatabaseProfileSelection";
-import KidsVideoHome, {
-  type KidsHomeTab,
-  type KidsVideoItem,
-} from "@/components/KidsVideoHome";
+import KidsVideoHome, { type KidsHomeTab, type KidsVideoItem } from "@/components/KidsVideoHome";
 import KidsVideoPlayer from "@/components/KidsVideoPlayer";
 import ParentalGate from "@/components/ParentalGate";
 import ParentLogin from "@/components/ParentLogin";
@@ -32,9 +27,7 @@ import {
   type DatabaseChild,
 } from "@/lib/api";
 
-export const Route = createFileRoute("/")(
-  { component: SasaApp }
-);
+export const Route = createFileRoute("/")({ component: SasaApp });
 
 type Profile = {
   id: number;
@@ -50,8 +43,7 @@ function getAccountRoleFromToken(token: string | null): "parent" | "admin" {
     const parts = token.split(".");
     if (parts.length !== 3) return "parent";
     const normalizedPayload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const paddedPayload =
-      normalizedPayload + "=".repeat((4 - (normalizedPayload.length % 4)) % 4);
+    const paddedPayload = normalizedPayload + "=".repeat((4 - (normalizedPayload.length % 4)) % 4);
     const payload = JSON.parse(window.atob(paddedPayload));
     return payload.role === "admin" ? "admin" : "parent";
   } catch {
@@ -72,21 +64,17 @@ function getStorageItem(key: string): string | null {
 
 function SasaApp() {
   const [parentToken, setParentToken] = useState<string | null>(() =>
-    getStorageItem("sasa-parent-token")
+    getStorageItem("sasa-parent-token"),
   );
 
   const [guestMode, setGuestMode] = useState(() => {
-    const savedParentToken =
-      getStorageItem("sasa-parent-token");
+    const savedParentToken = getStorageItem("sasa-parent-token");
 
-    return (
-      !savedParentToken &&
-      getStorageItem("sasa-account-mode") === "guest"
-    );
+    return !savedParentToken && getStorageItem("sasa-account-mode") === "guest";
   });
 
-  const [parentName, setParentName] = useState(() =>
-    getStorageItem("sasa-parent-name") || "Parent"
+  const [parentName, setParentName] = useState(
+    () => getStorageItem("sasa-parent-name") || "Parent",
   );
 
   const [databaseChildren, setDatabaseChildren] = useState<DatabaseChild[]>([]);
@@ -111,7 +99,7 @@ function SasaApp() {
       setDatabaseChildren(children);
     } catch (error) {
       setDatabaseChildrenError(
-        error instanceof Error ? error.message : "Unable to load child profiles."
+        error instanceof Error ? error.message : "Unable to load child profiles.",
       );
     } finally {
       setDatabaseChildrenLoading(false);
@@ -124,90 +112,80 @@ function SasaApp() {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [selectedKidsVideo, setSelectedKidsVideo] = useState<KidsVideoItem | null>(null);
-  const [assignedVideos, setAssignedVideos] =
-    useState<KidsVideoItem[]>([]);
+  const [assignedVideos, setAssignedVideos] = useState<KidsVideoItem[]>([]);
 
-  const [assignedMediaError, setAssignedMediaError] =
-    useState('');
+  const [assignedMediaError, setAssignedMediaError] = useState("");
 
   const [homeTab, setHomeTab] = useState<KidsHomeTab>("home");
 
   useEffect(() => {
     if (!parentToken || !profile) {
       setAssignedVideos([]);
-      setAssignedMediaError('');
+      setAssignedMediaError("");
       return;
     }
 
     let cancelled = false;
 
     const loadAssignedVideos = async () => {
-      setAssignedMediaError('');
+      setAssignedMediaError("");
 
       try {
-        const media = await getChildAssignedMedia(
-          parentToken,
-          profile.id,
-        );
+        const media = await getChildAssignedMedia(parentToken, profile.id);
 
         if (cancelled) return;
 
-        const mapped: KidsVideoItem[] = media.map(
-          (item: AssignedChildMedia) => {
-            const publicUrl =
-              item.public_url || item.storage_path || '';
+        const mapped: KidsVideoItem[] = media.map((item: AssignedChildMedia) => {
+          const publicUrl = item.public_url || item.storage_path || "";
 
-            const youtubeMatch = publicUrl.match(
-              /(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{6,20})/,
-            );
+          const youtubeMatch = publicUrl.match(
+            /(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{6,20})/,
+          );
 
-            const youtubeVideoId =
-              youtubeMatch?.[1] || undefined;
+          const youtubeVideoId = youtubeMatch?.[1] || undefined;
 
-            const isYoutube = Boolean(youtubeVideoId);
+          const isYoutube = Boolean(youtubeVideoId);
+          const isPhoto = item.media_type === "photo";
+          const assetUrl = isYoutube ? publicUrl : getApiAssetUrl(publicUrl);
 
-            const image = isYoutube
-              ? `https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg`
-              : `data:image/svg+xml,${encodeURIComponent(`
-                  <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">
-                    <defs>
-                      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stop-color="#7c3aed"/>
-                        <stop offset="100%" stop-color="#ec4899"/>
-                      </linearGradient>
-                    </defs>
-                    <rect width="640" height="360" fill="url(#g)"/>
-                    <circle cx="320" cy="170" r="65" fill="white" fill-opacity="0.95"/>
-                    <polygon points="300,130 300,210 365,170" fill="#7c3aed"/>
-                    <text x="320" y="295" text-anchor="middle"
-                      font-family="Arial" font-size="30" font-weight="700"
-                      fill="white">Parent Video</text>
-                  </svg>
-                `)}`;
+          const placeholderImage = `data:image/svg+xml,${encodeURIComponent(`
+                <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">
+                  <defs>
+                    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#7c3aed"/>
+                      <stop offset="100%" stop-color="#ec4899"/>
+                    </linearGradient>
+                  </defs>
+                  <rect width="640" height="360" fill="url(#g)"/>
+                  <circle cx="320" cy="170" r="65" fill="white" fill-opacity="0.95"/>
+                  <polygon points="300,130 300,210 365,170" fill="#7c3aed"/>
+                  <text x="320" y="295" text-anchor="middle"
+                    font-family="Arial" font-size="30" font-weight="700"
+                    fill="white">Family Media</text>
+                </svg>
+              `)}`;
 
-            return {
-              id: 1000000 + Number(item.id),
-              title:
-                item.title ||
-                item.original_name ||
-                'Parent Video',
-              duration: isYoutube
-                ? 'YouTube'
-                : 'Uploaded',
-              category:
-                item.category ||
-                'Parent Upload',
-              image,
-              sourceType: isYoutube
-                ? 'youtube'
-                : 'upload',
-              sourceUrl: isYoutube
-                ? publicUrl
-                : getApiAssetUrl(publicUrl),
-              youtubeVideoId,
-            };
-          },
-        );
+          const image = isYoutube
+            ? `https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg`
+            : isPhoto
+              ? assetUrl
+              : placeholderImage;
+
+          return {
+            id: 1000000 + Number(item.id),
+            title:
+              item.title ||
+              item.original_name ||
+              item.filename ||
+              (isPhoto ? "Family Photo" : "Family Video"),
+            duration: isYoutube ? "YouTube" : isPhoto ? "Photo" : "Video",
+            category: item.category || (isPhoto ? "Family Photos" : "Family Videos"),
+            image,
+            sourceType: isYoutube ? "youtube" : isPhoto ? "photo" : "upload",
+            sourceUrl: assetUrl,
+            youtubeVideoId,
+          };
+        });
 
         setAssignedVideos(mapped);
       } catch (error) {
@@ -215,9 +193,7 @@ function SasaApp() {
 
         setAssignedVideos([]);
         setAssignedMediaError(
-          error instanceof Error
-            ? error.message
-            : 'Unable to load assigned videos.',
+          error instanceof Error ? error.message : "Unable to load assigned media.",
         );
       }
     };
@@ -315,7 +291,10 @@ function SasaApp() {
       return h * 60 + m;
     };
     const checkBedtime = () => {
-      if (!parentControls.bedtimeEnabled) { setBedtimeActive(false); return; }
+      if (!parentControls.bedtimeEnabled) {
+        setBedtimeActive(false);
+        return;
+      }
       const now = new Date();
       const current = now.getHours() * 60 + now.getMinutes();
       const start = timeToMinutes(parentControls.bedtimeStart || "20:00");
@@ -331,8 +310,14 @@ function SasaApp() {
     return () => window.clearInterval(interval);
   }, [parentControls.bedtimeEnabled, parentControls.bedtimeStart, parentControls.bedtimeEnd]);
 
-  const openParentGate = () => { setShowParentDashboard(false); setShowParentGate(true); };
-  const changeProfile = () => { setSelectedKidsVideo(null); setProfile(null); };
+  const openParentGate = () => {
+    setShowParentDashboard(false);
+    setShowParentGate(true);
+  };
+  const changeProfile = () => {
+    setSelectedKidsVideo(null);
+    setProfile(null);
+  };
 
   const openKidsVideo = (video: KidsVideoItem) => {
     if (profile) {
@@ -340,7 +325,9 @@ function SasaApp() {
       try {
         const saved = localStorage.getItem(historyKey);
         const existing = Array.isArray(saved ? JSON.parse(saved) : [])
-          ? (saved ? JSON.parse(saved) : [])
+          ? saved
+            ? JSON.parse(saved)
+            : []
           : [];
         const entry = {
           historyId: `${Date.now()}-${profile.id}-${video.id}`,
@@ -357,13 +344,19 @@ function SasaApp() {
       } catch {
         localStorage.setItem(
           historyKey,
-          JSON.stringify([{
-            historyId: `${Date.now()}-${profile.id}-${video.id}`,
-            profileId: profile.id, profileName: profile.name,
-            videoId: video.id, title: video.title, image: video.image,
-            category: video.category, duration: video.duration,
-            watchedAt: new Date().toISOString(),
-          }])
+          JSON.stringify([
+            {
+              historyId: `${Date.now()}-${profile.id}-${video.id}`,
+              profileId: profile.id,
+              profileName: profile.name,
+              videoId: video.id,
+              title: video.title,
+              image: video.image,
+              category: video.category,
+              duration: video.duration,
+              watchedAt: new Date().toISOString(),
+            },
+          ]),
         );
       }
     }
@@ -397,11 +390,7 @@ function SasaApp() {
         parentToken={parentToken!}
         databaseChildren={databaseChildren}
         onDatabaseChildDeleted={(childId) => {
-          setDatabaseChildren((current) =>
-            current.filter(
-              (child) => child.id !== childId
-            )
-          );
+          setDatabaseChildren((current) => current.filter((child) => child.id !== childId));
 
           if (profile?.id === childId) {
             setProfile(null);
@@ -414,7 +403,10 @@ function SasaApp() {
         customProfiles={customProfiles}
         onDeleteCustomProfile={(profileId) => {
           const toDelete = customProfiles.find((c) => c.id === profileId);
-          if (toDelete?.isProtected) { window.alert("Unprotect this profile before deleting it."); return; }
+          if (toDelete?.isProtected) {
+            window.alert("Unprotect this profile before deleting it.");
+            return;
+          }
           const updated = customProfiles.filter((c) => c.id !== profileId);
           setCustomProfiles(updated);
           localStorage.setItem("sasa-custom-profiles", JSON.stringify(updated));
@@ -427,29 +419,42 @@ function SasaApp() {
                 ? parsed.filter((item) => Number(item.profileId) !== Number(profileId))
                 : [];
               localStorage.setItem("sasa-watch-history", JSON.stringify(remaining));
-            } catch { /* keep app working */ }
+            } catch {
+              /* keep app working */
+            }
           }
-          if (profile?.id === profileId) { setProfile(null); setSelectedKidsVideo(null); }
+          if (profile?.id === profileId) {
+            setProfile(null);
+            setSelectedKidsVideo(null);
+          }
         }}
         onUpdateCustomProfile={(updatedProfile) => {
           const updated = customProfiles.map((c) =>
-            c.id === updatedProfile.id ? { ...c, ...updatedProfile } : c
+            c.id === updatedProfile.id ? { ...c, ...updatedProfile } : c,
           );
           setCustomProfiles(updated);
           localStorage.setItem("sasa-custom-profiles", JSON.stringify(updated));
           if (profile?.id === updatedProfile.id) {
-            setProfile({ id: updatedProfile.id, name: updatedProfile.name, emoji: updatedProfile.emoji, color: updatedProfile.color });
+            setProfile({
+              id: updatedProfile.id,
+              name: updatedProfile.name,
+              emoji: updatedProfile.emoji,
+              color: updatedProfile.color,
+            });
           }
         }}
         onToggleProfileProtection={(profileId) => {
           const updated = customProfiles.map((c) =>
-            c.id === profileId ? { ...c, isProtected: !c.isProtected } : c
+            c.id === profileId ? { ...c, isProtected: !c.isProtected } : c,
           );
           setCustomProfiles(updated);
           localStorage.setItem("sasa-custom-profiles", JSON.stringify(updated));
         }}
         onSettingsChange={updateParentControls}
-        onClose={() => { setShowParentDashboard(false); setShowParentGate(false); }}
+        onClose={() => {
+          setShowParentDashboard(false);
+          setShowParentGate(false);
+        }}
       />
     );
   }
@@ -459,7 +464,10 @@ function SasaApp() {
       <ParentalGate
         parentPin={parentControls.parentPin}
         requireParentPin={parentControls.requireParentPin}
-        onSuccess={() => { setShowParentGate(false); setShowParentDashboard(true); }}
+        onSuccess={() => {
+          setShowParentGate(false);
+          setShowParentDashboard(true);
+        }}
         onCancel={() => setShowParentGate(false)}
       />
     );
@@ -511,10 +519,7 @@ function SasaApp() {
         parentName={parentName}
         onRetry={() => loadDatabaseChildren(parentToken)}
         onChildCreated={(child) => {
-          setDatabaseChildren((current) => [
-            ...current,
-            child,
-          ]);
+          setDatabaseChildren((current) => [...current, child]);
         }}
         onChildPinChanged={(childId) => {
           setDatabaseChildren((current) =>
@@ -538,11 +543,7 @@ function SasaApp() {
         }}
         onSelectChild={(child) => {
           const savedImage =
-            child.avatar_url ||
-            localStorage.getItem(
-              `sasa-child-image-${child.id}`,
-            ) ||
-            undefined;
+            child.avatar_url || localStorage.getItem(`sasa-child-image-${child.id}`) || undefined;
 
           setProfile({
             id: child.id,
@@ -574,13 +575,9 @@ function SasaApp() {
         <ProfileSelection
           customProfiles={customProfiles}
           onSelectProfile={(name, emoji, color, id, image) => {
-            const imageStorageKey =
-              `sasa-child-image-${id}`;
+            const imageStorageKey = `sasa-child-image-${id}`;
 
-            const savedImage =
-              image ||
-              localStorage.getItem(imageStorageKey) ||
-              undefined;
+            const savedImage = image || localStorage.getItem(imageStorageKey) || undefined;
 
             setProfile({
               id,
@@ -591,21 +588,16 @@ function SasaApp() {
             });
 
             if (image) {
-              localStorage.setItem(
-                imageStorageKey,
-                image,
-              );
+              localStorage.setItem(imageStorageKey, image);
             } else if (!savedImage) {
-              localStorage.removeItem(
-                imageStorageKey,
-              );
+              localStorage.removeItem(imageStorageKey);
             }
             localStorage.setItem("sasa-active-kid-emoji", emoji);
             localStorage.setItem("sasa-active-kid-name", name);
             if (parentControls.screenLimitEnabled) {
               localStorage.setItem(
                 `sasa-screen-expiry-${id}`,
-                String(Date.now() + parentControls.screenMinutes * 60 * 1000)
+                String(Date.now() + parentControls.screenMinutes * 60 * 1000),
               );
             }
             setSelectedKidsVideo(null);
@@ -624,9 +616,15 @@ function SasaApp() {
         profileName={profile?.name}
         profileEmoji={profile?.emoji}
         customProfiles={customProfiles}
-        onBack={() => { setHomeTab("home"); setSelectedKidsVideo(null); }}
+        onBack={() => {
+          setHomeTab("home");
+          setSelectedKidsVideo(null);
+        }}
         onOpenVideo={openKidsVideo}
-        onOpenHomeTab={(tab) => { setHomeTab(tab); setSelectedKidsVideo(null); }}
+        onOpenHomeTab={(tab) => {
+          setHomeTab(tab);
+          setSelectedKidsVideo(null);
+        }}
         onChangeProfile={changeProfile}
       />
     );

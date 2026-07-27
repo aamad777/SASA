@@ -1,8 +1,19 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Users, X, Sparkles, Send, CheckCircle2, Play, Pause, Heart, Radio, PartyPopper } from 'lucide-react';
-import confetti from 'canvas-confetti';
-import { playPopSound, playSuccessSound, playHeartSound } from '../lib/sound';
+import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  Users,
+  X,
+  Sparkles,
+  Send,
+  CheckCircle2,
+  Play,
+  Pause,
+  Heart,
+  Radio,
+  PartyPopper,
+} from "lucide-react";
+import confetti from "canvas-confetti";
+import { playPopSound, playSuccessSound, playHeartSound } from "../lib/sound";
 
 export type WatchPartyBuddy = {
   id: number;
@@ -43,7 +54,7 @@ export default function WatchPartyModal({
   videoTitle,
 }: WatchPartyModalProps) {
   const [selectedBuddy, setSelectedBuddy] = useState<WatchPartyBuddy | null>(
-    activeBuddy || (availableBuddies.length > 0 ? availableBuddies[0] : null)
+    activeBuddy || (availableBuddies.length > 0 ? availableBuddies[0] : null),
   );
   const [inviteSent, setInviteSent] = useState(false);
 
@@ -58,7 +69,7 @@ export default function WatchPartyModal({
       particleCount: 50,
       spread: 70,
       origin: { y: 0.6 },
-      colors: ['#ff72aa', '#ffd166', '#06d6a0', '#118ab2', '#38bdf8'],
+      colors: ["#ff72aa", "#ffd166", "#06d6a0", "#118ab2", "#38bdf8"],
     });
 
     setTimeout(() => {
@@ -99,7 +110,7 @@ export default function WatchPartyModal({
             </div>
 
             <h2 className="text-2xl font-black text-white drop-shadow-md">
-              {activeBuddy ? 'Synced Watch Party' : 'Invite a Buddy to Watch!'}
+              {activeBuddy ? "Synced Watch Party" : "Invite a Buddy to Watch!"}
             </h2>
             <p className="text-xs text-sky-100 font-medium mt-0.5 max-w-xs mx-auto truncate">
               "{videoTitle}"
@@ -142,7 +153,7 @@ export default function WatchPartyModal({
                   <div className="flex flex-col items-center">
                     <div
                       className="w-16 h-16 rounded-full border-4 border-purple-400 shadow-md overflow-hidden flex items-center justify-center text-3xl"
-                      style={{ backgroundColor: activeBuddy.color || '#e0e7ff' }}
+                      style={{ backgroundColor: activeBuddy.color || "#e0e7ff" }}
                     >
                       {activeBuddy.avatarUrl || activeBuddy.image ? (
                         <img
@@ -165,7 +176,7 @@ export default function WatchPartyModal({
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
                     <p className="text-xs font-bold text-emerald-900">
-                      {isPlaying ? 'Video playing synchronously' : 'Playback paused for both'}
+                      {isPlaying ? "Video playing synchronously" : "Playback paused for both"}
                     </p>
                   </div>
 
@@ -209,9 +220,7 @@ export default function WatchPartyModal({
                     className="py-8 bg-sky-50 rounded-2xl border border-sky-200 flex flex-col items-center space-y-2"
                   >
                     <CheckCircle2 size={48} className="text-emerald-500" />
-                    <h3 className="text-lg font-black text-slate-800">
-                      Invitation Sent!
-                    </h3>
+                    <h3 className="text-lg font-black text-slate-800">Invitation Sent!</h3>
                     <p className="text-xs text-slate-500 font-medium">
                       Joining watch party with {selectedBuddy?.name}...
                     </p>
@@ -230,7 +239,7 @@ export default function WatchPartyModal({
                         <div className="flex items-center gap-3">
                           <div
                             className="w-12 h-12 rounded-full border-2 border-white shadow-sm overflow-hidden flex items-center justify-center text-2xl shrink-0"
-                            style={{ backgroundColor: buddy.color || '#bae6fd' }}
+                            style={{ backgroundColor: buddy.color || "#bae6fd" }}
                           >
                             {buddy.avatarUrl || buddy.image ? (
                               <img
