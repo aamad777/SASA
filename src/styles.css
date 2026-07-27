@@ -6223,3 +6223,81 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== Parent settings mobile fixes ===== */
+@media (max-width: 767px) {
+  .parent-settings-page {
+    display: grid;
+    width: 100%;
+    gap: 14px;
+    padding-bottom: 24px;
+  }
+
+  .parent-settings-card {
+    width: 100%;
+    min-width: 0;
+    padding: 18px 14px;
+    border-radius: 20px;
+  }
+
+  .parent-settings-heading h2 {
+    font-size: 21px;
+    line-height: 1.25;
+  }
+
+  .parent-settings-heading p {
+    margin-bottom: 16px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .parent-settings-toggle-row {
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 12px;
+  }
+
+  .parent-settings-toggle-row > div {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .parent-settings-toggle-row .parent-switch {
+    flex: 0 0 auto;
+    min-width: 48px;
+    min-height: 28px;
+  }
+
+  .parent-pin-form {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .parent-pin-form input {
+    width: 100%;
+    min-width: 0;
+    min-height: 50px;
+  }
+
+  .parent-pin-form button,
+  .parent-reset-timer-button,
+  .parent-reset-all-button {
+    width: 100%;
+    min-height: 48px;
+    touch-action: manipulation;
+  }
+
+  .parent-dashboard-bottom-nav {
+    min-height: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  .parent-dashboard-bottom-nav button {
+    min-height: 52px;
+    touch-action: manipulation;
+  }
+
+  .parent-dashboard-main {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+}
