@@ -4412,8 +4412,7 @@ button {
 }
 
 /* Fix parent sidebar navigation overflow */
-.parent-dashboard-sidebar,
-.parent-sidebar {
+.parent-dashboard-sidebar {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
