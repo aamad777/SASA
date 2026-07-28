@@ -120,9 +120,9 @@ export default function DatabaseProfileSelection({
     setChildPinError("");
 
     try {
-      const result = await loginChild(pendingChild.login_name, childPin);
+      await loginChild(pendingChild.login_name, childPin);
 
-      localStorage.setItem("sasa-child-token", result.token);
+      localStorage.removeItem("sasa-child-token");
 
       const verifiedChild = pendingChild;
 
