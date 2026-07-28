@@ -595,7 +595,7 @@ export function getApiAssetUrl(value: string | null | undefined): string {
 }
 
 export type ParentMediaItem = {
-  id: number;
+  id: string;
   filename: string | null;
   original_name: string | null;
   media_type: "photo" | "video";
@@ -607,7 +607,7 @@ export type ParentMediaItem = {
   category: string | null;
   created_at: string;
   access: Array<{
-    child_id: number;
+    child_id: string;
     name: string;
   }>;
 };
@@ -627,8 +627,8 @@ export async function getParentMedia(token: string): Promise<ParentMediaItem[]> 
 
   const media = Array.isArray(data.media)
     ? (data.media as Array<{
-        id: number;
-        owner_user_id: number;
+        id: string;
+        owner_user_id: string;
         media_type: "photo" | "video";
         title: string | null;
         description: string | null;
@@ -640,7 +640,7 @@ export async function getParentMedia(token: string): Promise<ParentMediaItem[]> 
         size_bytes: number | null;
         created_at: string;
         child_access: Array<{
-          child_profile_id: number;
+          child_profile_id: string;
           display_name: string;
         }>;
       }>)
@@ -654,7 +654,7 @@ export async function getParentMedia(token: string): Promise<ParentMediaItem[]> 
     visibility: "assigned",
     access: Array.isArray(item.child_access)
       ? item.child_access.map((entry) => ({
-          child_id: Number(entry.child_profile_id),
+          child_id: String(entry.child_profile_id),
           name: entry.display_name,
         }))
       : [],
@@ -663,7 +663,7 @@ export async function getParentMedia(token: string): Promise<ParentMediaItem[]> 
 
 export async function updateParentMedia(
   token: string,
-  mediaId: number,
+  mediaId: string,
   input: {
     title: string;
     category: string;
@@ -694,13 +694,13 @@ export async function updateParentMedia(
 
 export async function updateParentMediaAccess(
   token: string,
-  mediaId: number,
-  childIds: number[],
+  mediaId: string,
+  childIds: string[],
 ): Promise<void> {
   const mediaItems = await getParentMedia(token);
-  const media = mediaItems.find((item) => Number(item.id) === Number(mediaId));
+  const media = mediaItems.find((item) => item.id === mediaId);
 
-  const currentIds = media ? media.access.map((entry) => Number(entry.child_id)) : [];
+  const currentIds = media ? media.access.map((entry) => String(entry.child_id)) : [];
 
   const idsToAdd = childIds.filter((id) => !currentIds.includes(id));
   const idsToRemove = currentIds.filter((id) => !childIds.includes(id));
@@ -733,7 +733,7 @@ export async function updateParentMediaAccess(
   }
 }
 
-export async function deleteParentMedia(token: string, mediaId: number): Promise<void> {
+export async function deleteParentMedia(token: string, mediaId: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/media/${mediaId}`, {
     method: "DELETE",
     headers: {

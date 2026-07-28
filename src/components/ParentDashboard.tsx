@@ -87,7 +87,12 @@ type ManagedCustomProfile = {
 };
 
 type ParentSection =
-  "screen-time" | "content-filters" | "kids-media" | "activity-history" | "profiles" | "settings";
+  | "screen-time"
+  | "content-filters"
+  | "kids-media"
+  | "activity-history"
+  | "profiles"
+  | "settings";
 
 type ParentDashboardProps = {
   parentToken: string;
@@ -204,9 +209,9 @@ export default function ParentDashboard({
 
   const [parentMediaLoading, setParentMediaLoading] = useState(false);
 
-  const [parentMediaActionId, setParentMediaActionId] = useState<number | null>(null);
+  const [parentMediaActionId, setParentMediaActionId] = useState<string | null>(null);
 
-  const [editingMediaId, setEditingMediaId] = useState<number | null>(null);
+  const [editingMediaId, setEditingMediaId] = useState<string | null>(null);
 
   const [editingMediaTitle, setEditingMediaTitle] = useState("");
 
@@ -558,7 +563,7 @@ export default function ParentDashboard({
     }
   };
 
-  const setParentMediaChildren = async (item: ParentMediaItem, childIds: number[]) => {
+  const setParentMediaChildren = async (item: ParentMediaItem, childIds: string[]) => {
     setParentMediaActionId(item.id);
     setMediaError("");
     setMediaMessage("");
@@ -581,8 +586,8 @@ export default function ParentDashboard({
     }
   };
 
-  const toggleParentMediaChild = async (item: ParentMediaItem, childId: number) => {
-    const currentIds = item.access.map((entry) => Number(entry.child_id));
+  const toggleParentMediaChild = async (item: ParentMediaItem, childId: string) => {
+    const currentIds = item.access.map((entry) => String(entry.child_id));
 
     const nextIds = currentIds.includes(childId)
       ? currentIds.filter((id) => id !== childId)
@@ -669,7 +674,10 @@ export default function ParentDashboard({
         `)}`;
 
     return {
-      id: 1000000 + Number(item.id),
+      id: Array.from(item.id).reduce(
+        (hash, character) => (hash * 31 + character.charCodeAt(0)) >>> 0,
+        1000000,
+      ),
       title: item.title || item.original_name || "Uploaded Media",
       category: item.category || (item.media_type === "photo" ? "Photos" : "Videos"),
       image: youtubeVideoId
@@ -1692,7 +1700,7 @@ export default function ParentDashboard({
 
                       const youtubeVideoId = youtubeMatch?.[1];
 
-                      const assignedIds = item.access.map((entry) => Number(entry.child_id));
+                      const assignedIds = item.access.map((entry) => String(entry.child_id));
 
                       const isBusy = parentMediaActionId === item.id;
 
