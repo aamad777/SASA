@@ -87,17 +87,12 @@ type ManagedCustomProfile = {
 };
 
 type ParentSection =
-  | "screen-time"
-  | "content-filters"
-  | "kids-media"
-  | "activity-history"
-  | "profiles"
-  | "settings";
+  "screen-time" | "content-filters" | "kids-media" | "activity-history" | "profiles" | "settings";
 
 type ParentDashboardProps = {
   parentToken: string;
   databaseChildren: DatabaseChild[];
-  onDatabaseChildDeleted: (childId: number) => void;
+  onDatabaseChildDeleted: (childId: string) => void;
   customProfiles: ManagedCustomProfile[];
   onDeleteCustomProfile: (profileId: number) => void;
   onUpdateCustomProfile: (profile: ManagedCustomProfile) => void;
@@ -217,7 +212,7 @@ export default function ParentDashboard({
 
   const [editingMediaCategory, setEditingMediaCategory] = useState("");
 
-  const [deletingDatabaseChildId, setDeletingDatabaseChildId] = useState<number | null>(null);
+  const [deletingDatabaseChildId, setDeletingDatabaseChildId] = useState<string | null>(null);
 
   const [newBlockedChannel, setNewBlockedChannel] = useState("");
   const [videoFilterQuery, setVideoFilterQuery] = useState("");

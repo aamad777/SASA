@@ -11,7 +11,7 @@ type Props = {
   parentName: string;
   onSelectChild: (child: DatabaseChild) => void;
   onChildCreated: (child: DatabaseChild) => void;
-  onChildPinChanged: (childId: number) => void;
+  onChildPinChanged: (childId: string) => void;
   onRetry: () => void;
   onLogout: () => void;
 };
@@ -72,7 +72,7 @@ export default function DatabaseProfileSelection({
 
   const [showManagePin, setShowManagePin] = useState(false);
 
-  const [managedChildId, setManagedChildId] = useState<number | null>(null);
+  const [managedChildId, setManagedChildId] = useState<string | null>(null);
 
   const [newChildPin, setNewChildPin] = useState("");
 
