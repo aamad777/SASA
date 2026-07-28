@@ -49,6 +49,7 @@ jobs:
       - name: Scan Docker image
         run: |
           trivy image \
+            --timeout 15m \
             --scanners vuln \
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
