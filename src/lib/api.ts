@@ -150,7 +150,7 @@ export async function getChildren(token: string): Promise<DatabaseChild[]> {
     : [];
 
   return children.map((child) => ({
-    id: Number(child.id),
+    id: String(child.id),
     display_name: child.display_name,
     login_name: child.child_login_id ?? null,
     age: child.age ?? null,
@@ -204,7 +204,7 @@ export async function createChild(token: string, input: CreateChildInput): Promi
   const child = data.child;
 
   return {
-    id: Number(child.id),
+    id: String(child.id),
     display_name: child.display_name,
     login_name: child.child_login_id ?? null,
     age: child.age ?? null,
@@ -520,7 +520,7 @@ export async function addParentYoutubeVideo(
   throw new Error("Adding YouTube links is not supported by the backend yet.");
 }
 
-export async function deleteChild(token: string, childId: number): Promise<void> {
+export async function deleteChild(token: string, childId: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/parent/children/${childId}`, {
     method: "DELETE",
     headers: {
