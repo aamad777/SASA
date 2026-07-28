@@ -555,7 +555,7 @@ export type AssignedChildMedia = {
 
 export async function getChildAssignedMedia(
   token: string,
-  childId: number,
+  childId: string | number,
 ): Promise<AssignedChildMedia[]> {
   const response = await fetch(`${API_BASE_URL}/child/${childId}/media`, {
     headers: {
@@ -579,7 +579,7 @@ export async function getChildAssignedMedia(
     throw new Error(data.error || "Unable to load child media.");
   }
 
-  return Array.isArray(data) ? data : [];
+  return Array.isArray(data.media) ? data.media : [];
 }
 
 export function getApiAssetUrl(value: string | null | undefined): string {
