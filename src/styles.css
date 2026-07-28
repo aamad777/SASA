@@ -6301,3 +6301,69 @@ button {
     padding-bottom: calc(84px + env(safe-area-inset-bottom));
   }
 }
+
+/* Final mobile parent-dashboard layout correction */
+@media (max-width: 767px) {
+  /* Hide the legacy desktop navigation completely */
+  .parent-dashboard .parent-sidebar,
+  .parent-dashboard .parent-desktop-header,
+  .parent-dashboard .parent-mobile-header {
+    display: none !important;
+  }
+
+  /* Keep only the newer mobile header */
+  .parent-dashboard-mobile-header {
+    display: block !important;
+    position: sticky;
+    top: 0;
+    z-index: 70;
+    width: 100%;
+  }
+
+  .parent-dashboard {
+    display: block !important;
+    width: 100%;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  .parent-dashboard-main {
+    display: block !important;
+    width: 100%;
+    min-width: 0;
+    min-height: calc(100dvh - 64px);
+    padding: 0 0 88px !important;
+    overflow-x: hidden;
+  }
+
+  .parent-dashboard-content {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    padding: 16px 12px 28px !important;
+  }
+
+  /* Ensure dashboard sections stack vertically */
+  .parent-dashboard-content > div,
+  .parent-dashboard-content > section,
+  .parent-dashboard-content > article {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .parent-dashboard-content .flex {
+    min-width: 0;
+  }
+
+  /* Keep the new bottom navigation visible */
+  .parent-dashboard-bottom-nav {
+    display: flex !important;
+    position: fixed !important;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 80;
+    width: 100%;
+  }
+}
