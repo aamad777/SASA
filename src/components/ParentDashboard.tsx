@@ -87,12 +87,7 @@ type ManagedCustomProfile = {
 };
 
 type ParentSection =
-  | "screen-time"
-  | "content-filters"
-  | "kids-media"
-  | "activity-history"
-  | "profiles"
-  | "settings";
+  "screen-time" | "content-filters" | "kids-media" | "activity-history" | "profiles" | "settings";
 
 type ParentDashboardProps = {
   parentToken: string;
