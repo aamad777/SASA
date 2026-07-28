@@ -653,6 +653,26 @@ function SasaApp() {
               }
             : undefined
         }
+        accountActionLabel={parentToken ? "Sign Out" : "Login"}
+        onAccountAction={() => {
+          if (parentToken) {
+            localStorage.removeItem("sasa-parent-token");
+            localStorage.removeItem("sasa-parent-name");
+            localStorage.removeItem("sasa-parent-role");
+            localStorage.removeItem("sasa-account-mode");
+            setParentToken(null);
+            setParentName("Parent");
+            setDatabaseChildren([]);
+            setProfile(null);
+            setSelectedKidsVideo(null);
+            return;
+          }
+
+          localStorage.removeItem("sasa-account-mode");
+          setGuestMode(false);
+          setProfile(null);
+          setSelectedKidsVideo(null);
+        }}
       />
     </div>
   );

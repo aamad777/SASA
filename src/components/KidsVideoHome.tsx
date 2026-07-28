@@ -24,6 +24,8 @@ import {
   Crown,
   Plus,
   Music,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import confetti from "canvas-confetti";
@@ -68,6 +70,8 @@ type KidsVideoHomeProps = {
   onOpenParentalControls: () => void;
   onChangeProfile: () => void;
   onOpenFreeAccount?: () => void;
+  accountActionLabel: "Login" | "Sign Out";
+  onAccountAction: () => void;
 };
 
 const categories = [
@@ -232,6 +236,8 @@ export default function KidsVideoHome({
   onOpenParentalControls,
   onChangeProfile,
   onOpenFreeAccount,
+  accountActionLabel,
+  onAccountAction,
 }: KidsVideoHomeProps) {
   const isGuestAccount = typeof onOpenFreeAccount === "function";
 
@@ -515,6 +521,21 @@ export default function KidsVideoHome({
               ) : (
                 <VolumeX size={20} className="text-slate-400" />
               )}
+            </motion.button>
+
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.94 }}
+              className="kids-account-btn font-extrabold text-white bg-slate-800 hover:bg-slate-700 shadow-md rounded-2xl px-4 py-2 flex items-center gap-2 cursor-pointer shrink-0"
+              onClick={() => {
+                playPopSound();
+                onAccountAction();
+              }}
+              title={accountActionLabel}
+            >
+              {accountActionLabel === "Login" ? <LogIn size={18} /> : <LogOut size={18} />}
+              <span>{accountActionLabel}</span>
             </motion.button>
 
             <motion.button
