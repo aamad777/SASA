@@ -36,13 +36,13 @@ export async function registerParent(
   email: string,
   password: string,
 ): Promise<ParentLoginResponse> {
-  const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+  const response = await fetch(`${API_BASE_URL}/auth/register`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      display_name: name,
+      displayName: name,
       email,
       password,
     }),
@@ -119,7 +119,7 @@ export type DatabaseChild = {
 };
 
 export async function getChildren(token: string): Promise<DatabaseChild[]> {
-  const response = await fetch(`${API_BASE_URL}/children`, {
+  const response = await fetch(`${API_BASE_URL}/parent/children`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -137,7 +137,29 @@ export async function getChildren(token: string): Promise<DatabaseChild[]> {
     throw new Error(data.error || "Unable to load child profiles.");
   }
 
-  return Array.isArray(data) ? data : [];
+  const children = Array.isArray(data.children)
+    ? (data.children as Array<{
+        id: number;
+        display_name: string;
+        child_login_id: string | null;
+        age: number | null;
+        avatar_url: string | null;
+        selected_theme: string | null;
+        created_at: string;
+      }>)
+    : [];
+
+  return children.map((child) => ({
+    id: Number(child.id),
+    display_name: child.display_name,
+    login_name: child.child_login_id ?? null,
+    age: child.age ?? null,
+    avatar_url: child.avatar_url ?? null,
+    selected_theme: child.selected_theme ?? null,
+    login_code: child.child_login_id ?? null,
+    has_pin: Boolean(child.child_login_id),
+    created_at: child.created_at,
+  }));
 }
 
 export type CreateChildInput = {
@@ -148,13 +170,19 @@ export type CreateChildInput = {
 };
 
 export async function createChild(token: string, input: CreateChildInput): Promise<DatabaseChild> {
-  const response = await fetch(`${API_BASE_URL}/children`, {
+  const response = await fetch(`${API_BASE_URL}/parent/children`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      displayName: input.display_name,
+      childLoginId: input.login_name,
+      age: input.age,
+      pin: input.pin,
+      selectedTheme: "rainbow",
+    }),
   });
 
   const contentType = response.headers.get("content-type") || "";
@@ -173,27 +201,43 @@ export async function createChild(token: string, input: CreateChildInput): Promi
     throw new Error(data.error || "Unable to create child profile.");
   }
 
-  return data;
+  const child = data.child;
+
+  return {
+    id: Number(child.id),
+    display_name: child.display_name,
+    login_name: child.child_login_id ?? null,
+    age: child.age ?? null,
+    avatar_url: child.avatar_url ?? null,
+    selected_theme: child.selected_theme ?? null,
+    login_code: child.child_login_id ?? null,
+    has_pin: Boolean(input.pin),
+    created_at: child.created_at ?? new Date().toISOString(),
+  };
 }
 
 export type ChildLoginResponse = {
-  token: string;
+  status: string;
   child: {
     id: number;
-    display_name: string;
-    login_name: string;
-    parent_id: number | null;
+    userId: number;
+    name: string;
+    avatarUrl: string | null;
+    age: number | null;
+    theme: string;
+    childLoginId: string;
+    parentId: number | null;
   };
 };
 
 export async function loginChild(loginName: string, pin: string): Promise<ChildLoginResponse> {
-  const response = await fetch(`${API_BASE_URL}/auth/kid-login`, {
+  const response = await fetch(`${API_BASE_URL}/child/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      login_name: loginName,
+      childLoginId: loginName,
       pin,
     }),
   });
@@ -217,26 +261,8 @@ export async function loginChild(loginName: string, pin: string): Promise<ChildL
   return data;
 }
 
-export async function setChildPin(token: string, childId: number, pin: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/auth/set-kid-pin`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      child_id: childId,
-      pin,
-    }),
-  });
-
-  const contentType = response.headers.get("content-type") || "";
-
-  const data = contentType.includes("application/json") ? await response.json() : null;
-
-  if (!response.ok) {
-    throw new Error(data?.error || "Unable to update child PIN.");
-  }
+export async function setChildPin(_token: string, _childId: number, _pin: string): Promise<void> {
+  throw new Error("Updating an existing child PIN is not supported by the backend yet.");
 }
 
 export type AccountRole = "parent" | "admin";
@@ -516,7 +542,7 @@ export async function addParentYoutubeVideo(
 }
 
 export async function deleteChild(token: string, childId: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/children/${childId}`, {
+  const response = await fetch(`${API_BASE_URL}/parent/children/${childId}`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -552,7 +578,7 @@ export async function getChildAssignedMedia(
   token: string,
   childId: number,
 ): Promise<AssignedChildMedia[]> {
-  const response = await fetch(`${API_BASE_URL}/parent/children/${childId}/media`, {
+  const response = await fetch(`${API_BASE_URL}/child/${childId}/media`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
