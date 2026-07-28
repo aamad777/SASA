@@ -1,35 +1,85 @@
-name: CD Runner Test
+name: Build SASA Image
 
 on:
+  push:
+    branches:
+      - latest-full-integration
+    paths-ignore:
+      - "k8s/sasa/deployment.yaml"
+
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sasa-image-build
+  cancel-in-progress: false
 
 jobs:
-  runner-test:
-    name: Test Dell deployment runner
+  build-and-propose-deployment:
+    name: Build image and create deployment PR
     runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-      - name: Show runner information
+      - name: Define image
         run: |
-          echo "Runner: $RUNNER_NAME"
-          echo "OS: $RUNNER_OS"
-          echo "Architecture: $RUNNER_ARCH"
-          id
+          echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "IMAGE=192.168.0.101:5050/sasa-frontend:${GITHUB_SHA}" >> "$GITHUB_ENV"
 
-      - name: Test Docker access
-        run: |
-          docker version
-          docker info --format 'Docker server: {{.ServerVersion}}'
-
-      - name: Test private registry access
+      - name: Verify private registry
         run: |
           curl --fail --silent --show-error \
             http://192.168.0.101:5050/v2/
           echo
-          echo "Private registry is reachable."
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg VITE_API_BASE_URL="${{ vars.VITE_API_BASE_URL }}" \
+            --tag "$IMAGE" \
+            .
+
+      - name: Scan Docker image
+        run: |
+          trivy image \
+            --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --exit-code 1 \
+            "$IMAGE"
+
+      - name: Push Docker image
+        run: docker push "$IMAGE"
+
+      - name: Update Kubernetes image tag
+        run: |
+          sed -i \
+            "s|image: 192.168.0.101:5050/sasa-frontend:.*|image: ${IMAGE}|" \
+            k8s/sasa/deployment.yaml
+
+          grep -n "image:" k8s/sasa/deployment.yaml
+
+      - name: Create deployment pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: deploy/sasa-${{ github.sha }}
+          delete-branch: true
+          base: latest-full-integration
+          commit-message: Deploy SASA image ${{ github.sha }}
+          title: Deploy SASA image ${{ github.sha }}
+          body: |
+            Automated deployment update.
+
+            Image:
+            `192.168.0.101:5050/sasa-frontend:${{ github.sha }}`
+
+            After this pull request passes checks and is merged,
+            Argo CD will deploy the new image to k3s.
+          labels: deployment
