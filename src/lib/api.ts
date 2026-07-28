@@ -491,9 +491,9 @@ export async function uploadParentVideo(token: string, file: File, input: Parent
   formData.append("file", file);
   formData.append("title", input.title);
   formData.append("category", input.category);
-  formData.append("child_ids", JSON.stringify(input.childIds));
+  formData.append("childProfileIds", JSON.stringify(input.childIds));
 
-  const response = await fetch(`${API_BASE_URL}/parent/media/upload`, {
+  const response = await fetch(`${API_BASE_URL}/media/upload`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -511,34 +511,13 @@ export async function uploadParentVideo(token: string, file: File, input: Parent
 }
 
 export async function addParentYoutubeVideo(
-  token: string,
-  input: ParentMediaInput & {
+  _token: string,
+  _input: ParentMediaInput & {
     url: string;
     description?: string;
   },
 ) {
-  const response = await fetch(`${API_BASE_URL}/parent/media/youtube`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      url: input.url,
-      title: input.title,
-      description: input.description || "",
-      category: input.category,
-      child_ids: input.childIds,
-    }),
-  });
-
-  const data = await readApiResponse(response);
-
-  if (!response.ok) {
-    throw new Error(data.error || "Unable to add YouTube video.");
-  }
-
-  return data;
+  throw new Error("Adding YouTube links is not supported by the backend yet.");
 }
 
 export async function deleteChild(token: string, childId: number): Promise<void> {
@@ -634,7 +613,7 @@ export type ParentMediaItem = {
 };
 
 export async function getParentMedia(token: string): Promise<ParentMediaItem[]> {
-  const response = await fetch(`${API_BASE_URL}/media`, {
+  const response = await fetch(`${API_BASE_URL}/media/manage`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -646,7 +625,40 @@ export async function getParentMedia(token: string): Promise<ParentMediaItem[]> 
     throw new Error(data.error || "Unable to load parent media.");
   }
 
-  return Array.isArray(data) ? data : [];
+  const media = Array.isArray(data.media)
+    ? (data.media as Array<{
+        id: number;
+        owner_user_id: number;
+        media_type: "photo" | "video";
+        title: string | null;
+        description: string | null;
+        category: string | null;
+        public_url: string | null;
+        thumbnail_url: string | null;
+        original_filename: string | null;
+        mime_type: string | null;
+        size_bytes: number | null;
+        created_at: string;
+        child_access: Array<{
+          child_profile_id: number;
+          display_name: string;
+        }>;
+      }>)
+    : [];
+
+  return media.map((item) => ({
+    ...item,
+    filename: item.original_filename ?? null,
+    original_name: item.original_filename ?? null,
+    storage_path: item.public_url ?? null,
+    visibility: "assigned",
+    access: Array.isArray(item.child_access)
+      ? item.child_access.map((entry) => ({
+          child_id: Number(entry.child_profile_id),
+          name: entry.display_name,
+        }))
+      : [],
+  }));
 }
 
 export async function updateParentMedia(
@@ -659,7 +671,7 @@ export async function updateParentMedia(
   },
 ): Promise<ParentMediaItem> {
   const response = await fetch(`${API_BASE_URL}/media/${mediaId}`, {
-    method: "PUT",
+    method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -677,7 +689,7 @@ export async function updateParentMedia(
     throw new Error(data.error || "Unable to update media.");
   }
 
-  return data;
+  return data.media ?? data;
 }
 
 export async function updateParentMediaAccess(
@@ -685,21 +697,39 @@ export async function updateParentMediaAccess(
   mediaId: number,
   childIds: number[],
 ): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/media/${mediaId}/access`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      child_ids: childIds,
-    }),
-  });
+  const mediaItems = await getParentMedia(token);
+  const media = mediaItems.find((item) => Number(item.id) === Number(mediaId));
 
-  const data = await readApiResponse(response);
+  const currentIds = media ? media.access.map((entry) => Number(entry.child_id)) : [];
 
-  if (!response.ok) {
-    throw new Error(data.error || "Unable to update media access.");
+  const idsToAdd = childIds.filter((id) => !currentIds.includes(id));
+  const idsToRemove = currentIds.filter((id) => !childIds.includes(id));
+
+  for (const childProfileId of idsToAdd) {
+    const response = await fetch(`${API_BASE_URL}/media/${mediaId}/access`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        childProfileId,
+        noLimit: true,
+      }),
+    });
+
+    await readJsonResponse(response);
+  }
+
+  for (const childProfileId of idsToRemove) {
+    const response = await fetch(`${API_BASE_URL}/media/${mediaId}/access/${childProfileId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    await readJsonResponse(response);
   }
 }
 
