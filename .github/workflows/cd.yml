@@ -1,4 +1,4 @@
-name: Build and Deploy SASA Image
+name: Build SASA Image
 
 on:
   push:
@@ -11,21 +11,21 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: sasa-image-build
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
-    name: Build image and update deployment
+  build-and-propose-deployment:
+    name: Build image and create deployment PR
     runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          ref: latest-full-integration
           fetch-depth: 0
 
       - name: Define image
@@ -67,17 +67,20 @@ jobs:
 
           grep -n "image:" k8s/sasa/deployment.yaml
 
-      - name: Commit deployment update
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Create deployment pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: deploy/sasa-${{ github.sha }}
+          delete-branch: true
+          base: latest-full-integration
+          commit-message: Deploy SASA image ${{ github.sha }}
+          title: Deploy SASA image ${{ github.sha }}
+          body: |
+            Automated deployment update.
 
-          git add k8s/sasa/deployment.yaml
+            Image:
+            `192.168.0.101:5050/sasa-frontend:${{ github.sha }}`
 
-          if git diff --cached --quiet; then
-            echo "Deployment manifest is already current."
-            exit 0
-          fi
-
-          git commit -m "Deploy SASA image ${GITHUB_SHA}"
-          git push origin HEAD:latest-full-integration
+            After this pull request passes checks and is merged,
+            Argo CD will deploy the new image to k3s.
+          labels: deployment
