@@ -611,7 +611,12 @@ function SasaApp() {
             localStorage.removeItem("sasa-parent-role");
             localStorage.removeItem("sasa-active-kid-name");
             localStorage.removeItem("sasa-active-kid-emoji");
-            window.location.replace("/");
+            setParentToken(null);
+            setParentName("Parent");
+            setDatabaseChildren([]);
+            setGuestMode(false);
+            setProfile(null);
+            setSelectedKidsVideo(null);
           }}
         />
       </>
