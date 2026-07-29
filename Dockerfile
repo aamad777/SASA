@@ -4,11 +4,20 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-RUN npm config set fetch-retries 6 && \
+RUN --mount=type=cache,target=/root/.npm \
+    npm config set fetch-retries 6 && \
     npm config set fetch-retry-mintimeout 20000 && \
     npm config set fetch-retry-maxtimeout 120000 && \
     npm config set fetch-timeout 300000 && \
-    npm ci --no-audit --no-fund
+    for attempt in 1 2 3 4 5; do \
+      echo "npm ci attempt ${attempt} of 5"; \
+      npm ci --prefer-offline --no-audit --no-fund && break; \
+      if [ "${attempt}" = "5" ]; then \
+        echo "npm ci failed after 5 attempts"; \
+        exit 1; \
+      fi; \
+      sleep $((attempt * 15)); \
+    done
 
 COPY . .
 
@@ -30,10 +39,6 @@ ENV HOST=0.0.0.0
 ENV PORT=3000
 
 COPY --from=builder /app/.output ./.output
-
-# The runtime only needs Node.js. Remove package managers and their
-# bundled dependencies to reduce the production attack surface.
-RUN rm -rf     /usr/local/lib/node_modules/npm     /usr/local/lib/node_modules/corepack     /opt/yarn-*     /usr/local/bin/npm     /usr/local/bin/npx     /usr/local/bin/corepack     /usr/local/bin/yarn     /usr/local/bin/yarnpkg
 
 EXPOSE 3000
 
