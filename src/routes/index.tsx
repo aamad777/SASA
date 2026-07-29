@@ -604,6 +604,12 @@ function SasaApp() {
           }}
           onOpenParentalControls={openParentGate}
           onAddProfile={() => setShowAddProfile(true)}
+          onLogin={() => {
+            localStorage.removeItem("sasa-account-mode");
+            setGuestMode(false);
+            setProfile(null);
+            setSelectedKidsVideo(null);
+          }}
         />
       </>
     );

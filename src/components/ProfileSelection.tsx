@@ -108,7 +108,35 @@ export default function ProfileSelection({
       <div className="kids-star star-two" />
       <div className="kids-star star-three" />
 
-      <header className="relative z-10 flex w-full justify-end px-6 pt-6">
+      <header className="relative z-10 flex w-full items-center justify-end gap-3 px-6 pt-6">
+        <motion.button
+          type="button"
+          animate={selectingId !== null ? { opacity: 0.3, scale: 0.95 } : { opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          whileHover={selectingId === null ? { scale: 1.06 } : undefined}
+          whileTap={selectingId === null ? { scale: 0.94 } : undefined}
+          className="kids-profile-login-button"
+          onClick={() => {
+            if (selectingId !== null) return;
+            playPopSound();
+            onLogin();
+          }}
+        >
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            viewBox="0 0 24 24"
+          >
+            <path
+              d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span>Login</span>
+        </motion.button>
         <motion.button
           type="button"
           animate={selectingId !== null ? { opacity: 0.3, scale: 0.95 } : { opacity: 1, scale: 1 }}
@@ -150,7 +178,7 @@ export default function ProfileSelection({
         </motion.button>
       </header>
 
-      <main className="relative z-10 -mt-8 flex w-full flex-grow flex-col items-center justify-center px-8">
+      <main className="kids-profile-content relative z-10 -mt-8 flex w-full flex-grow flex-col items-center justify-center px-8">
         <motion.div
           className="mb-8 text-center"
           animate={selectingId !== null ? { opacity: 0.35, scale: 0.94 } : { opacity: 1, scale: 1 }}
