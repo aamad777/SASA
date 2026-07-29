@@ -182,7 +182,7 @@ export default function ProfileSelection({
         </motion.button>
       </header>
 
-      <main className="kids-profile-content relative z-10 -mt-8 flex w-full flex-grow flex-col items-center justify-center px-8">
+      <main className="kids-profile-content relative z-10 -mt-8 mx-auto flex w-[calc(100%-2rem)] max-w-[760px] flex-grow flex-col items-center justify-center px-4 sm:px-6">
         <motion.div
           className="mb-8 text-center"
           animate={selectingId !== null ? { opacity: 0.35, scale: 0.94 } : { opacity: 1, scale: 1 }}
