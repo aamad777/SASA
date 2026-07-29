@@ -606,9 +606,9 @@ function SasaApp() {
           onAddProfile={() => setShowAddProfile(true)}
           onLogin={() => {
             localStorage.removeItem("sasa-account-mode");
-            setGuestMode(false);
-            setProfile(null);
-            setSelectedKidsVideo(null);
+            localStorage.removeItem("sasa-active-kid-name");
+            localStorage.removeItem("sasa-active-kid-emoji");
+            window.location.href = "/";
           }}
         />
       </>
