@@ -365,7 +365,11 @@ function SasaApp() {
 
   // ── Screen priority ──────────────────────────────────────────────────────────
 
-  if (!parentToken && !guestMode) {
+  const forceParentLogin =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("screen") === "parent-login";
+
+  if (forceParentLogin || (!parentToken && !guestMode)) {
     return (
       <ParentLogin
         onSuccess={(token, name) => {
