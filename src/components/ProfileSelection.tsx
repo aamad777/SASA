@@ -197,7 +197,7 @@ export default function ProfileSelection({
           </h1>
         </motion.div>
 
-        <div className="grid w-full max-w-sm grid-cols-2 gap-x-8 gap-y-10">
+        <div className="grid w-full max-w-[680px] grid-cols-2 place-items-center gap-x-6 gap-y-8 sm:grid-cols-3 sm:gap-x-10">
           {profiles.map((profile, idx) => {
             const isSelected = selectingId === profile.id;
             const isOtherSelected = selectingId !== null && !isSelected;

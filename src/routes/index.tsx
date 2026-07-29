@@ -67,11 +67,7 @@ function SasaApp() {
     getStorageItem("sasa-parent-token"),
   );
 
-  const [guestMode, setGuestMode] = useState(() => {
-    const savedParentToken = getStorageItem("sasa-parent-token");
-
-    return !savedParentToken && getStorageItem("sasa-account-mode") === "guest";
-  });
+  const [guestMode, setGuestMode] = useState(() => !getStorageItem("sasa-parent-token"));
 
   const [parentName, setParentName] = useState(
     () => getStorageItem("sasa-parent-name") || "Parent",
