@@ -108,7 +108,7 @@ export default function ProfileSelection({
       <div className="kids-star star-two" />
       <div className="kids-star star-three" />
 
-      <header className="relative z-10 mx-auto flex w-[calc(100%-2rem)] max-w-[760px] items-center justify-end gap-3 pt-6">
+      <header className="relative z-[60] mx-auto flex w-[calc(100%-2rem)] max-w-[760px] items-center justify-end gap-3 pt-6">
         <motion.button
           type="button"
           animate={selectingId !== null ? { opacity: 0.3, scale: 0.95 } : { opacity: 1, scale: 1 }}
@@ -116,11 +116,10 @@ export default function ProfileSelection({
           whileHover={selectingId === null ? { scale: 1.06 } : undefined}
           whileTap={selectingId === null ? { scale: 0.94 } : undefined}
           className="flex cursor-pointer items-center gap-2 rounded-full border-2 border-slate-400/30 bg-white/90 px-5 py-2.5 shadow-md backdrop-blur-md"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
+          onClick={() => {
             playPopSound();
             onLogin();
+            window.location.assign("/?screen=parent-login");
           }}
         >
           <svg
