@@ -108,7 +108,7 @@ export default function ProfileSelection({
       <div className="kids-star star-two" />
       <div className="kids-star star-three" />
 
-      <header className="relative z-10 flex w-full items-center justify-end gap-3 px-6 pt-6">
+      <header className="relative z-10 mx-auto flex w-[calc(100%-2rem)] max-w-[760px] items-center justify-end gap-3 pt-6">
         <motion.button
           type="button"
           animate={selectingId !== null ? { opacity: 0.3, scale: 0.95 } : { opacity: 1, scale: 1 }}
