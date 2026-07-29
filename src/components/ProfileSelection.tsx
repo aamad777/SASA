@@ -116,8 +116,9 @@ export default function ProfileSelection({
           whileHover={selectingId === null ? { scale: 1.06 } : undefined}
           whileTap={selectingId === null ? { scale: 0.94 } : undefined}
           className="flex cursor-pointer items-center gap-2 rounded-full border-2 border-slate-400/30 bg-white/90 px-5 py-2.5 shadow-md backdrop-blur-md"
-          onClick={() => {
-            if (selectingId !== null) return;
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
             playPopSound();
             onLogin();
           }}
