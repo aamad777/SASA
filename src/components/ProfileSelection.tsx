@@ -115,7 +115,7 @@ export default function ProfileSelection({
           transition={{ duration: 0.3 }}
           whileHover={selectingId === null ? { scale: 1.06 } : undefined}
           whileTap={selectingId === null ? { scale: 0.94 } : undefined}
-          className="kids-profile-login-button"
+          className="flex cursor-pointer items-center gap-2 rounded-full border-2 border-slate-400/30 bg-white/90 px-5 py-2.5 shadow-md backdrop-blur-md"
           onClick={() => {
             if (selectingId !== null) return;
             playPopSound();
@@ -123,7 +123,7 @@ export default function ProfileSelection({
           }}
         >
           <svg
-            className="h-5 w-5"
+            className="h-7 w-7 text-slate-600"
             fill="none"
             stroke="currentColor"
             strokeWidth="2.5"
@@ -135,7 +135,11 @@ export default function ProfileSelection({
               strokeLinejoin="round"
             />
           </svg>
-          <span>Login</span>
+          <span className="text-left text-sm font-bold leading-tight text-slate-700">
+            Parent
+            <br />
+            Login
+          </span>
         </motion.button>
         <motion.button
           type="button"

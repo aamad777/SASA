@@ -789,32 +789,74 @@ button {
   box-shadow: 0 0 30px 10px rgba(255, 255, 255, 0.9);
 }
 
+.kids-profile-content {
+  width: min(100%, 760px);
+  margin-inline: auto;
+}
+
 .cloud {
   position: absolute;
-  border-radius: 50px;
-  background: white;
-  opacity: 0.6;
+  z-index: 1;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  filter: drop-shadow(0 12px 20px rgba(47, 128, 170, 0.12));
+}
+
+.cloud::before,
+.cloud::after {
+  position: absolute;
+  content: "";
+  border-radius: 50%;
+  background: inherit;
+}
+
+.cloud::before {
+  left: 17%;
+  bottom: 18%;
+  width: 43%;
+  height: 130%;
+}
+
+.cloud::after {
+  right: 14%;
+  bottom: 25%;
+  width: 37%;
+  height: 105%;
 }
 
 .cloud-one {
-  top: 2.5rem;
-  left: 2.5rem;
-  width: 6rem;
-  height: 2.5rem;
+  top: 9rem;
+  left: -6rem;
+  width: 22rem;
+  height: 5.5rem;
 }
 
 .cloud-two {
-  top: 6rem;
-  right: 1.25rem;
-  width: 8rem;
-  height: 3rem;
+  top: 15rem;
+  right: -7rem;
+  width: 25rem;
+  height: 6rem;
 }
 
 .cloud-three {
-  bottom: 10rem;
-  left: -1.25rem;
-  width: 10rem;
-  height: 4rem;
+  bottom: 8rem;
+  left: -8rem;
+  width: 27rem;
+  height: 6.5rem;
+}
+
+@media (max-width: 900px) {
+  .cloud-one {
+    left: -13rem;
+  }
+
+  .cloud-two {
+    right: -15rem;
+  }
+
+  .cloud-three {
+    left: -16rem;
+  }
 }
 
 .kids-star {
