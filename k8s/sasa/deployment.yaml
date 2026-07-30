@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: sasa-frontend
-          image: 192.168.0.101:5050/sasa-frontend:f19d92ddcfa7039ac40eaa620ac35b2f2632e10a
+          image: 192.168.0.101:5050/sasa-frontend:16103f62f3e390d19c9ff5486a1d94c63dd9ca3f
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
