@@ -1,3 +1,4 @@
+import IntroSplash from "@/components/IntroSplash";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
@@ -27,7 +28,7 @@ import {
   type DatabaseChild,
 } from "@/lib/api";
 
-export const Route = createFileRoute("/")({ component: SasaApp });
+export const Route = createFileRoute("/")({ component: SasaEntry });
 
 type Profile = {
   id: number;
@@ -60,6 +61,12 @@ function getStorageItem(key: string): string | null {
     }
   }
   return null;
+}
+
+function SasaEntry() {
+  const [showIntro, setShowIntro] = useState(true);
+
+  return showIntro ? <IntroSplash onComplete={() => setShowIntro(false)} /> : <SasaApp />;
 }
 
 function SasaApp() {

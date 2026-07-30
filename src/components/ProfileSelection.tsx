@@ -108,7 +108,7 @@ export default function ProfileSelection({
       <div className="kids-star star-two" />
       <div className="kids-star star-three" />
 
-      <header className="relative z-[60] mx-auto flex w-[calc(100%-2rem)] max-w-[760px] items-center justify-end gap-3 pt-6">
+      <header className="relative z-[60] mx-auto flex w-[calc(100%-2rem)] max-w-[760px] items-center justify-center gap-3 pt-6">
         <a
           href="/?screen=parent-login"
           className="flex cursor-pointer items-center gap-2 rounded-full border-2 border-slate-400/30 bg-white/90 px-5 py-2.5 shadow-md backdrop-blur-md transition-transform hover:scale-105 active:scale-95"
@@ -402,7 +402,13 @@ export default function ProfileSelection({
 function BottomNavigation() {
   return (
     <nav className="relative z-20 flex w-full items-center justify-between rounded-t-3xl bg-white px-8 pb-8 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
-      <NavigationItem label="Home" color="text-[#8ecae6]">
+      <NavigationItem
+        label="Home"
+        color="text-[#8ecae6]"
+        onClick={() => {
+          window.location.href = "/videos";
+        }}
+      >
         <svg
           className="h-8 w-8"
           fill="none"
@@ -414,7 +420,13 @@ function BottomNavigation() {
         </svg>
       </NavigationItem>
 
-      <NavigationItem label="Search" color="text-[#f28482]">
+      <NavigationItem
+        label="Search"
+        color="text-[#f28482]"
+        onClick={() => {
+          window.location.href = "/videos";
+        }}
+      >
         <svg
           className="h-8 w-8"
           fill="none"
@@ -430,7 +442,13 @@ function BottomNavigation() {
         </svg>
       </NavigationItem>
 
-      <NavigationItem label="Library" color="text-[#84a59d]">
+      <NavigationItem
+        label="Library"
+        color="text-[#84a59d]"
+        onClick={() => {
+          window.location.href = "/photos";
+        }}
+      >
         <div className="flex gap-0.5">
           <div className="h-7 w-2 -rotate-[10deg] rounded-sm bg-current" />
           <div className="h-7 w-2 rounded-sm bg-current" />
@@ -438,7 +456,14 @@ function BottomNavigation() {
         </div>
       </NavigationItem>
 
-      <NavigationItem label="Profile" color="text-[#ffa62b]" active>
+      <NavigationItem
+        label="Profile"
+        color="text-[#ffa62b]"
+        onClick={() => {
+          window.location.href = "/";
+        }}
+        active
+      >
         <svg className="h-7 w-7" fill="currentColor" viewBox="0 0 24 24">
           <path
             fillRule="evenodd"
@@ -454,16 +479,22 @@ function BottomNavigation() {
 function NavigationItem({
   label,
   color,
+  onClick,
   active = false,
   children,
 }: {
   label: string;
   color: string;
+  onClick: () => void;
   active?: boolean;
   children: ReactNode;
 }) {
   return (
-    <button type="button" className="flex flex-col items-center gap-1">
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex cursor-pointer flex-col items-center gap-1 transition-transform hover:scale-105 active:scale-95"
+    >
       <div className={`${color} ${active ? "rounded-full ring-4 ring-[#ffa62b]/20" : ""}`}>
         {children}
       </div>
