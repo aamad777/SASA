@@ -22,9 +22,14 @@ export default function FreeAccountBanner({
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -16 }}
+        style={{
+          width: "min(calc(100% - 2rem), 760px)",
+          marginInline: "auto",
+          borderRadius: "0 0 1.5rem 1.5rem",
+        }}
         className={`w-full bg-gradient-to-r from-amber-50 via-sky-50 to-indigo-50 border-b border-sky-200/80 px-3.5 py-2.5 sm:px-6 relative shadow-sm z-40 ${className}`}
       >
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+        <div className="max-w-[760px] mx-auto flex items-center justify-between gap-3">
           {/* Left info area */}
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="p-2 bg-amber-400 text-amber-950 rounded-2xl shadow-sm shrink-0 flex items-center justify-center">

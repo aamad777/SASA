@@ -6408,3 +6408,11 @@ button {
     width: 100%;
   }
 }
+
+/* PROFILE PAGE WIDTH ALIGNMENT */
+.kids-profile-page > header,
+.kids-profile-page > nav {
+  width: min(calc(100% - 2rem), 760px);
+  margin-inline: auto;
+  box-sizing: border-box;
+}
