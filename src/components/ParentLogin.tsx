@@ -86,6 +86,7 @@ export default function ParentLogin({ onSuccess, onGuest }: ParentLoginProps) {
       localStorage.setItem("sasa-parent-name", result.user.display_name);
 
       onSuccess(result.token, result.user.display_name);
+      window.location.replace("/");
     } catch (err) {
       setError(
         err instanceof Error
