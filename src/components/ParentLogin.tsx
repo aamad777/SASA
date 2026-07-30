@@ -660,8 +660,7 @@ export default function ParentLogin({ onSuccess, onGuest }: ParentLoginProps) {
         <button
           type="button"
           onClick={() => {
-            setScreen("welcome");
-            setError("");
+            window.location.assign("/");
           }}
           className="absolute left-4 top-4 w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700"
           aria-label="Back to welcome screen"
