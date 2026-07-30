@@ -39,7 +39,7 @@ const flowerImages = [
 const penguinImage = "/welcome-assets/penguin.png";
 
 export default function ParentLogin({ onSuccess, onGuest }: ParentLoginProps) {
-  const [screen, setScreen] = useState<"welcome" | "auth">("welcome");
+  const [screen, setScreen] = useState<"welcome" | "auth">("auth");
 
   const [mode, setMode] = useState<"login" | "register">("login");
 
