@@ -1,8 +1,10 @@
-import { useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   ArrowLeft,
   BookOpen,
   Home,
+  Lock,
+  Maximize2,
   MoreVertical,
   Pause,
   Play,
@@ -12,6 +14,7 @@ import {
   Users,
   PartyPopper,
   Radio,
+  Unlock,
   X,
   Volume2,
 } from "lucide-react";
@@ -44,6 +47,7 @@ type KidsVideoPlayerProps = {
   profileName?: string;
   profileEmoji?: string;
   customProfiles?: CustomProfileProp[];
+  playlist?: KidsVideoItem[];
   onBack: () => void;
   onOpenVideo: (video: KidsVideoItem) => void;
   onOpenHomeTab: (tab: "home" | "search" | "library") => void;
@@ -151,12 +155,19 @@ export default function KidsVideoPlayer({
   profileName = "Leo",
   profileEmoji = "🦁",
   customProfiles = [],
+  playlist = [],
   onBack,
   onOpenVideo,
   onOpenHomeTab,
   onChangeProfile,
 }: KidsVideoPlayerProps) {
   const [playing, setPlaying] = useState(false);
+  const [isVideoLocked, setIsVideoLocked] = useState(false);
+  const [isVideoFullscreen, setIsVideoFullscreen] = useState(false);
+  const [showPhotoFullscreen, setShowPhotoFullscreen] = useState(false);
+  const videoShellRef = useRef<HTMLElement | null>(null);
+  const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const shouldAutoPlayNextRef = useRef(false);
   const [showAll, setShowAll] = useState(false);
   const [showWatchPartyModal, setShowWatchPartyModal] = useState(false);
   const [activeWatchPartyBuddy, setActiveWatchPartyBuddy] = useState<WatchPartyBuddy | null>(null);
@@ -186,6 +197,105 @@ export default function KidsVideoPlayer({
     setSyncToast(message);
     setTimeout(() => setSyncToast(null), 2500);
   };
+
+  // MEDIA_FULLSCREEN_HELPERS_START
+  const getNextUploadedVideo = () => {
+    const uploadedVideos = playlist.filter(
+      (item) => item.sourceType === "upload" && Boolean(item.sourceUrl),
+    );
+
+    if (uploadedVideos.length < 2) return null;
+
+    const currentIndex = uploadedVideos.findIndex((item) => item.id === video.id);
+
+    if (currentIndex < 0) return uploadedVideos[0];
+
+    return uploadedVideos[(currentIndex + 1) % uploadedVideos.length];
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const fullscreenActive = document.fullscreenElement === videoShellRef.current;
+
+      setIsVideoFullscreen(fullscreenActive);
+
+      if (!fullscreenActive) {
+        setIsVideoLocked(false);
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  const handleEnterVideoFullscreen = async () => {
+    const playerElement = videoShellRef.current;
+
+    if (!playerElement) return;
+
+    playPopSound();
+
+    try {
+      await playerElement.requestFullscreen();
+      setIsVideoFullscreen(true);
+    } catch {
+      showToast("Full screen is not available in this browser.");
+    }
+  };
+
+  const handleUploadedVideoEnded = () => {
+    setPlaying(false);
+
+    if (!isVideoFullscreen) return;
+
+    const nextVideo = getNextUploadedVideo();
+
+    if (!nextVideo) {
+      showToast("No other uploaded videos are available.");
+      return;
+    }
+
+    shouldAutoPlayNextRef.current = true;
+    onOpenVideo(nextVideo);
+  };
+
+  useEffect(() => {
+    if (!shouldAutoPlayNextRef.current || video.sourceType !== "upload" || !video.sourceUrl) {
+      return;
+    }
+
+    const videoElement = videoElementRef.current;
+
+    if (!videoElement) return;
+
+    shouldAutoPlayNextRef.current = false;
+    videoElement.load();
+
+    const playNextVideo = () => {
+      void videoElement
+        .play()
+        .then(() => setPlaying(true))
+        .catch(() => showToast("Tap play to continue the next video."));
+    };
+
+    if (videoElement.readyState >= 2) {
+      playNextVideo();
+      return;
+    }
+
+    videoElement.addEventListener("canplay", playNextVideo, {
+      once: true,
+    });
+
+    return () => {
+      videoElement.removeEventListener("canplay", playNextVideo);
+    };
+  }, [video.id, video.sourceType, video.sourceUrl]);
+
+  // MEDIA_FULLSCREEN_HELPERS_END
 
   const handleTogglePlay = () => {
     playPopSound();
@@ -397,19 +507,79 @@ export default function KidsVideoPlayer({
               src={video.sourceUrl}
               alt={video.title}
             />
+
+            <button
+              type="button"
+              onClick={() => {
+                playPopSound();
+                setShowPhotoFullscreen(true);
+              }}
+              className="absolute right-4 top-4 z-20 flex items-center gap-2 rounded-full bg-black/75 px-4 py-2 font-black text-white shadow-lg backdrop-blur-sm transition hover:scale-105 active:scale-95"
+              aria-label="Open photo full screen"
+            >
+              <Maximize2 size={20} />
+              Full Screen
+            </button>
           </section>
         ) : video.sourceType === "upload" && video.sourceUrl ? (
-          <section className="kids-player-hero relative rounded-3xl overflow-hidden shadow-xl bg-black aspect-video">
+          <section
+            ref={videoShellRef}
+            className="kids-player-hero relative aspect-video overflow-hidden rounded-3xl bg-black shadow-xl fullscreen:rounded-none"
+          >
             <video
-              className="w-full h-full object-contain bg-black"
+              ref={videoElementRef}
+              className={
+                "h-full w-full bg-black object-contain " +
+                (isVideoLocked ? "pointer-events-none" : "")
+              }
               src={video.sourceUrl}
-              controls
+              controls={!isVideoLocked}
               playsInline
               preload="metadata"
               poster={video.image}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onEnded={handleUploadedVideoEnded}
             >
               Your browser does not support video playback.
             </video>
+
+            {!isVideoFullscreen && (
+              <button
+                type="button"
+                onClick={handleEnterVideoFullscreen}
+                className="absolute right-4 top-4 z-30 flex items-center gap-2 rounded-full bg-black/80 px-4 py-2 font-black text-white shadow-lg backdrop-blur-sm transition hover:scale-105 active:scale-95"
+                aria-label="Open video full screen"
+              >
+                <Maximize2 size={20} />
+                Full Screen
+              </button>
+            )}
+
+            {isVideoFullscreen && (
+              <button
+                type="button"
+                onClick={() => {
+                  playPopSound();
+                  setIsVideoLocked((locked) => !locked);
+                }}
+                className="absolute right-4 top-4 z-40 flex items-center gap-2 rounded-full bg-black/80 px-4 py-2 font-black text-white shadow-lg backdrop-blur-sm transition hover:scale-105 active:scale-95"
+                aria-label={isVideoLocked ? "Unlock screen" : "Lock screen"}
+                aria-pressed={isVideoLocked}
+              >
+                {isVideoLocked ? <Unlock size={20} /> : <Lock size={20} />}
+                {isVideoLocked ? "Unlock" : "Lock"}
+              </button>
+            )}
+
+            {isVideoFullscreen && isVideoLocked && (
+              <div className="pointer-events-none absolute left-4 top-4 z-30">
+                <div className="flex items-center gap-2 rounded-full bg-black/75 px-4 py-2 font-black text-white shadow-xl backdrop-blur-sm">
+                  <Lock size={20} />
+                  Screen locked
+                </div>
+              </div>
+            )}
           </section>
         ) : video.id === 7 || video.category === "Numbers" ? (
           <NumbersLearningVideo isPlaying={playing} onTogglePlay={handleTogglePlay} />
@@ -455,6 +625,45 @@ export default function KidsVideoPlayer({
             </motion.button>
           </section>
         )}
+
+        <AnimatePresence>
+          {showPhotoFullscreen && video.sourceType === "photo" && video.sourceUrl && (
+            <motion.div
+              className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 p-3 sm:p-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowPhotoFullscreen(false)}
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Full-screen photo: ${video.title}`}
+            >
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  playPopSound();
+                  setShowPhotoFullscreen(false);
+                }}
+                className="absolute right-4 top-4 z-10 flex items-center gap-2 rounded-full bg-white px-4 py-2 font-black text-slate-900 shadow-xl transition hover:scale-105 active:scale-95"
+                aria-label="Close full-screen photo"
+              >
+                <X size={22} />
+                Close
+              </button>
+
+              <motion.img
+                className="max-h-full max-w-full object-contain"
+                src={video.sourceUrl}
+                alt={video.title}
+                initial={{ scale: 0.92 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.92 }}
+                onClick={(event) => event.stopPropagation()}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {video.sourceType !== "photo" && (
           <div className="kids-player-progress rounded-full overflow-hidden mt-3">
