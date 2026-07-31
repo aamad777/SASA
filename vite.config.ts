@@ -21,6 +21,10 @@ export default defineConfig({
           target: "https://sara.khader-ai.online",
           changeOrigin: true,
         },
+        "/uploads": {
+          target: "https://sara.khader-ai.online",
+          changeOrigin: true,
+        },
       },
     },
   },
