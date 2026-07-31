@@ -637,6 +637,7 @@ function SasaApp() {
         profileName={profile?.name}
         profileEmoji={profile?.emoji}
         customProfiles={customProfiles}
+        playlist={assignedVideos}
         onBack={() => {
           setHomeTab("home");
           setSelectedKidsVideo(null);
