@@ -83,9 +83,12 @@ export default function ParentLogin({ onSuccess, onGuest }: ParentLoginProps) {
 
       localStorage.setItem("sasa-parent-token", result.token);
 
-      localStorage.setItem("sasa-parent-name", result.user.display_name);
+      const safeParentName =
+        result.user.display_name?.trim() || cleanName || cleanEmail.split("@")[0] || "Parent";
 
-      onSuccess(result.token, result.user.display_name);
+      localStorage.setItem("sasa-parent-name", safeParentName);
+
+      onSuccess(result.token, safeParentName);
       window.location.replace("/");
     } catch (err) {
       setError(

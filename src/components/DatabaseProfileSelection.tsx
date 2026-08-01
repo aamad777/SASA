@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff, LockKeyhole, Plus, X } from "lucide-react";
+import { Eye, EyeOff, LockKeyhole, Plus, X, Settings } from "lucide-react";
 
 import { createChild, loginChild, setChildPin, type DatabaseChild } from "../lib/api";
 
@@ -13,6 +13,7 @@ type Props = {
   onChildCreated: (child: DatabaseChild) => void;
   onChildPinChanged: (childId: string) => void;
   onRetry: () => void;
+  onOpenParentControls: () => void;
   onLogout: () => void;
 };
 
@@ -49,8 +50,16 @@ export default function DatabaseProfileSelection({
   onChildCreated,
   onChildPinChanged,
   onRetry,
+  onOpenParentControls,
   onLogout,
 }: Props) {
+  const normalizedParentName = parentName?.trim();
+
+  const displayParentName =
+    normalizedParentName && !["undefined", "null"].includes(normalizedParentName.toLowerCase())
+      ? normalizedParentName
+      : "Parent";
+
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [loginName, setLoginName] = useState("");
@@ -260,7 +269,7 @@ export default function DatabaseProfileSelection({
         <div>
           <small style={{ color: "#64748b" }}>Connected parent</small>
 
-          <h2 style={{ margin: "4px 0 0" }}>{parentName}</h2>
+          <h2 style={{ margin: "4px 0 0" }}>{displayParentName}</h2>
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
@@ -308,6 +317,27 @@ export default function DatabaseProfileSelection({
           >
             <LockKeyhole size={18} />
             Manage PIN
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenParentControls}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "11px 16px",
+              border: 0,
+              borderRadius: 14,
+              background: "linear-gradient(135deg, #8b5cf6, #ec4899)",
+              color: "white",
+              fontWeight: 800,
+              cursor: "pointer",
+              boxShadow: "0 8px 20px rgba(139, 92, 246, 0.25)",
+            }}
+          >
+            <Settings size={18} />
+            Parent Controls
           </button>
 
           <button
