@@ -63,6 +63,18 @@ function getStorageItem(key: string): string | null {
   return null;
 }
 
+function normalizeParentName(value: unknown): string {
+  if (typeof value !== "string") return "Parent";
+
+  const name = value.trim();
+
+  if (!name || ["undefined", "null"].includes(name.toLowerCase())) {
+    return "Parent";
+  }
+
+  return name;
+}
+
 function SasaEntry() {
   const [showIntro, setShowIntro] = useState(true);
 
@@ -76,8 +88,8 @@ function SasaApp() {
 
   const [guestMode, setGuestMode] = useState(() => !getStorageItem("sasa-parent-token"));
 
-  const [parentName, setParentName] = useState(
-    () => getStorageItem("sasa-parent-name") || "Parent",
+  const [parentName, setParentName] = useState(() =>
+    normalizeParentName(getStorageItem("sasa-parent-name")),
   );
 
   const [databaseChildren, setDatabaseChildren] = useState<DatabaseChild[]>([]);
@@ -379,7 +391,7 @@ function SasaApp() {
           localStorage.removeItem("sasa-account-mode");
           setGuestMode(false);
           setParentToken(token);
-          setParentName(name);
+          setParentName(normalizeParentName(name));
         }}
         onGuest={() => {
           localStorage.setItem("sasa-account-mode", "guest");
@@ -524,6 +536,7 @@ function SasaApp() {
         loading={databaseChildrenLoading}
         error={databaseChildrenError}
         parentName={parentName}
+        onOpenParentControls={openParentGate}
         onRetry={() => loadDatabaseChildren(parentToken)}
         onChildCreated={(child) => {
           setDatabaseChildren((current) => [...current, child]);
