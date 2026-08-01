@@ -6416,3 +6416,37 @@ button {
   margin-inline: auto;
   box-sizing: border-box;
 }
+
+/* FULL WIDTH DYNAMIC CATEGORY ROW */
+.kids-category-nav {
+  width: min(1180px, calc(100% - 24px));
+  justify-content: space-between;
+  gap: clamp(14px, 2.2vw, 32px);
+  margin-inline: auto;
+  padding-inline: 12px;
+}
+
+.kids-category-nav button {
+  min-width: 84px;
+  flex: 0 0 84px;
+}
+
+@media (max-width: 699px) {
+  .kids-category-nav {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 18px;
+    padding-inline: 16px;
+  }
+
+  .kids-category-nav button {
+    min-width: 72px;
+    flex-basis: 72px;
+  }
+}
+
+/* PREVENT OLD MEDIA FLASH DURING TAB CHANGE */
+.kids-video-home main:not(.kids-video-grid) > article,
+.kids-video-home main:not(.kids-video-grid) > div > article {
+  display: none !important;
+}
