@@ -74,7 +74,7 @@ type KidsVideoHomeProps = {
   onAccountAction: () => void;
 };
 
-const categories = [
+const builtInCategories = [
   {
     name: "Numbers",
     image: numbersVideoImg,
@@ -389,6 +389,38 @@ export default function KidsVideoHome({
     return list;
   }, [assignedVideos, currentTab, libraryIds, searchText, selectedCategory]);
 
+  const visibleCategories = useMemo(() => {
+    const categoryMap = new Map(
+      builtInCategories.map((category) => [category.name.toLowerCase(), category]),
+    );
+
+    const firstPhoto = assignedVideos.find((video) => video.sourceType === "photo");
+
+    if (firstPhoto) {
+      categoryMap.set("photos", {
+        name: "Photos",
+        image: firstPhoto.image,
+      });
+    }
+
+    assignedVideos.forEach((video) => {
+      const categoryName = video.category?.trim();
+
+      if (!categoryName) return;
+
+      const key = categoryName.toLowerCase();
+
+      if (!categoryMap.has(key)) {
+        categoryMap.set(key, {
+          name: categoryName,
+          image: video.image,
+        });
+      }
+    });
+
+    return Array.from(categoryMap.values());
+  }, [assignedVideos]);
+
   const toggleLibrary = (videoId: number, event: MouseEvent) => {
     event.stopPropagation();
     const isAdding = !libraryIds.includes(videoId);
@@ -672,7 +704,7 @@ export default function KidsVideoHome({
               <strong>All Cartoons</strong>
             </motion.button>
 
-            {categories.map((category) => (
+            {visibleCategories.map((category) => (
               <motion.button
                 whileHover={{ scale: 1.06 }}
                 whileTap={{ scale: 0.93 }}
@@ -695,6 +727,7 @@ export default function KidsVideoHome({
       </div>
 
       <main
+        key={currentTab}
         className={`pb-28 ${["home", "search", "library"].includes(currentTab) ? "kids-video-grid" : "w-full px-3 sm:px-6 py-4"}`}
       >
         {currentTab === "games" ? (
