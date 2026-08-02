@@ -501,12 +501,8 @@ export default function KidsVideoPlayer({
             />
           </section>
         ) : video.sourceType === "photo" && video.sourceUrl ? (
-          <section className="kids-player-hero relative rounded-3xl overflow-hidden shadow-xl bg-slate-950 min-h-[300px] sm:min-h-[480px] flex items-center justify-center">
-            <img
-              className="w-full h-full max-h-[72vh] object-contain bg-slate-950"
-              src={video.sourceUrl}
-              alt={video.title}
-            />
+          <section className="kids-player-hero kids-player-media-shell kids-player-photo-shell relative overflow-hidden rounded-3xl bg-slate-950 shadow-xl">
+            <img className="kids-player-media-object" src={video.sourceUrl} alt={video.title} />
 
             <button
               type="button"
@@ -524,13 +520,12 @@ export default function KidsVideoPlayer({
         ) : video.sourceType === "upload" && video.sourceUrl ? (
           <section
             ref={videoShellRef}
-            className="kids-player-hero relative aspect-video overflow-hidden rounded-3xl bg-black shadow-xl fullscreen:rounded-none"
+            className="kids-player-hero kids-player-media-shell kids-player-video-shell relative overflow-hidden rounded-3xl bg-black shadow-xl fullscreen:rounded-none"
           >
             <video
               ref={videoElementRef}
               className={
-                "h-full w-full bg-black object-contain " +
-                (isVideoLocked ? "pointer-events-none" : "")
+                "kids-player-media-object bg-black " + (isVideoLocked ? "pointer-events-none" : "")
               }
               src={video.sourceUrl}
               controls={!isVideoLocked}
