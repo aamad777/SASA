@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   BookOpen,
   Home,
   Lock,
@@ -162,6 +164,7 @@ export default function KidsVideoPlayer({
   onChangeProfile,
 }: KidsVideoPlayerProps) {
   const [playing, setPlaying] = useState(false);
+  const [autoPlayMuted, setAutoPlayMuted] = useState(false);
   const [isVideoLocked, setIsVideoLocked] = useState(false);
   const [isVideoFullscreen, setIsVideoFullscreen] = useState(false);
   const [showPhotoFullscreen, setShowPhotoFullscreen] = useState(false);
@@ -177,9 +180,17 @@ export default function KidsVideoPlayer({
     return localStorage.getItem(`sasa-video-reaction-${video.id}`) ?? "";
   });
 
-  const upNext = kidsVideos
+  const mediaPlaylist = playlist.length > 0 ? playlist : kidsVideos;
+
+  const upNext = mediaPlaylist
     .filter((item) => item.id !== video.id)
-    .slice(0, showAll ? kidsVideos.length : 3);
+    .slice(0, showAll ? mediaPlaylist.length : 3);
+
+  const hasAdjacentMedia =
+    mediaPlaylist.filter(
+      (item) =>
+        (item.sourceType === "upload" || item.sourceType === "photo") && Boolean(item.sourceUrl),
+    ).length > 1;
 
   // Combine default buddies and custom profiles, excluding the currently logged-in kid
   const availableBuddies: WatchPartyBuddy[] = [
@@ -199,18 +210,50 @@ export default function KidsVideoPlayer({
   };
 
   // MEDIA_FULLSCREEN_HELPERS_START
-  const getNextUploadedVideo = () => {
-    const uploadedVideos = playlist.filter(
-      (item) => item.sourceType === "upload" && Boolean(item.sourceUrl),
+  const getNextPlayableMedia = () => {
+    const playableMedia = mediaPlaylist.filter(
+      (item) =>
+        (item.sourceType === "upload" || item.sourceType === "photo") && Boolean(item.sourceUrl),
     );
 
-    if (uploadedVideos.length < 2) return null;
+    if (playableMedia.length < 2) return null;
 
-    const currentIndex = uploadedVideos.findIndex((item) => item.id === video.id);
+    const currentIndex = playableMedia.findIndex((item) => item.id === video.id);
 
-    if (currentIndex < 0) return uploadedVideos[0];
+    if (currentIndex < 0) return playableMedia[0];
 
-    return uploadedVideos[(currentIndex + 1) % uploadedVideos.length];
+    return playableMedia[(currentIndex + 1) % playableMedia.length];
+  };
+
+  const getPreviousPlayableMedia = () => {
+    const playableMedia = mediaPlaylist.filter(
+      (item) =>
+        (item.sourceType === "upload" || item.sourceType === "photo") && Boolean(item.sourceUrl),
+    );
+
+    if (playableMedia.length < 2) return null;
+
+    const currentIndex = playableMedia.findIndex((item) => item.id === video.id);
+
+    if (currentIndex < 0) {
+      return playableMedia[playableMedia.length - 1];
+    }
+
+    return playableMedia[(currentIndex - 1 + playableMedia.length) % playableMedia.length];
+  };
+
+  const openMediaFromControl = (item: KidsVideoItem | null) => {
+    if (!item) return;
+
+    shouldAutoPlayNextRef.current = item.sourceType === "upload";
+
+    playPopSound();
+    onOpenVideo(item);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   };
 
   useEffect(() => {
@@ -249,17 +292,17 @@ export default function KidsVideoPlayer({
   const handleUploadedVideoEnded = () => {
     setPlaying(false);
 
-    if (!isVideoFullscreen) return;
+    const nextItem = getNextPlayableMedia();
 
-    const nextVideo = getNextUploadedVideo();
-
-    if (!nextVideo) {
-      showToast("No other uploaded videos are available.");
+    if (!nextItem) {
+      showToast("No other photo or video is available.");
       return;
     }
 
-    shouldAutoPlayNextRef.current = true;
-    onOpenVideo(nextVideo);
+    shouldAutoPlayNextRef.current = nextItem.sourceType === "upload";
+
+    onOpenVideo(nextItem);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -272,28 +315,51 @@ export default function KidsVideoPlayer({
     if (!videoElement) return;
 
     shouldAutoPlayNextRef.current = false;
+    videoElement.muted = true;
+    setAutoPlayMuted(true);
     videoElement.load();
 
-    const playNextVideo = () => {
+    const startPlayback = () => {
       void videoElement
         .play()
         .then(() => setPlaying(true))
-        .catch(() => showToast("Tap play to continue the next video."));
+        .catch(() => showToast("Tap play to continue."));
     };
 
     if (videoElement.readyState >= 2) {
-      playNextVideo();
+      startPlayback();
       return;
     }
 
-    videoElement.addEventListener("canplay", playNextVideo, {
+    videoElement.addEventListener("canplay", startPlayback, {
       once: true,
     });
 
     return () => {
-      videoElement.removeEventListener("canplay", playNextVideo);
+      videoElement.removeEventListener("canplay", startPlayback);
     };
   }, [video.id, video.sourceType, video.sourceUrl]);
+
+  // AUTO_NEXT_PHOTO_START
+  useEffect(() => {
+    if (video.sourceType !== "photo" || !video.sourceUrl) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const nextItem = getNextPlayableMedia();
+
+      if (!nextItem) return;
+
+      shouldAutoPlayNextRef.current = nextItem.sourceType === "upload";
+
+      onOpenVideo(nextItem);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 8000);
+
+    return () => window.clearTimeout(timer);
+  }, [video.id, video.sourceType, video.sourceUrl, playlist]);
+  // AUTO_NEXT_PHOTO_END
 
   // MEDIA_FULLSCREEN_HELPERS_END
 
@@ -504,6 +570,36 @@ export default function KidsVideoPlayer({
           <section className="kids-player-hero kids-player-media-shell kids-player-photo-shell relative overflow-hidden rounded-3xl bg-slate-950 shadow-xl">
             <img className="kids-player-media-object" src={video.sourceUrl} alt={video.title} />
 
+            <span className="kids-auto-next-badge">Next in 8 seconds</span>
+
+            {hasAdjacentMedia && (
+              <div className="kids-media-nav-controls" aria-label="Photo and video navigation">
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.9 }}
+                  className="kids-media-nav-button"
+                  onClick={() => openMediaFromControl(getPreviousPlayableMedia())}
+                  aria-label="Previous photo or video"
+                  title="Previous"
+                >
+                  <ChevronLeft size={28} />
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.9 }}
+                  className="kids-media-nav-button"
+                  onClick={() => openMediaFromControl(getNextPlayableMedia())}
+                  aria-label="Next photo or video"
+                  title="Next"
+                >
+                  <ChevronRight size={28} />
+                </motion.button>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => {
@@ -538,6 +634,54 @@ export default function KidsVideoPlayer({
             >
               Your browser does not support video playback.
             </video>
+
+            {hasAdjacentMedia && (
+              <div className="kids-media-nav-controls" aria-label="Video navigation">
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.9 }}
+                  className="kids-media-nav-button"
+                  onClick={() => openMediaFromControl(getPreviousPlayableMedia())}
+                  aria-label="Previous photo or video"
+                  title="Previous"
+                >
+                  <ChevronLeft size={28} />
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.9 }}
+                  className="kids-media-nav-button"
+                  onClick={() => openMediaFromControl(getNextPlayableMedia())}
+                  aria-label="Next photo or video"
+                  title="Next"
+                >
+                  <ChevronRight size={28} />
+                </motion.button>
+              </div>
+            )}
+
+            {autoPlayMuted && (
+              <button
+                type="button"
+                className="kids-autoplay-sound-button"
+                onClick={() => {
+                  const element = videoElementRef.current;
+
+                  if (element) {
+                    element.muted = false;
+                  }
+
+                  setAutoPlayMuted(false);
+                  playPopSound();
+                }}
+              >
+                <Volume2 size={17} />
+                Tap for sound
+              </button>
+            )}
 
             {!isVideoFullscreen && (
               <button
@@ -698,8 +842,33 @@ export default function KidsVideoPlayer({
             )}
           </div>
 
-          <section className="kids-reaction-section mt-6">
-            <h3>How do you feel about this cartoon?</h3>
+          {upNext[0] && (
+            <button
+              type="button"
+              className="kids-next-media-preview"
+              onClick={() => {
+                const nextItem = upNext[0];
+
+                shouldAutoPlayNextRef.current = nextItem.sourceType === "upload";
+
+                playPopSound();
+                onOpenVideo(nextItem);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              <img src={upNext[0].image} alt={upNext[0].title} />
+
+              <span>
+                <small>Playing next</small>
+                <strong>{upNext[0].title}</strong>
+              </span>
+
+              <Play size={18} fill="currentColor" />
+            </button>
+          )}
+
+          <section className="kids-reaction-section kids-reaction-compact mt-3">
+            <h3>Pick a reaction</h3>
 
             <div className="kids-reaction-grid">
               {reactions.map((item) => {
@@ -711,17 +880,13 @@ export default function KidsVideoPlayer({
                     whileHover={{ scale: 1.08, y: -3 }}
                     whileTap={{ scale: 0.9 }}
                     type="button"
-                    className={[
-                      "kids-reaction-choice",
-                      item.className,
-                      selected ? "selected ring-4 ring-purple-400" : "",
-                    ]
+                    className={["kids-reaction-choice", item.className, selected ? "selected" : ""]
                       .filter(Boolean)
                       .join(" ")}
                     onClick={(e) => handleReactionClick(item.id, e)}
                     aria-pressed={selected}
                   >
-                    <span className="kids-reaction-face text-3xl">{item.emoji}</span>
+                    <span className="kids-reaction-face">{item.emoji}</span>
                     <span className="kids-reaction-label font-bold">{item.label}</span>
                   </motion.button>
                 );
