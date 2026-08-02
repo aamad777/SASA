@@ -6515,3 +6515,251 @@ button {
     min-height: 220px !important;
   }
 }
+
+/* PLAYER AUTO NEXT AND EXTRA COMPACT REACTIONS */
+.kids-auto-next-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 30;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.82);
+  color: white;
+  font-size: 10px;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+.kids-autoplay-sound-button {
+  position: absolute;
+  bottom: 15px;
+  left: 50%;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #172033;
+  font-size: 12px;
+  font-weight: 900;
+  transform: translateX(-50%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.kids-next-media-preview {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  width: 100%;
+  align-items: center;
+  gap: 9px;
+  margin: 12px 0 8px;
+  padding: 6px;
+  border: 1px solid #dbeafe;
+  border-radius: 13px;
+  background: #f8fbff;
+  color: #172033;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kids-next-media-preview img {
+  width: 76px;
+  height: 46px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: #020617;
+}
+
+.kids-next-media-preview > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.kids-next-media-preview small {
+  color: #7c3aed;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.kids-next-media-preview strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kids-reaction-section.kids-reaction-compact {
+  margin: 6px 0 12px !important;
+  padding: 7px 8px !important;
+  border-radius: 12px !important;
+}
+
+.kids-reaction-section.kids-reaction-compact > h3 {
+  margin: 0 0 5px !important;
+  font-size: 8px !important;
+}
+
+.kids-reaction-compact .kids-reaction-grid {
+  display: flex !important;
+  justify-content: center;
+  gap: 5px !important;
+  margin: 0 !important;
+}
+
+.kids-reaction-compact .kids-reaction-choice {
+  display: flex !important;
+  width: auto !important;
+  min-width: 54px !important;
+  min-height: 30px !important;
+  flex-direction: row !important;
+  justify-content: center;
+  gap: 3px !important;
+  padding: 3px 5px !important;
+  border-radius: 9px;
+}
+
+.kids-reaction-compact .kids-reaction-face {
+  width: 22px !important;
+  height: 22px !important;
+  border-width: 1px !important;
+  border-bottom-width: 2px !important;
+  border-radius: 7px !important;
+  font-size: 13px !important;
+}
+
+.kids-reaction-compact .kids-reaction-label {
+  font-size: 7px !important;
+  line-height: 1 !important;
+  white-space: nowrap;
+}
+
+.kids-reaction-compact .kids-reaction-choice.selected .kids-reaction-face {
+  outline: 1px solid #3b82f6 !important;
+  outline-offset: 1px !important;
+  transform: none !important;
+}
+
+/* FITTED REACTIONS AND MEDIA NAVIGATION */
+.kids-media-nav-controls {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  left: 12px;
+  z-index: 38;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.kids-media-nav-button {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.78);
+  color: white;
+  box-shadow: 0 7px 22px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.kids-media-nav-button:hover {
+  background: rgba(37, 99, 235, 0.92);
+}
+
+.kids-reaction-section.kids-reaction-compact {
+  width: 100%;
+  max-width: 460px;
+  margin: 8px auto 14px !important;
+  padding: 9px 10px !important;
+}
+
+.kids-reaction-compact .kids-reaction-grid {
+  display: grid !important;
+  width: min(390px, 100%);
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  margin: 0 auto !important;
+}
+
+.kids-reaction-compact .kids-reaction-choice {
+  display: flex !important;
+  min-width: 0 !important;
+  min-height: 50px !important;
+  flex-direction: column !important;
+  align-items: center;
+  justify-content: center;
+  gap: 3px !important;
+  padding: 4px 2px !important;
+  border-radius: 11px;
+}
+
+.kids-reaction-compact .kids-reaction-face {
+  display: grid !important;
+  width: 30px !important;
+  height: 30px !important;
+  place-items: center !important;
+  border-width: 1px !important;
+  border-bottom-width: 3px !important;
+  border-radius: 9px !important;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+}
+
+.kids-reaction-compact .kids-reaction-label {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  font-size: 9px !important;
+  line-height: 1.1 !important;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kids-reaction-compact .kids-reaction-choice.selected .kids-reaction-face {
+  border-color: #2563eb !important;
+  outline: 2px solid rgba(37, 99, 235, 0.22) !important;
+  outline-offset: 1px !important;
+  transform: none !important;
+}
+
+@media (max-width: 420px) {
+  .kids-media-nav-controls {
+    right: 8px;
+    left: 8px;
+  }
+
+  .kids-media-nav-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .kids-reaction-compact .kids-reaction-grid {
+    gap: 5px !important;
+  }
+
+  .kids-reaction-compact .kids-reaction-face {
+    width: 27px !important;
+    height: 27px !important;
+    font-size: 16px !important;
+  }
+
+  .kids-reaction-compact .kids-reaction-label {
+    font-size: 8px !important;
+  }
+}
