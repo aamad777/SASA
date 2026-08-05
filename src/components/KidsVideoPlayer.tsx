@@ -1,3 +1,4 @@
+import YouTubeStyleMediaPlayer from "./YouTubeStyleMediaPlayer";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   ArrowLeft,
@@ -182,15 +183,39 @@ export default function KidsVideoPlayer({
 
   const mediaPlaylist = playlist.length > 0 ? playlist : kidsVideos;
 
+  const getMediaIdentity = (item: KidsVideoItem) =>
+    [
+      item.sourceType || "built-in",
+      item.id,
+      item.sourceUrl || "",
+      item.youtubeVideoId || "",
+      item.title,
+    ].join("::");
+
+  const navigableMedia = mediaPlaylist
+    .filter(
+      (item) =>
+        ((item.sourceType === "upload" || item.sourceType === "photo") &&
+          Boolean(item.sourceUrl)) ||
+        (item.sourceType === "youtube" && Boolean(item.youtubeVideoId)),
+    )
+    .filter((item, index, items) => {
+      const identity = getMediaIdentity(item);
+
+      return items.findIndex((candidate) => getMediaIdentity(candidate) === identity) === index;
+    });
+
+  const currentMediaIdentity = getMediaIdentity(video);
+
+  const currentNavigableIndex = navigableMedia.findIndex(
+    (item) => getMediaIdentity(item) === currentMediaIdentity,
+  );
+
   const upNext = mediaPlaylist
-    .filter((item) => item.id !== video.id)
+    .filter((item) => getMediaIdentity(item) !== currentMediaIdentity)
     .slice(0, showAll ? mediaPlaylist.length : 3);
 
-  const hasAdjacentMedia =
-    mediaPlaylist.filter(
-      (item) =>
-        (item.sourceType === "upload" || item.sourceType === "photo") && Boolean(item.sourceUrl),
-    ).length > 1;
+  const hasAdjacentMedia = navigableMedia.length > 1;
 
   // Combine default buddies and custom profiles, excluding the currently logged-in kid
   const availableBuddies: WatchPartyBuddy[] = [
@@ -211,35 +236,25 @@ export default function KidsVideoPlayer({
 
   // MEDIA_FULLSCREEN_HELPERS_START
   const getNextPlayableMedia = () => {
-    const playableMedia = mediaPlaylist.filter(
-      (item) =>
-        (item.sourceType === "upload" || item.sourceType === "photo") && Boolean(item.sourceUrl),
-    );
+    if (navigableMedia.length < 2) return null;
 
-    if (playableMedia.length < 2) return null;
+    if (currentNavigableIndex < 0) {
+      return navigableMedia[0];
+    }
 
-    const currentIndex = playableMedia.findIndex((item) => item.id === video.id);
-
-    if (currentIndex < 0) return playableMedia[0];
-
-    return playableMedia[(currentIndex + 1) % playableMedia.length];
+    return navigableMedia[(currentNavigableIndex + 1) % navigableMedia.length];
   };
 
   const getPreviousPlayableMedia = () => {
-    const playableMedia = mediaPlaylist.filter(
-      (item) =>
-        (item.sourceType === "upload" || item.sourceType === "photo") && Boolean(item.sourceUrl),
-    );
+    if (navigableMedia.length < 2) return null;
 
-    if (playableMedia.length < 2) return null;
-
-    const currentIndex = playableMedia.findIndex((item) => item.id === video.id);
-
-    if (currentIndex < 0) {
-      return playableMedia[playableMedia.length - 1];
+    if (currentNavigableIndex < 0) {
+      return navigableMedia[navigableMedia.length - 1];
     }
 
-    return playableMedia[(currentIndex - 1 + playableMedia.length) % playableMedia.length];
+    return navigableMedia[
+      (currentNavigableIndex - 1 + navigableMedia.length) % navigableMedia.length
+    ];
   };
 
   const openMediaFromControl = (item: KidsVideoItem | null) => {
@@ -339,27 +354,6 @@ export default function KidsVideoPlayer({
       videoElement.removeEventListener("canplay", startPlayback);
     };
   }, [video.id, video.sourceType, video.sourceUrl]);
-
-  // AUTO_NEXT_PHOTO_START
-  useEffect(() => {
-    if (video.sourceType !== "photo" || !video.sourceUrl) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      const nextItem = getNextPlayableMedia();
-
-      if (!nextItem) return;
-
-      shouldAutoPlayNextRef.current = nextItem.sourceType === "upload";
-
-      onOpenVideo(nextItem);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }, 8000);
-
-    return () => window.clearTimeout(timer);
-  }, [video.id, video.sourceType, video.sourceUrl, playlist]);
-  // AUTO_NEXT_PHOTO_END
 
   // MEDIA_FULLSCREEN_HELPERS_END
 
@@ -565,161 +559,41 @@ export default function KidsVideoPlayer({
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
             />
-          </section>
-        ) : video.sourceType === "photo" && video.sourceUrl ? (
-          <section className="kids-player-hero kids-player-media-shell kids-player-photo-shell relative overflow-hidden rounded-3xl bg-slate-950 shadow-xl">
-            <img className="kids-player-media-object" src={video.sourceUrl} alt={video.title} />
-
-            <span className="kids-auto-next-badge">Next in 8 seconds</span>
 
             {hasAdjacentMedia && (
-              <div className="kids-media-nav-controls" aria-label="Photo and video navigation">
-                <motion.button
+              <div className="sasa-youtube-frame-nav">
+                <button
                   type="button"
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.9 }}
-                  className="kids-media-nav-button"
                   onClick={() => openMediaFromControl(getPreviousPlayableMedia())}
-                  aria-label="Previous photo or video"
-                  title="Previous"
+                  aria-label="Previous assigned media"
                 >
                   <ChevronLeft size={28} />
-                </motion.button>
+                </button>
 
-                <motion.button
+                <button
                   type="button"
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.9 }}
-                  className="kids-media-nav-button"
                   onClick={() => openMediaFromControl(getNextPlayableMedia())}
-                  aria-label="Next photo or video"
-                  title="Next"
+                  aria-label="Next assigned media"
                 >
                   <ChevronRight size={28} />
-                </motion.button>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                playPopSound();
-                setShowPhotoFullscreen(true);
-              }}
-              className="absolute right-4 top-4 z-20 flex items-center gap-2 rounded-full bg-black/75 px-4 py-2 font-black text-white shadow-lg backdrop-blur-sm transition hover:scale-105 active:scale-95"
-              aria-label="Open photo full screen"
-            >
-              <Maximize2 size={20} />
-              Full Screen
-            </button>
-          </section>
-        ) : video.sourceType === "upload" && video.sourceUrl ? (
-          <section
-            ref={videoShellRef}
-            className="kids-player-hero kids-player-media-shell kids-player-video-shell relative overflow-hidden rounded-3xl bg-black shadow-xl fullscreen:rounded-none"
-          >
-            <video
-              ref={videoElementRef}
-              className={
-                "kids-player-media-object bg-black " + (isVideoLocked ? "pointer-events-none" : "")
-              }
-              src={video.sourceUrl}
-              controls={!isVideoLocked}
-              playsInline
-              preload="metadata"
-              poster={video.image}
-              onPlay={() => setPlaying(true)}
-              onPause={() => setPlaying(false)}
-              onEnded={handleUploadedVideoEnded}
-            >
-              Your browser does not support video playback.
-            </video>
-
-            {hasAdjacentMedia && (
-              <div className="kids-media-nav-controls" aria-label="Video navigation">
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.9 }}
-                  className="kids-media-nav-button"
-                  onClick={() => openMediaFromControl(getPreviousPlayableMedia())}
-                  aria-label="Previous photo or video"
-                  title="Previous"
-                >
-                  <ChevronLeft size={28} />
-                </motion.button>
-
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.9 }}
-                  className="kids-media-nav-button"
-                  onClick={() => openMediaFromControl(getNextPlayableMedia())}
-                  aria-label="Next photo or video"
-                  title="Next"
-                >
-                  <ChevronRight size={28} />
-                </motion.button>
-              </div>
-            )}
-
-            {autoPlayMuted && (
-              <button
-                type="button"
-                className="kids-autoplay-sound-button"
-                onClick={() => {
-                  const element = videoElementRef.current;
-
-                  if (element) {
-                    element.muted = false;
-                  }
-
-                  setAutoPlayMuted(false);
-                  playPopSound();
-                }}
-              >
-                <Volume2 size={17} />
-                Tap for sound
-              </button>
-            )}
-
-            {!isVideoFullscreen && (
-              <button
-                type="button"
-                onClick={handleEnterVideoFullscreen}
-                className="absolute right-4 top-4 z-30 flex items-center gap-2 rounded-full bg-black/80 px-4 py-2 font-black text-white shadow-lg backdrop-blur-sm transition hover:scale-105 active:scale-95"
-                aria-label="Open video full screen"
-              >
-                <Maximize2 size={20} />
-                Full Screen
-              </button>
-            )}
-
-            {isVideoFullscreen && (
-              <button
-                type="button"
-                onClick={() => {
-                  playPopSound();
-                  setIsVideoLocked((locked) => !locked);
-                }}
-                className="absolute right-4 top-4 z-40 flex items-center gap-2 rounded-full bg-black/80 px-4 py-2 font-black text-white shadow-lg backdrop-blur-sm transition hover:scale-105 active:scale-95"
-                aria-label={isVideoLocked ? "Unlock screen" : "Lock screen"}
-                aria-pressed={isVideoLocked}
-              >
-                {isVideoLocked ? <Unlock size={20} /> : <Lock size={20} />}
-                {isVideoLocked ? "Unlock" : "Lock"}
-              </button>
-            )}
-
-            {isVideoFullscreen && isVideoLocked && (
-              <div className="pointer-events-none absolute left-4 top-4 z-30">
-                <div className="flex items-center gap-2 rounded-full bg-black/75 px-4 py-2 font-black text-white shadow-xl backdrop-blur-sm">
-                  <Lock size={20} />
-                  Screen locked
-                </div>
+                </button>
               </div>
             )}
           </section>
+        ) : (video.sourceType === "photo" || video.sourceType === "upload") && video.sourceUrl ? (
+          <YouTubeStyleMediaPlayer
+            key={getMediaIdentity(video)}
+            media={video}
+            hasAdjacentMedia={hasAdjacentMedia}
+            autoPlay={shouldAutoPlayNextRef.current}
+            onAutoPlayConsumed={() => {
+              shouldAutoPlayNextRef.current = false;
+            }}
+            onPrevious={() => openMediaFromControl(getPreviousPlayableMedia())}
+            onNext={() => openMediaFromControl(getNextPlayableMedia())}
+            onPlayingChange={setPlaying}
+            onToast={showToast}
+          />
         ) : video.id === 7 || video.category === "Numbers" ? (
           <NumbersLearningVideo isPlaying={playing} onTogglePlay={handleTogglePlay} />
         ) : (
@@ -804,7 +678,7 @@ export default function KidsVideoPlayer({
           )}
         </AnimatePresence>
 
-        {video.sourceType !== "photo" && (
+        {video.sourceType !== "photo" && video.sourceType !== "upload" && (
           <div className="kids-player-progress rounded-full overflow-hidden mt-3">
             <motion.span
               className="bg-gradient-to-r from-pink-500 to-purple-500 h-full block"
@@ -820,7 +694,8 @@ export default function KidsVideoPlayer({
             <div>
               <h2 className="text-xl sm:text-2xl font-black text-slate-800">{video.title}</h2>
               <p className="font-semibold text-slate-500 text-xs sm:text-sm mt-0.5">
-                2.4M Views · Safe Kids Content
+                {video.sourceType === "photo" ? "📷 Photo" : "▶ Video"} · 🗂{" "}
+                {video.category || "Kids Media"} · 🛡 Safe for kids · 🔁 Auto next
               </p>
             </div>
 
@@ -868,10 +743,10 @@ export default function KidsVideoPlayer({
           )}
 
           <section className="kids-reaction-section kids-reaction-compact mt-3">
-            <h3>Pick a reaction</h3>
+            <h3>How was it?</h3>
 
             <div className="kids-reaction-grid">
-              {reactions.map((item) => {
+              {reactions.map((item, reactionIndex) => {
                 const selected = reaction === item.id;
 
                 return (
@@ -887,7 +762,9 @@ export default function KidsVideoPlayer({
                     aria-pressed={selected}
                   >
                     <span className="kids-reaction-face">{item.emoji}</span>
-                    <span className="kids-reaction-label font-bold">{item.label}</span>
+                    <span className="kids-reaction-label font-bold">
+                      {["Love it", "Amazing", "Funny", "So cool"][reactionIndex] ?? item.label}
+                    </span>
                   </motion.button>
                 );
               })}
@@ -895,7 +772,7 @@ export default function KidsVideoPlayer({
           </section>
 
           <div className="kids-up-next-heading flex items-center justify-between mt-6">
-            <h3 className="text-xl font-black">Up Next Cartoons</h3>
+            <h3 className="text-xl font-black">More to Watch</h3>
 
             <motion.button
               whileTap={{ scale: 0.95 }}
