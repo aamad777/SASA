@@ -6763,3 +6763,468 @@ button {
     font-size: 8px !important;
   }
 }
+
+/* YOUTUBE-STYLE PHOTO AND VIDEO PLAYER */
+.sasa-youtube-player {
+  position: relative;
+  display: flex;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: min(74dvh, 760px);
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #000;
+  color: #fff;
+  box-shadow: 0 16px 45px rgba(2, 6, 23, 0.3);
+  cursor: pointer;
+  user-select: none;
+}
+
+.sasa-youtube-media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background: #000;
+}
+
+.sasa-youtube-center-button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 40;
+  display: grid;
+  width: 76px;
+  height: 76px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.84);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  pointer-events: none;
+}
+
+.sasa-youtube-center-button.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  pointer-events: auto;
+}
+
+.sasa-youtube-controls {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 45;
+  padding: 70px 16px 13px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.94), rgba(0, 0, 0, 0.5) 55%, transparent);
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  pointer-events: none;
+}
+
+.sasa-youtube-controls.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.sasa-youtube-progress {
+  width: 100%;
+  height: 5px;
+  margin: 0 0 9px;
+  padding: 0;
+  border: 0;
+  accent-color: #ff1744;
+  cursor: pointer;
+}
+
+.sasa-youtube-control-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+}
+
+.sasa-youtube-control-row button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.sasa-youtube-control-row button:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.sasa-youtube-control-row button:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.sasa-youtube-time {
+  flex: 0 0 auto;
+  margin-left: 3px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sasa-youtube-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  margin-left: 8px;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sasa-youtube-lock-button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.sasa-youtube-player:fullscreen {
+  width: 100vw;
+  height: 100dvh;
+  max-height: none;
+  border-radius: 0;
+}
+
+.sasa-youtube-player:fullscreen .sasa-youtube-media {
+  width: 100vw;
+  height: 100dvh;
+}
+
+.sasa-youtube-player:fullscreen .sasa-youtube-controls {
+  padding-right: 24px;
+  padding-bottom: calc(18px + env(safe-area-inset-bottom));
+  padding-left: 24px;
+}
+
+@media (max-width: 699px) {
+  .sasa-youtube-player {
+    min-height: 260px;
+    max-height: 68dvh;
+    border-radius: 18px;
+  }
+
+  .sasa-youtube-center-button {
+    width: 62px;
+    height: 62px;
+  }
+
+  .sasa-youtube-controls {
+    padding: 55px 8px 8px;
+  }
+
+  .sasa-youtube-control-row {
+    gap: 1px;
+  }
+
+  .sasa-youtube-control-row button {
+    width: 34px;
+    height: 34px;
+    flex-basis: 34px;
+  }
+
+  .sasa-youtube-time {
+    font-size: 10px;
+  }
+
+  .sasa-youtube-title {
+    display: none;
+  }
+
+  .sasa-youtube-lock-button span {
+    display: none;
+  }
+}
+
+/* PLAYER DETAILS FINAL COMPACT V4 */
+
+.kids-player-info {
+  width: min(960px, 100%);
+  margin-inline: auto;
+  padding: 14px 14px 28px !important;
+}
+
+.kids-player-info > h2 {
+  margin: 0 0 7px !important;
+  color: #172033;
+  font-size: clamp(19px, 2.2vw, 24px) !important;
+  line-height: 1.15 !important;
+}
+
+.kids-player-info > p {
+  display: inline-flex !important;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 13px !important;
+  padding: 6px 11px !important;
+  border: 1px solid #ddd6fe;
+  border-radius: 999px;
+  background: #f5f3ff;
+  color: #6d28d9 !important;
+  font-size: 9px !important;
+  font-weight: 900 !important;
+}
+
+/* Playing-next preview */
+.kids-next-media-preview {
+  display: grid !important;
+  width: min(540px, 100%) !important;
+  max-width: 540px !important;
+  grid-template-columns: 72px minmax(0, 1fr) 28px !important;
+  align-items: center !important;
+  gap: 9px !important;
+  margin: 0 auto 9px !important;
+  padding: 6px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05) !important;
+}
+
+.kids-next-media-preview:hover {
+  border-color: #a78bfa !important;
+  background: #faf8ff !important;
+}
+
+.kids-next-media-preview img {
+  width: 72px !important;
+  height: 43px !important;
+  border-radius: 8px !important;
+  object-fit: cover !important;
+}
+
+.kids-next-media-preview small {
+  font-size: 7px !important;
+  letter-spacing: 0.05em;
+}
+
+.kids-next-media-preview strong {
+  font-size: 10px !important;
+}
+
+/* Compact reaction row */
+.kids-reaction-section.kids-reaction-compact {
+  display: grid !important;
+  width: min(540px, 100%) !important;
+  max-width: 540px !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin: 0 auto 18px !important;
+  padding: 7px 9px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05) !important;
+}
+
+.kids-reaction-section.kids-reaction-compact > h3 {
+  margin: 0 !important;
+  color: #64748b !important;
+  font-size: 8px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.kids-reaction-compact .kids-reaction-grid {
+  display: grid !important;
+  width: 100% !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 5px !important;
+  margin: 0 !important;
+}
+
+.kids-reaction-compact .kids-reaction-choice {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 35px !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  padding: 4px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-bottom-width: 1px !important;
+  border-radius: 999px !important;
+  background: #f8fafc !important;
+  box-shadow: none !important;
+}
+
+.kids-reaction-compact .kids-reaction-choice:hover {
+  border-color: #a78bfa !important;
+  background: #f5f3ff !important;
+}
+
+.kids-reaction-compact .kids-reaction-face {
+  display: inline-block !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+}
+
+.kids-reaction-compact .kids-reaction-label {
+  display: inline-block !important;
+  width: auto !important;
+  overflow: visible !important;
+  color: #475569 !important;
+  font-size: 7px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  white-space: nowrap;
+}
+
+.kids-reaction-compact .kids-reaction-choice.selected {
+  border-color: #8b5cf6 !important;
+  background: #ede9fe !important;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.13) !important;
+}
+
+.kids-reaction-compact .kids-reaction-choice.selected .kids-reaction-face {
+  outline: 0 !important;
+  transform: scale(1.08) !important;
+}
+
+/* More-to-watch alignment */
+.kids-up-next-heading,
+.kids-up-next-list {
+  width: min(760px, 100%);
+  margin-right: auto !important;
+  margin-left: auto !important;
+}
+
+.kids-up-next-heading {
+  align-items: center !important;
+  margin-top: 10px !important;
+  margin-bottom: 10px !important;
+}
+
+.kids-up-next-heading h3 {
+  font-size: 17px !important;
+}
+
+@media (max-width: 600px) {
+  .kids-player-info {
+    padding: 11px 8px 24px !important;
+  }
+
+  .kids-player-info > p {
+    border-radius: 12px;
+    font-size: 8px !important;
+  }
+
+  .kids-reaction-section.kids-reaction-compact {
+    display: block !important;
+  }
+
+  .kids-reaction-section.kids-reaction-compact > h3 {
+    margin-bottom: 6px !important;
+    text-align: center;
+  }
+
+  .kids-reaction-compact .kids-reaction-choice {
+    min-height: 43px !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    border-radius: 9px !important;
+  }
+
+  .kids-reaction-compact .kids-reaction-label {
+    font-size: 6px !important;
+  }
+}
+
+/* COMPLETE ASSIGNED MEDIA NAVIGATION */
+
+.sasa-youtube-frame-nav {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  left: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.sasa-youtube-frame-nav button {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.76);
+  color: white;
+  box-shadow: 0 7px 22px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(7px);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.sasa-youtube-frame-nav button:hover {
+  background: rgba(124, 58, 237, 0.92);
+}
+
+@media (max-width: 600px) {
+  .sasa-youtube-frame-nav {
+    right: 8px;
+    left: 8px;
+  }
+
+  .sasa-youtube-frame-nav button {
+    width: 40px;
+    height: 40px;
+  }
+}
