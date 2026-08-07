@@ -1,3 +1,5 @@
+/* SARA FUNCTIONAL REPAIR V5 */
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 if (!API_BASE_URL) {
@@ -107,7 +109,13 @@ export async function getCurrentUser(token: string): Promise<{
 }
 
 export type DatabaseChild = {
-  id: number;
+  // The backend's numeric child id is stringified below (getChildren,
+  // createChild) so every consumer compares/stores it the same way as
+  // localStorage-keyed activity/PIN/screen-time state (all string-keyed).
+  // This type previously said `number` while the real value was always a
+  // string — a stale annotation that never matched what these functions
+  // actually returned.
+  id: string;
   display_name: string;
   login_name: string | null;
   age: number | null;
@@ -146,6 +154,8 @@ export async function getChildren(token: string): Promise<DatabaseChild[]> {
         avatar_url: string | null;
         selected_theme: string | null;
         created_at: string;
+        has_pin?: boolean;
+        pin_set?: boolean;
       }>)
     : [];
 
@@ -157,7 +167,17 @@ export async function getChildren(token: string): Promise<DatabaseChild[]> {
     avatar_url: child.avatar_url ?? null,
     selected_theme: child.selected_theme ?? null,
     login_code: child.child_login_id ?? null,
-    has_pin: Boolean(child.child_login_id),
+    // A login name is required for every child, so it is not a valid stand-in
+    // for "has a PIN" — that made every child look PIN-protected even when no
+    // PIN was ever set, locking kids out of their own profile. Prefer the
+    // backend's own has_pin/pin_set flag when it's present; only fall back to
+    // the login-name heuristic if the API doesn't send one.
+    has_pin:
+      typeof child.has_pin === "boolean"
+        ? child.has_pin
+        : typeof child.pin_set === "boolean"
+          ? child.pin_set
+          : Boolean(child.child_login_id),
     created_at: child.created_at,
   }));
 }
@@ -261,8 +281,53 @@ export async function loginChild(loginName: string, pin: string): Promise<ChildL
   return data;
 }
 
-export async function setChildPin(_token: string, _childId: number, _pin: string): Promise<void> {
-  throw new Error("Updating an existing child PIN is not supported by the backend yet.");
+// SARA_KIDS_PIN_V7 — the V5 pass guessed `PUT /parent/children/:id` here with
+// no evidence it exists on the real backend, which is why "PIN reset" was
+// still broken after that fix. Git archaeology gives a stronger answer:
+// commit 821a313 ("Add parent child management, PIN protection and profile
+// photo fixes") shipped a real, working-shaped call to
+// `POST /auth/set-kid-pin` with body `{ child_id, pin }` — the exact same
+// `/auth/*` namespace that still backs the currently-working
+// register/login/me calls above. Commit eb19912 ("fix frontend API routes
+// and response mappings") later rewrote every other route to match the real
+// backend (`/parent/children`, `childLoginId`, `/child/login`, ...) and, in
+// that SAME pass, gave up on this one and stubbed it out — the strongest
+// signal in the repo's history that this was a deliberate "couldn't get this
+// endpoint working" call, not an accidental omission.
+//
+// Restoring the historically-real request shape here rather than inventing
+// a new one. This sandbox has no network access to confirm the endpoint is
+// still live on the current backend — if it 404s/500s, the caller's
+// catch block already surfaces that error message rather than a false
+// success (see DatabaseProfileSelection.saveManagedPin and
+// ParentDashboard.saveChildPin). Treat this as BACKEND REQUIRED /
+// needs-manual-verification until confirmed against the live API.
+export async function setChildPin(
+  token: string,
+  childId: string | number,
+  pin: string,
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/auth/set-kid-pin`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      child_id: Number(childId),
+      pin,
+    }),
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+  const data = contentType.includes("application/json") ? await response.json() : null;
+
+  if (!response.ok) {
+    throw new Error(
+      data?.error ||
+        "Unable to update child PIN. This backend may not support resetting an existing child PIN yet.",
+    );
+  }
 }
 
 export type AccountRole = "parent" | "admin";
@@ -279,7 +344,10 @@ export type AdminParent = {
 
 export type AdminChild = {
   id: number;
-  parent_id: number;
+  // Nullable: AdminDashboard already treats an "Unlinked" child (no parent
+  // account) as a real, valid state (see the parent_id === null check and
+  // the "Unlinked" <option> in its edit form).
+  parent_id: number | null;
   display_name: string;
   login_name: string | null;
   age: number | null;
@@ -470,7 +538,7 @@ export { API_BASE_URL };
 export type ParentMediaInput = {
   title: string;
   category: string;
-  childIds: number[];
+  childIds: string[];
 };
 
 async function readApiResponse(response: Response) {
@@ -491,7 +559,11 @@ export async function uploadParentVideo(token: string, file: File, input: Parent
   formData.append("file", file);
   formData.append("title", input.title);
   formData.append("category", input.category);
-  formData.append("childProfileIds", JSON.stringify(input.childIds));
+  // childIds are the frontend's stringified DatabaseChild.id (see api.ts's
+  // DatabaseChild type) — convert back to numbers for the wire payload,
+  // matching the real numeric child id the backend returns/expects
+  // elsewhere (e.g. setChildPin's child_id).
+  formData.append("childProfileIds", JSON.stringify(input.childIds.map(Number)));
 
   const response = await fetch(`${API_BASE_URL}/media/upload`, {
     method: "POST",
@@ -546,6 +618,11 @@ export type AssignedChildMedia = {
   media_type: string;
   storage_path: string | null;
   public_url: string | null;
+  // Optional — mirrors ParentMediaItem.thumbnail_url from the sibling
+  // /media/manage endpoint on the same media table. Not every deployment of
+  // the child-media endpoint returns it, so consumers must fall back
+  // gracefully when it's absent.
+  thumbnail_url?: string | null;
   visibility: string | null;
   title: string | null;
   description: string | null;

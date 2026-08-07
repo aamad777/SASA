@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SARA_ANDROID_DELL_QA_DEBUG_V1: debug-variant-only manifest override.
+
+  This file is merged by the Android Gradle Plugin ONLY into the `debug`
+  build type (android/app/src/main/AndroidManifest.xml is unaffected, so
+  `assembleRelease` never sees this attribute). It exists solely to allow
+  the debug QA APK to load the Dell dev server over plain HTTP
+  (http://192.168.0.113:5173) while development is happening on the local
+  network. Do not add this attribute to the main or release manifest.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application android:usesCleartextTraffic="true" />
+
+</manifest>

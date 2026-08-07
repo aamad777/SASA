@@ -1,7 +1,18 @@
 import { useState } from "react";
 import { Eye, EyeOff, LockKeyhole, Plus, X, Settings } from "lucide-react";
 
-import { createChild, loginChild, setChildPin, type DatabaseChild } from "../lib/api";
+// SARA_PIN_RESET_V5 — aliased on import: this file also declares a local
+// `setChildPin` state setter (useState below) for the *verify* PIN input.
+// The previous unaliased import let that local declaration silently shadow
+// this API function for the whole component, so "Update PIN" was actually
+// calling the React state setter (which just no-ops on 3 arguments) instead
+// of ever hitting the backend — it looked like it saved but nothing changed.
+import {
+  createChild,
+  loginChild,
+  setChildPin as updateChildPin,
+  type DatabaseChild,
+} from "../lib/api";
 
 type Props = {
   token: string;
@@ -20,12 +31,27 @@ type Props = {
 const emojis = ["🦁", "🐼", "🐰", "🐻", "🦊", "🐸"];
 const colors = ["#ffa62b", "#95d5b2", "#ff8fa3", "#8ecae6", "#c89f7a", "#b8e986"];
 
-export function getDatabaseProfileEmoji(childId: number): string {
-  return emojis[Math.abs(childId) % emojis.length];
+// child.id is the backend's real (string) id — hash it the same way
+// ParentDashboard already hashes string media ids for a stable numeric key,
+// so the emoji/color pick stays deterministic per child regardless of
+// whether an id happens to look numeric.
+function hashChildId(childId: string | number): number {
+  if (typeof childId === "number") {
+    return Math.abs(childId);
+  }
+
+  return Array.from(childId).reduce(
+    (hash, character) => (hash * 31 + character.charCodeAt(0)) >>> 0,
+    0,
+  );
 }
 
-export function getDatabaseProfileColor(childId: number): string {
-  return colors[Math.abs(childId) % colors.length];
+export function getDatabaseProfileEmoji(childId: string | number): string {
+  return emojis[hashChildId(childId) % emojis.length];
+}
+
+export function getDatabaseProfileColor(childId: string | number): string {
+  return colors[hashChildId(childId) % colors.length];
 }
 
 function getSavedChildImage(child: DatabaseChild): string | undefined {
@@ -180,7 +206,7 @@ export default function DatabaseProfileSelection({
     setManagePinSuccess("");
 
     try {
-      await setChildPin(token, managedChildId, newChildPin);
+      await updateChildPin(token, managedChildId, newChildPin);
 
       onChildPinChanged(managedChildId);
 
@@ -261,6 +287,11 @@ export default function DatabaseProfileSelection({
           maxWidth: 1050,
           margin: "0 auto",
           display: "flex",
+          // Mobile fit fix: this row of 4 labeled buttons plus the
+          // parent-name block had no wrap, so it overflowed the viewport
+          // horizontally at 320-390px widths. flexWrap lets both groups
+          // reflow onto their own row(s) instead of clipping/scrolling.
+          flexWrap: "wrap",
           justifyContent: "space-between",
           alignItems: "center",
           gap: 16,
@@ -272,7 +303,7 @@ export default function DatabaseProfileSelection({
           <h2 style={{ margin: "4px 0 0" }}>{displayParentName}</h2>
         </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
           <button
             type="button"
             onClick={() => setShowForm(true)}
@@ -297,7 +328,7 @@ export default function DatabaseProfileSelection({
             type="button"
             onClick={() => {
               setShowManagePin(true);
-              setManagedChildId(children.length === 1 ? children[0].id : null);
+              setManagedChildId(children.length === 1 ? String(children[0].id) : null);
               setManagePinError("");
               setManagePinSuccess("");
             }}
@@ -510,6 +541,11 @@ export default function DatabaseProfileSelection({
             display: "grid",
             placeItems: "center",
             padding: 20,
+            // SARA_ANDROID_AUTH_RECOVERY_V10 — matches the Manage PIN modal
+            // below: without this, a short viewport (landscape phone, or the
+            // keyboard covering half the screen) had no way to reach the
+            // Create Child button.
+            overflowY: "auto",
             background: "rgba(15,23,42,.6)",
           }}
         >
@@ -645,6 +681,10 @@ export default function DatabaseProfileSelection({
             display: "grid",
             placeItems: "center",
             padding: 20,
+            // SARA_ANDROID_AUTH_RECOVERY_V10 — matches the Manage PIN modal
+            // below: keeps the PIN input/submit button reachable when the
+            // on-screen keyboard shrinks the visible viewport.
+            overflowY: "auto",
             background: "rgba(15,23,42,.65)",
           }}
         >
@@ -936,7 +976,7 @@ export default function DatabaseProfileSelection({
                 <select
                   value={managedChildId ?? ""}
                   onChange={(event) => {
-                    setManagedChildId(event.target.value ? Number(event.target.value) : null);
+                    setManagedChildId(event.target.value || null);
                     setManagePinError("");
                     setManagePinSuccess("");
                   }}

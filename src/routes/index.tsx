@@ -19,6 +19,7 @@ import ParentDashboard, {
 import ProfileSelection from "@/components/ProfileSelection";
 import AdminDashboard from "@/components/AdminDashboard";
 import FreeAccountBanner from "@/components/FreeAccountBanner";
+import { recordActivity, removeActivityForProfile } from "@/lib/activity";
 import {
   getApiAssetUrl,
   getApiHealth,
@@ -31,7 +32,10 @@ import {
 export const Route = createFileRoute("/")({ component: SasaEntry });
 
 type Profile = {
-  id: number;
+  // Real database children carry the backend's string id (see
+  // DatabaseChild.id in src/lib/api.ts); locally-created custom profiles
+  // (ProfileSelection) still generate a plain number id. Both are valid here.
+  id: number | string;
   name: string;
   emoji: string;
   color: string;
@@ -130,6 +134,8 @@ function SasaApp() {
   const [assignedVideos, setAssignedVideos] = useState<KidsVideoItem[]>([]);
 
   const [assignedMediaError, setAssignedMediaError] = useState("");
+  const [assignedMediaLoading, setAssignedMediaLoading] = useState(false);
+  const [assignedMediaRetryToken, setAssignedMediaRetryToken] = useState(0);
 
   const [homeTab, setHomeTab] = useState<KidsHomeTab>("home");
 
@@ -137,6 +143,7 @@ function SasaApp() {
     if (!parentToken || !profile) {
       setAssignedVideos([]);
       setAssignedMediaError("");
+      setAssignedMediaLoading(false);
       return;
     }
 
@@ -144,12 +151,17 @@ function SasaApp() {
 
     const loadAssignedVideos = async () => {
       setAssignedMediaError("");
+      setAssignedMediaLoading(true);
 
       try {
         const media = await getChildAssignedMedia(parentToken, profile.id);
 
         if (cancelled) return;
 
+        // SARA_ASSIGNED_MEDIA_MAPPING_V5 — maps raw backend media records onto
+        // the KidsVideoItem shape the home screen, categories, and player all
+        // consume. Keep this the single source of truth for that mapping so
+        // photo/video/YouTube detection stays consistent everywhere.
         const mapped: KidsVideoItem[] = media.map((item: AssignedChildMedia) => {
           const publicUrl = item.public_url || item.storage_path || "";
 
@@ -160,8 +172,11 @@ function SasaApp() {
           const youtubeVideoId = youtubeMatch?.[1] || undefined;
 
           const isYoutube = Boolean(youtubeVideoId);
-          const isPhoto = item.media_type === "photo";
+          // Accept "image" as a defensive alias for "photo" in case a given
+          // backend record uses either label for the same media kind.
+          const isPhoto = item.media_type === "photo" || item.media_type === "image";
           const assetUrl = isYoutube ? publicUrl : getApiAssetUrl(publicUrl);
+          const thumbnailUrl = item.thumbnail_url ? getApiAssetUrl(item.thumbnail_url) : "";
 
           const placeholderImage = `data:image/svg+xml,${encodeURIComponent(`
                 <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">
@@ -184,7 +199,7 @@ function SasaApp() {
             ? `https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg`
             : isPhoto
               ? assetUrl
-              : placeholderImage;
+              : thumbnailUrl || placeholderImage;
 
           return {
             id: 1000000 + Number(item.id),
@@ -194,7 +209,11 @@ function SasaApp() {
               item.filename ||
               (isPhoto ? "Family Photo" : "Family Video"),
             duration: isYoutube ? "YouTube" : isPhoto ? "Photo" : "Video",
-            category: item.category || (isPhoto ? "Family Photos" : "Family Videos"),
+            // Never invent a category name — an assigned item with no
+            // category from the parent simply has none. It still surfaces
+            // under "All", and photos also surface under the dedicated
+            // "Photos" bucket (see KidsVideoHome's visibleCategories).
+            category: item.category?.trim() || "",
             image,
             sourceType: isYoutube ? "youtube" : isPhoto ? "photo" : "upload",
             sourceUrl: assetUrl,
@@ -210,6 +229,8 @@ function SasaApp() {
         setAssignedMediaError(
           error instanceof Error ? error.message : "Unable to load assigned media.",
         );
+      } finally {
+        if (!cancelled) setAssignedMediaLoading(false);
       }
     };
 
@@ -218,7 +239,7 @@ function SasaApp() {
     return () => {
       cancelled = true;
     };
-  }, [parentToken, profile?.id]);
+  }, [parentToken, profile?.id, assignedMediaRetryToken]);
 
   const [showAddProfile, setShowAddProfile] = useState(false);
   const [showParentGate, setShowParentGate] = useState(false);
@@ -329,51 +350,37 @@ function SasaApp() {
     setShowParentDashboard(false);
     setShowParentGate(true);
   };
+
+  // SARA_KIDS_PIN_V7 — shared between the "Who's Watching?" Manage PIN modal
+  // (DatabaseProfileSelection) and the Parent Dashboard's per-child Change
+  // PIN action (ParentDashboard) so both entry points update the same local
+  // has_pin state consistently.
+  const handleChildPinChanged = (childId: string) => {
+    setDatabaseChildren((current) =>
+      current.map((child) => (String(child.id) === childId ? { ...child, has_pin: true } : child)),
+    );
+  };
   const changeProfile = () => {
     setSelectedKidsVideo(null);
     setProfile(null);
   };
 
+  // SARA_KIDS_ACTIVITY_V7 — real activity, recorded the moment a kid actually
+  // opens a media item. See src/lib/activity.ts for why this is
+  // localStorage-based rather than a backend call.
   const openKidsVideo = (video: KidsVideoItem) => {
     if (profile) {
-      const historyKey = "sasa-watch-history";
-      try {
-        const saved = localStorage.getItem(historyKey);
-        const existing = Array.isArray(saved ? JSON.parse(saved) : [])
-          ? saved
-            ? JSON.parse(saved)
-            : []
-          : [];
-        const entry = {
-          historyId: `${Date.now()}-${profile.id}-${video.id}`,
-          profileId: profile.id,
-          profileName: profile.name,
-          videoId: video.id,
-          title: video.title,
-          image: video.image,
-          category: video.category,
-          duration: video.duration,
-          watchedAt: new Date().toISOString(),
-        };
-        localStorage.setItem(historyKey, JSON.stringify([entry, ...existing].slice(0, 300)));
-      } catch {
-        localStorage.setItem(
-          historyKey,
-          JSON.stringify([
-            {
-              historyId: `${Date.now()}-${profile.id}-${video.id}`,
-              profileId: profile.id,
-              profileName: profile.name,
-              videoId: video.id,
-              title: video.title,
-              image: video.image,
-              category: video.category,
-              duration: video.duration,
-              watchedAt: new Date().toISOString(),
-            },
-          ]),
-        );
-      }
+      recordActivity({
+        profileId: String(profile.id),
+        profileName: profile.name,
+        videoId: video.id,
+        title: video.title,
+        image: video.image,
+        category: video.category,
+        duration: video.duration,
+        mediaType: video.sourceType || "built-in",
+        kind: "opened",
+      });
     }
     setSelectedKidsVideo(video);
   };
@@ -409,13 +416,14 @@ function SasaApp() {
         parentToken={parentToken!}
         databaseChildren={databaseChildren}
         onDatabaseChildDeleted={(childId) => {
-          setDatabaseChildren((current) => current.filter((child) => child.id !== childId));
+          setDatabaseChildren((current) => current.filter((child) => String(child.id) !== childId));
 
-          if (profile?.id === childId) {
+          if (profile != null && String(profile.id) === childId) {
             setProfile(null);
             setSelectedKidsVideo(null);
           }
         }}
+        onChildPinChanged={handleChildPinChanged}
         settings={parentControls}
         profileId={profile?.id ?? null}
         profileName={profile?.name ?? "Child"}
@@ -430,17 +438,10 @@ function SasaApp() {
           setCustomProfiles(updated);
           localStorage.setItem("sasa-custom-profiles", JSON.stringify(updated));
           localStorage.removeItem(`sasa-screen-expiry-${profileId}`);
-          const savedHistory = localStorage.getItem("sasa-watch-history");
-          if (savedHistory) {
-            try {
-              const parsed = JSON.parse(savedHistory);
-              const remaining = Array.isArray(parsed)
-                ? parsed.filter((item) => Number(item.profileId) !== Number(profileId))
-                : [];
-              localStorage.setItem("sasa-watch-history", JSON.stringify(remaining));
-            } catch {
-              /* keep app working */
-            }
+          try {
+            removeActivityForProfile(String(profileId));
+          } catch {
+            /* keep app working */
           }
           if (profile?.id === profileId) {
             setProfile(null);
@@ -541,18 +542,7 @@ function SasaApp() {
         onChildCreated={(child) => {
           setDatabaseChildren((current) => [...current, child]);
         }}
-        onChildPinChanged={(childId) => {
-          setDatabaseChildren((current) =>
-            current.map((child) =>
-              child.id === childId
-                ? {
-                    ...child,
-                    has_pin: true,
-                  }
-                : child,
-            ),
-          );
-        }}
+        onChildPinChanged={handleChildPinChanged}
         onLogout={() => {
           localStorage.removeItem("sasa-parent-token");
           localStorage.removeItem("sasa-parent-name");
@@ -647,6 +637,7 @@ function SasaApp() {
     return (
       <KidsVideoPlayer
         video={selectedKidsVideo}
+        profileId={profile?.id}
         profileName={profile?.name}
         profileEmoji={profile?.emoji}
         customProfiles={customProfiles}
@@ -666,9 +657,17 @@ function SasaApp() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    // Mobile fit fix: min-h-screen (100vh) sat on top of the body's own
+    // min-height:100vh, and on mobile browsers 100vh includes the
+    // collapsible address-bar height, leaving stray scrollable whitespace
+    // below the fold. min-h-dvh matches the dvh convention already used
+    // elsewhere (styles.css, ParentLogin, AddProfile).
+    <div className="min-h-dvh flex flex-col">
       <KidsVideoHome
         assignedVideos={assignedVideos}
+        assignedVideosLoading={assignedMediaLoading}
+        assignedMediaError={assignedMediaError}
+        onRetryAssignedMedia={() => setAssignedMediaRetryToken((value) => value + 1)}
         profileName={profile.name}
         profileEmoji={profile.emoji}
         profileId={profile.id}

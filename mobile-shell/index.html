@@ -1,0 +1,45 @@
+<!doctype html>
+<!--
+  SARA_MOBILE_ANDROID_V1 — this is NOT the SARA web app. It is only the
+  local fallback shell Capacitor requires to exist as `webDir` for its CLI
+  tooling (cap add/sync). At runtime the app never shows this: capacitor.config.ts
+  sets `server.url` to the live SARA deployment, so the native WebView
+  navigates straight to https://sara.khader-ai.online on launch. This file
+  only appears if that navigation fails before it starts (e.g. no network
+  at all on first cold start).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>SARA</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #05060a;
+        color: #f2f3f7;
+        font-family: -apple-system, "Plus Jakarta Sans", sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .wrap {
+        text-align: center;
+        padding: 24px;
+      }
+      p {
+        opacity: 0.7;
+        font-size: 14px;
+        margin-top: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div style="font-size: 40px">🐧</div>
+      <p>Loading SARA…</p>
+    </div>
+  </body>
+</html>

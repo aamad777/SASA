@@ -1,0 +1,106 @@
+<!-- SARA_CARTOON_THEMES_V7 — original artwork, no copyrighted characters. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <linearGradient id="bright-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a2a10" />
+      <stop offset="55%" stop-color="#4a3312" />
+      <stop offset="100%" stop-color="#170f05" />
+    </linearGradient>
+  </defs>
+
+  <style>
+    .sun-rays { animation: sara-spin-slow 30s linear infinite; transform-origin: 1340px 190px; }
+    .cloud-drift { animation: sara-cloud 11s ease-in-out infinite; transform-origin: center; }
+    .cloud-drift.d2 { animation-delay: 2s; }
+    .butterfly { animation: sara-flutter 3.4s ease-in-out infinite; transform-origin: center; }
+    @keyframes sara-spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes sara-cloud {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(26px); }
+    }
+    @keyframes sara-flutter {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-12px) rotate(6deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sun-rays, .cloud-drift, .butterfly { animation: none; }
+    }
+  </style>
+
+  <rect width="1600" height="900" fill="url(#bright-sky)" />
+
+  <!-- smiling sun, top corner -->
+  <g transform="translate(1340,190)">
+    <g class="sun-rays" stroke="#ffd77a" stroke-width="10" stroke-linecap="round" opacity="0.8">
+      <line x1="0" y1="-118" x2="0" y2="-96" />
+      <line x1="0" y1="118" x2="0" y2="96" />
+      <line x1="-118" y1="0" x2="-96" y2="0" />
+      <line x1="118" y1="0" x2="96" y2="0" />
+      <line x1="-84" y1="-84" x2="-68" y2="-68" />
+      <line x1="84" y1="-84" x2="68" y2="-68" />
+      <line x1="-84" y1="84" x2="-68" y2="68" />
+      <line x1="84" y1="84" x2="68" y2="68" />
+    </g>
+    <circle r="76" fill="#ffd77a" />
+    <circle cx="-20" cy="-8" r="7" fill="#5c3d12" />
+    <circle cx="18" cy="-8" r="7" fill="#5c3d12" />
+    <path d="M -24 16 Q 0 36 24 16" stroke="#5c3d12" stroke-width="6" fill="none" stroke-linecap="round" />
+    <circle cx="-30" cy="10" r="9" fill="#ffb454" opacity="0.6" />
+    <circle cx="30" cy="10" r="9" fill="#ffb454" opacity="0.6" />
+  </g>
+
+  <!-- clouds -->
+  <g class="cloud-drift" fill="#ffffff" opacity="0.85" transform="translate(280,150)">
+    <ellipse rx="56" ry="26" />
+    <ellipse cx="42" cy="-8" rx="36" ry="22" />
+    <ellipse cx="-42" cy="-6" rx="30" ry="18" />
+  </g>
+  <g class="cloud-drift d2" fill="#ffffff" opacity="0.8" transform="translate(120,260)">
+    <ellipse rx="40" ry="20" />
+    <ellipse cx="32" cy="-6" rx="26" ry="16" />
+  </g>
+
+  <!-- rolling hills -->
+  <ellipse cx="230" cy="960" rx="420" ry="180" fill="#3a7d3f" />
+  <ellipse cx="1400" cy="980" rx="480" ry="200" fill="#2e6a34" />
+  <ellipse cx="800" cy="1000" rx="600" ry="180" fill="#357a3b" />
+
+  <!-- flowers along the hills -->
+  <g>
+    <g transform="translate(300,830)">
+      <circle cx="-8" r="7" fill="#ff9ecf" /><circle cx="8" r="7" fill="#ff9ecf" />
+      <circle cy="-8" r="7" fill="#ff9ecf" /><circle cy="8" r="7" fill="#ff9ecf" />
+      <circle r="6" fill="#ffd77a" />
+    </g>
+    <g transform="translate(360,850)">
+      <circle cx="-7" r="6" fill="#8ee6d6" /><circle cx="7" r="6" fill="#8ee6d6" />
+      <circle cy="-7" r="6" fill="#8ee6d6" /><circle cy="7" r="6" fill="#8ee6d6" />
+      <circle r="5" fill="#ffd77a" />
+    </g>
+    <g transform="translate(1250,860)">
+      <circle cx="-8" r="7" fill="#ff9ecf" /><circle cx="8" r="7" fill="#ff9ecf" />
+      <circle cy="-8" r="7" fill="#ff9ecf" /><circle cy="8" r="7" fill="#ff9ecf" />
+      <circle r="6" fill="#ffd77a" />
+    </g>
+    <g transform="translate(1320,840)">
+      <circle cx="-7" r="6" fill="#b7a4ff" /><circle cx="7" r="6" fill="#b7a4ff" />
+      <circle cy="-7" r="6" fill="#b7a4ff" /><circle cy="7" r="6" fill="#b7a4ff" />
+      <circle r="5" fill="#ffd77a" />
+    </g>
+  </g>
+
+  <!-- butterflies -->
+  <g class="butterfly" transform="translate(500,600)">
+    <path d="M0 0 C -24 -28 -56 -16 -48 6 C -56 26 -24 32 0 6 Z" fill="#ffd77a" />
+    <path d="M0 0 C 24 -28 56 -16 48 6 C 56 26 24 32 0 6 Z" fill="#ef6fb6" />
+    <rect x="-2" y="-4" width="4" height="20" fill="#2c1a0d" />
+  </g>
+  <g class="butterfly" transform="translate(1080,540) scale(0.85)">
+    <path d="M0 0 C -24 -28 -56 -16 -48 6 C -56 26 -24 32 0 6 Z" fill="#8ee6d6" />
+    <path d="M0 0 C 24 -28 56 -16 48 6 C 56 26 24 32 0 6 Z" fill="#ffb454" />
+    <rect x="-2" y="-4" width="4" height="20" fill="#2c1a0d" />
+  </g>
+</svg>

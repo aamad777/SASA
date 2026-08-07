@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SARA</string>
+    <string name="title_activity_main">SARA</string>
+    <string name="package_name">online.khaderai.sara</string>
+    <string name="custom_url_scheme">online.khaderai.sara</string>
+</resources>

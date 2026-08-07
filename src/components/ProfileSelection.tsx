@@ -18,6 +18,10 @@ type ProfileSelectionProps = {
   onSelectProfile: (name: string, emoji: string, color: string, id: number, image?: string) => void;
   onOpenParentalControls: () => void;
   onAddProfile: () => void;
+  /** Called just before navigating to the Parent Login screen — lets the
+   * caller clear guest/kid session state so it doesn't linger once a parent
+   * signs back in. */
+  onLogin?: () => void;
 };
 
 const profiles = [
@@ -58,6 +62,7 @@ export default function ProfileSelection({
   onSelectProfile,
   onOpenParentalControls,
   onAddProfile,
+  onLogin,
 }: ProfileSelectionProps) {
   const [selectingId, setSelectingId] = useState<number | string | null>(null);
 
@@ -112,7 +117,10 @@ export default function ProfileSelection({
         <a
           href="/?screen=parent-login"
           className="flex cursor-pointer items-center gap-2 rounded-full border-2 border-slate-400/30 bg-white/90 px-5 py-2.5 shadow-md backdrop-blur-md transition-transform hover:scale-105 active:scale-95"
-          onClick={() => playPopSound()}
+          onClick={() => {
+            playPopSound();
+            onLogin?.();
+          }}
         >
           <svg
             className="h-7 w-7 text-slate-600"

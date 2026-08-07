@@ -902,7 +902,11 @@ button {
   position: relative;
   display: flex;
   width: 100%;
-  min-height: max(884px, 100dvh);
+  /* Mobile fit fix: the forced 884px floor made this PIN gate taller than
+     the viewport on most phones (portrait heights run ~600-800px), forcing
+     a scroll just to reach the keypad. Real content height, dvh-based like
+     the rest of the app. */
+  min-height: 100dvh;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
@@ -1908,7 +1912,11 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 32px 22px 18px;
+  /* SARA_MOBILE_ANDROID_V1 — env(safe-area-inset-top) is 0px on desktop (and
+     in browsers generally), so this only adds real space on devices with an
+     edge-to-edge status bar/notch; the existing 32px design padding is
+     untouched otherwise. */
+  padding: calc(32px + env(safe-area-inset-top)) 22px 18px;
   border-radius: 0 0 32px 32px;
   background: linear-gradient(90deg, #89b4f8, #b8b8ff);
 }
@@ -2002,6 +2010,60 @@ button {
 
 .kids-category-nav strong {
   font-size: 14px;
+}
+
+.kids-category-count {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.65;
+}
+
+.kids-media-status-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 4px 16px 0;
+  padding: 8px 14px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.kids-media-status-banner.is-loading {
+  background: rgba(124, 58, 237, 0.1);
+  color: #6d28d9;
+}
+
+.kids-media-status-banner.is-error {
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+}
+
+.kids-media-status-banner.is-error button {
+  border: 1px solid rgba(185, 28, 28, 0.35);
+  border-radius: 999px;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+
+.kids-media-status-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(124, 58, 237, 0.25);
+  border-top-color: #7c3aed;
+  animation: kids-media-status-spin 0.7s linear infinite;
+}
+
+@keyframes kids-media-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .kids-video-grid {
@@ -2108,7 +2170,9 @@ button {
   width: 100%;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 24px 28px;
+  /* SARA_MOBILE_ANDROID_V1 — see .kids-video-header above; keeps the bottom
+     tab bar clear of the gesture nav bar on edge-to-edge Android. */
+  padding: 12px 24px calc(28px + env(safe-area-inset-bottom));
   border-radius: 28px 28px 0 0;
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
@@ -2211,289 +2275,1123 @@ button {
   }
 }
 
+/* SARA CINEMATIC PLAYER V3 */
+/* ============================================================
+   KIDS CINEMATIC MEDIA PLAYER — dark theater page chrome, ambient
+   backdrop, theater stage, metadata, reaction dock, and Up Next queue.
+   (See the second block further down for the interactive player's own
+   surface — media, fading top overlay, photo HUD, and glass control dock.)
+   ============================================================ */
+
+/* SARA PROFESSIONAL PLAYER V4 */
+
+.sasa-professional-player-v4 {
+  position: relative;
+  isolation: isolate;
+}
+
+/* ---- Theme tokens ----
+   Six built-in watching-page themes (`Space`, `Ocean`, `Jungle`, `Rainbow`,
+   `Night`, `Bright`) swap these custom properties via `data-theme` on the
+   player root. They only ever touch background/accent decoration — never
+   media, layout, or readability. `night` (the default) is a neutral,
+   professional dark theater; the rest add a gentle tint. */
 .kids-player-page {
+  --player-accent: #818cf8;
+  --player-accent-soft: rgba(129, 140, 248, 0.16);
+  --player-bg-1: #0b0c10;
+  --player-bg-2: #131519;
+  --player-bg-3: #05060a;
+
   min-height: 100dvh;
   padding-bottom: 96px;
-  color: #1a1c1e;
-  background: #f6fafe;
+  color: #f2f3f7;
+  background: var(--player-bg-3);
   font-family: "Plus Jakarta Sans", sans-serif;
 }
+
+.kids-player-page[data-theme="space"] {
+  --player-accent: #8b7bf7;
+  --player-accent-soft: rgba(139, 123, 247, 0.18);
+  --player-bg-1: #10102a;
+  --player-bg-2: #1c1a45;
+  --player-bg-3: #05050f;
+}
+
+.kids-player-page[data-theme="ocean"] {
+  --player-accent: #22c3e6;
+  --player-accent-soft: rgba(34, 195, 230, 0.16);
+  --player-bg-1: #06222f;
+  --player-bg-2: #0c3a4d;
+  --player-bg-3: #030d13;
+}
+
+.kids-player-page[data-theme="jungle"] {
+  --player-accent: #4ade80;
+  --player-accent-soft: rgba(74, 222, 128, 0.16);
+  --player-bg-1: #0a2116;
+  --player-bg-2: #123a26;
+  --player-bg-3: #04100a;
+}
+
+.kids-player-page[data-theme="rainbow"] {
+  --player-accent: #ef6fb6;
+  --player-accent-soft: rgba(239, 111, 182, 0.16);
+  --player-bg-1: #221033;
+  --player-bg-2: #33205a;
+  --player-bg-3: #08060f;
+}
+
+.kids-player-page[data-theme="night"] {
+  --player-accent: #818cf8;
+  --player-accent-soft: rgba(129, 140, 248, 0.14);
+  --player-bg-1: #0b0c10;
+  --player-bg-2: #131519;
+  --player-bg-3: #05060a;
+}
+
+.kids-player-page[data-theme="bright"] {
+  --player-accent: #fb923c;
+  --player-accent-soft: rgba(251, 146, 60, 0.16);
+  --player-bg-1: #241a0c;
+  --player-bg-2: #3a2a10;
+  --player-bg-3: #0c0904;
+}
+
+/* ---- Theater backdrop: neutral dark surface, a softly blurred still from
+   the active media, and one low-opacity ambient glow tinted by the current
+   theme. No starfields, no multi-color aurora, no continuous motion. ---- */
+
+.sasa-cinema-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sasa-cinema-bg-image {
+  position: absolute;
+  inset: -5%;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  filter: blur(50px) saturate(1.1) brightness(0.4);
+  transform: scale(1.1);
+  opacity: 0.7;
+}
+
+.sasa-cinema-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      120% 90% at 50% 0%,
+      var(--player-bg-1) 0%,
+      var(--player-bg-2) 40%,
+      var(--player-bg-3) 78%
+    ),
+    linear-gradient(180deg, rgba(5, 6, 10, 0.6) 0%, rgba(5, 6, 10, 0.92) 100%);
+  opacity: 0.94;
+}
+
+/* SARA_CARTOON_THEMES_V7 — cute original per-theme illustration (see
+   src/assets/themes/*), set via the --player-art custom property in
+   KidsVideoPlayer. Kept confined to the edges: cover-sized so it fills the
+   viewport, then faded toward the center with a radial mask so the middle
+   (behind the player stage) always stays calm/dark/readable, and never
+   painted over the media itself — this whole layer sits at z-index 0,
+   strictly behind the stage. */
+.sasa-cinema-theme-art {
+  position: absolute;
+  inset: 0;
+  background-image: var(--player-art, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.5;
+  mask-image: radial-gradient(60% 55% at 50% 42%, transparent 0%, transparent 20%, black 72%);
+  -webkit-mask-image: radial-gradient(
+    60% 55% at 50% 42%,
+    transparent 0%,
+    transparent 20%,
+    black 72%
+  );
+}
+
+.sasa-cinema-ambient-glow {
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  width: 70vw;
+  height: 70vw;
+  max-width: 900px;
+  max-height: 900px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--player-accent) 0%, transparent 68%);
+  opacity: 0.14;
+  filter: blur(80px);
+  transform: translateX(-50%);
+  animation: sasa-ambient-breathe 16s ease-in-out infinite;
+}
+
+@keyframes sasa-ambient-breathe {
+  0%,
+  100% {
+    opacity: 0.1;
+  }
+
+  50% {
+    opacity: 0.18;
+  }
+}
+
+/* ---- Header + content ---- */
 
 .kids-player-header {
   position: sticky;
   top: 0;
-  z-index: 40;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  background: #f6fafe;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  gap: 10px;
+  /* SARA_MOBILE_ANDROID_V1 — see .kids-video-header above. */
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  background: rgba(10, 11, 15, 0.82);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(16px);
+  isolation: isolate;
 }
 
-.kids-player-header h1 {
+.sasa-player-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0;
-  color: #00b4ff;
-  font-size: 21px;
+  color: #f2f3f7;
+  font-size: 16px;
   font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
-.kids-player-header button {
+.sasa-player-brand svg {
+  color: var(--player-accent);
+}
+
+.kids-player-header > button {
+  position: relative;
+  z-index: 10;
   display: grid;
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
   place-items: center;
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: #1a1c1e;
+  color: #f2f3f7;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.kids-player-header > button * {
+  pointer-events: none;
+}
+
+.kids-player-header > button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.kids-player-header > button:active {
+  transform: scale(0.94);
+}
+
+.kids-player-header > button:focus-visible {
+  outline: 2px solid var(--player-accent);
+  outline-offset: 2px;
+}
+
+.sasa-player-header-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sasa-player-header-btn {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e5e7eb;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.sasa-player-header-btn:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.sasa-player-header-btn:focus-visible {
+  outline: 2px solid var(--player-accent);
+  outline-offset: 2px;
+}
+
+.sasa-player-header-btn.is-active {
+  border-color: rgba(52, 211, 153, 0.4);
+  background: rgba(16, 185, 129, 0.18);
+  color: #a7f3d0;
+}
+
+@media (max-width: 480px) {
+  .sasa-player-header-btn span {
+    display: none;
+  }
+}
+
+/* ---- Theme picker popover ---- */
+
+.sasa-theme-picker-wrap {
+  position: relative;
+}
+
+.sasa-theme-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 199;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.sasa-theme-picker {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 200;
+  width: 264px;
+  /* Defensive clamp so this right-anchored popover can never exceed the
+     viewport width at the narrowest phones. */
+  max-width: calc(100vw - 24px);
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: #14161c;
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.5);
+}
+
+.sasa-theme-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 10px;
+}
+
+.sasa-theme-picker-header h4 {
+  margin: 0;
+  color: #f2f3f7;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sasa-theme-picker-header button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd2e1;
+  cursor: pointer;
+}
+
+.sasa-theme-picker-header button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.sasa-theme-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.sasa-theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 0.15s ease;
+}
+
+.sasa-theme-card:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.sasa-theme-card:focus-visible {
+  outline: 2px solid var(--player-accent);
+  outline-offset: 2px;
+}
+
+.sasa-theme-card.selected {
+  border-color: var(--player-accent);
+  background: var(--player-accent-soft);
+}
+
+.sasa-theme-card-swatch {
+  display: grid;
+  height: 56px;
+  place-items: center;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  color: #fff;
+  transition: transform 0.15s ease;
+}
+
+.sasa-theme-card:hover .sasa-theme-card-swatch {
+  transform: scale(1.03);
+}
+
+.sasa-theme-card-label {
+  color: #e5e7eb;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .kids-player-content {
-  min-height: calc(100dvh - 64px);
-}
-
-.kids-player-hero {
   position: relative;
+  z-index: 1;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  background: #e0e4e9;
-}
-
-.kids-player-hero img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  min-width: 0;
+  min-height: calc(100dvh - 64px);
 }
 
 .kids-player-play-button {
   position: absolute;
   top: 50%;
   left: 50%;
+  z-index: 20;
   display: grid;
-  width: 82px;
-  height: 82px;
+  width: 76px;
+  height: 76px;
   place-items: center;
-  border: 3px solid white;
+  border: 2px solid rgba(255, 255, 255, 0.5);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.65);
-  color: #00b4ff;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  background: rgba(20, 22, 28, 0.6);
+  color: #fff;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
   transform: translate(-50%, -50%);
   backdrop-filter: blur(8px);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
   transition: transform 0.2s ease;
+}
+
+.kids-player-play-button * {
+  pointer-events: none;
 }
 
 .kids-player-play-button:active {
   transform: translate(-50%, -50%) scale(0.94);
 }
 
-.kids-player-progress {
-  width: 100%;
-  height: 12px;
-  overflow: hidden;
-  background: #e0e4e9;
+.kids-player-play-button:focus-visible {
+  outline: 2px solid var(--player-accent);
+  outline-offset: 4px;
 }
 
-.kids-player-progress span {
-  display: block;
-  height: 100%;
-  border-radius: 0 999px 999px 0;
-  background: #00b4ff;
-  transition: width 0.3s ease;
-}
+/* ---- Player toolbar: position pill + Theater/Queue toggles, sits directly
+   above the stage so it never competes with the controls inside it. ---- */
 
-.kids-player-info {
-  padding: 24px 20px 32px;
-}
-
-.kids-player-info h2 {
-  margin: 0 0 8px;
-  font-size: 25px;
-  line-height: 1.25;
-}
-
-.kids-player-info > p {
-  margin: 0 0 24px;
-  color: #42474e;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.kids-reaction-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 34px;
-}
-
-.kids-reaction-button {
-  aspect-ratio: 1;
-  padding: 10px;
-  border-width: 4px;
-  border-style: solid;
-  border-bottom-width: 8px;
-  border-radius: 24px;
-  font-size: 34px;
-  transition:
-    transform 0.2s ease,
-    border-bottom-width 0.2s ease;
-}
-
-.kids-reaction-button:nth-child(1) {
-  border-color: #ba1a1a;
-  background: #ffb4ab;
-}
-
-.kids-reaction-button:nth-child(2) {
-  border-color: #f57f17;
-  background: #ffe082;
-}
-
-.kids-reaction-button:nth-child(3) {
-  border-color: #0277bd;
-  background: #b3e5fc;
-}
-
-.kids-reaction-button:nth-child(4) {
-  border-color: #2e7d32;
-  background: #c8e6c9;
-}
-
-.kids-reaction-button:active,
-.kids-reaction-button.selected {
-  border-bottom-width: 4px;
-  transform: translateY(4px);
-}
-
-.kids-up-next-heading {
+.sasa-player-toolbar {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.kids-up-next-heading h3 {
-  margin: 0;
-  font-size: 21px;
-}
-
-.kids-up-next-heading button {
-  border: 0;
-  background: transparent;
-  color: #00b4ff;
-  font-weight: 700;
-}
-
-.kids-up-next-list {
-  display: grid;
-  gap: 14px;
-}
-
-.kids-up-next-card {
-  display: flex;
-  width: 100%;
   align-items: center;
-  gap: 14px;
-  padding: 9px;
-  border: 0;
-  border-radius: 18px;
-  background: white;
-  color: #1a1c1e;
-  text-align: left;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 10px;
 }
 
-.kids-up-next-card img {
-  width: 128px;
+.sasa-player-toolbar-left,
+.sasa-player-toolbar-right {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sasa-player-position-pill {
+  padding: 5px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #9aa3b5;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sasa-player-toolbar-btn {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd2e1;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.sasa-player-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f2f3f7;
+}
+
+.sasa-player-toolbar-btn:focus-visible {
+  outline: 2px solid var(--player-accent);
+  outline-offset: 2px;
+}
+
+.sasa-player-toolbar-btn.is-active {
+  border-color: var(--player-accent);
+  background: var(--player-accent-soft);
+  color: #f2f3f7;
+}
+
+.sasa-player-toolbar-btn.is-accent {
+  border-color: var(--player-accent);
+  background: var(--player-accent-soft);
+  color: #f2f3f7;
+}
+
+.sasa-desktop-only {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .sasa-desktop-only {
+    display: flex;
+  }
+}
+
+@media (max-width: 640px) {
+  .sasa-player-toolbar-btn span {
+    display: none;
+  }
+}
+
+/* ---- Theater layout: stage column (~73%) + Up Next queue (~27%) ---- */
+
+.sasa-cinema-layout {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 20px;
+}
+
+.sasa-cinema-stage-col {
+  min-width: 0;
+}
+
+/* ---- Stage: a plain black 16:9 box with a subtle shadow and — only while
+   something is actively playing — a very soft single-color glow. No rainbow
+   gradients, no infinite animation. ---- */
+
+.sasa-cinema-stage-shell {
+  position: relative;
+  padding: 0;
+}
+
+.sasa-cinema-stage-glow {
+  position: absolute;
+  inset: -10px;
+  z-index: 0;
+  border-radius: 24px;
+  background: var(--player-accent);
+  filter: blur(36px);
+  opacity: 0.16;
+}
+
+.sasa-cinema-stage {
+  position: relative;
+  z-index: 1;
+  width: 100%;
   aspect-ratio: 16 / 9;
-  flex: 0 0 128px;
-  border-radius: 13px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #000;
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+}
+
+.sasa-cinema-stage.is-fluid {
+  aspect-ratio: auto;
+  min-height: 420px;
+}
+
+.sasa-cinema-stage-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sasa-cinema-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+.sasa-cinema-frame.is-fluid {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto;
+}
+
+.sasa-cinema-frame-img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
 }
 
-.kids-up-next-card > span {
-  display: grid;
-  gap: 7px;
-}
+/* ---- Shared title/category/type/parent-approved overlay ---- */
 
-.kids-up-next-card strong {
-  line-height: 1.3;
-}
-
-.kids-up-next-card small {
-  color: #42474e;
-}
-
-.kids-player-bottom-nav {
-  position: fixed;
-  bottom: 0;
+.sasa-cinema-top-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
   left: 0;
-  z-index: 50;
+  z-index: 46;
   display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-around;
-  padding: 9px 16px 24px;
-  border-top: 4px solid rgba(0, 180, 255, 0.1);
-  border-radius: 28px 28px 0 0;
-  background: #eceff4;
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 18px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.65), transparent);
+  color: #fff;
+  pointer-events: none;
 }
 
-.kids-player-bottom-nav button {
-  display: flex;
-  min-width: 66px;
-  flex-direction: column;
+.sasa-cinema-top-overlay:not(.is-static) {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    visibility 180ms;
+  visibility: hidden;
+}
+
+.sasa-cinema-top-overlay.visible {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+
+.sasa-cinema-now-playing {
+  display: inline-flex;
+  width: fit-content;
   align-items: center;
-  gap: 4px;
-  padding: 7px 13px;
-  border: 0;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #e5e7eb;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.sasa-cinema-now-playing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+}
+
+.sasa-cinema-overlay-title {
+  overflow: hidden;
+  max-width: 80%;
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sasa-cinema-overlay-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sasa-cinema-overlay-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.sasa-cinema-overlay-chip.is-type {
+  background: var(--player-accent-soft);
+  color: #e5e7eb;
+}
+
+.sasa-cinema-overlay-chip.is-approved {
+  background: rgba(34, 197, 94, 0.2);
+  color: #bbf7d0;
+}
+
+/* ---- Compact metadata row ----
+   media type • category • Safe for Kids • Parent Approved • Autoplay
+   status — no view counts, likes, or comment totals. */
+
+.sasa-cinema-meta-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 0;
+}
+
+.sasa-cinema-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #b6bccb;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sasa-cinema-meta-chip.is-safe {
+  border-color: rgba(52, 211, 153, 0.3);
+  background: rgba(16, 185, 129, 0.1);
+  color: #86efac;
+}
+
+.sasa-cinema-meta-chip.is-approved {
+  border-color: rgba(74, 222, 128, 0.3);
+  background: rgba(34, 197, 94, 0.1);
+  color: #bbf7d0;
+}
+
+.sasa-cinema-meta-chip.is-autoplay {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd2e1;
+}
+
+.sasa-cinema-meta-chip.is-type {
+  border-color: var(--player-accent);
+  background: var(--player-accent-soft);
+  color: #f2f3f7;
+}
+
+/* ---- Reaction dock ---- */
+
+.sasa-cinema-reaction-dock {
+  margin: 18px 0 0;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  background: transparent;
-  color: #42474e;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+}
+
+.sasa-cinema-reaction-label {
+  margin: 0 0 10px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sasa-cinema-reaction-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sasa-cinema-reaction-pill {
+  position: relative;
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e5e7eb;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.sasa-cinema-reaction-pill * {
+  pointer-events: none;
+}
+
+.sasa-cinema-reaction-emoji {
+  display: inline-block;
+  font-size: 15px;
+}
+
+.sasa-cinema-reaction-pill:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.sasa-cinema-reaction-pill:active {
+  transform: scale(0.96);
+}
+
+.sasa-cinema-reaction-pill:focus-visible {
+  outline: 2px solid var(--player-accent);
+  outline-offset: 2px;
+}
+
+.sasa-cinema-reaction-pill.selected {
+  border-color: var(--player-accent);
+  background: var(--player-accent-soft);
+  color: #fff;
+}
+
+/* SARA UP NEXT BELOW PLAYER V6 */
+
+/* ---- Up Next: a YouTube-style horizontal recommendation row below the
+   player/media info/reactions on every breakpoint — never a side column. ---- */
+
+.sasa-cinema-upnext {
+  min-width: 0;
+}
+
+.sasa-cinema-upnext-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 12px;
+}
+
+.sasa-cinema-upnext-header h3 {
+  margin: 0;
+  color: #f2f3f7;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.sasa-cinema-upnext-row {
+  display: flex;
+  gap: 10px;
+  padding-bottom: 6px;
+  overflow-x: auto;
+  overflow-y: visible;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sasa-cinema-upnext-card {
+  position: relative;
+  display: flex;
+  width: 168px;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #f2f3f7;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+  scroll-snap-align: start;
+  touch-action: manipulation;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.sasa-cinema-upnext-card * {
+  pointer-events: none;
+}
+
+.sasa-cinema-upnext-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.sasa-cinema-upnext-card:hover .sasa-cinema-upnext-thumb img {
+  transform: scale(1.06);
+}
+
+.sasa-cinema-upnext-card:focus-visible {
+  outline: 2px solid var(--player-accent);
+  outline-offset: 2px;
+}
+
+/* Current media: a subtle border + tinted wash only — no glow/blur. */
+.sasa-cinema-upnext-card.is-current {
+  cursor: default;
+  border-color: var(--player-accent);
+  background: var(--player-accent-soft);
+}
+
+.sasa-cinema-upnext-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #0b0c10;
+}
+
+.sasa-cinema-upnext-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.25s ease;
+}
+
+.sasa-cinema-upnext-duration {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
   font-size: 10px;
   font-weight: 700;
 }
 
-.kids-player-bottom-nav button.active {
-  border-bottom: 4px solid #4f616e;
-  background: #d3e5f5;
-  color: #0b1d29;
+.sasa-cinema-upnext-info {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
 }
 
-@media (min-width: 760px) {
-  .kids-player-page {
-    width: min(900px, 100%);
-    margin: 0 auto;
-    box-shadow: 0 0 40px rgba(0, 0, 0, 0.08);
+.sasa-cinema-upnext-badge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 0 2px;
+  color: #9aa3b5;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.sasa-cinema-upnext-badge.is-now-playing {
+  color: var(--player-accent);
+}
+
+.sasa-cinema-upnext-now-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+}
+
+.sasa-cinema-upnext-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.sasa-cinema-upnext-category {
+  display: block;
+  overflow: hidden;
+  margin-top: 2px;
+  color: #8890a0;
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Desktop: bigger cards, roughly 4-5 visible across the player's width. */
+@media (min-width: 1024px) {
+  .sasa-cinema-upnext-card {
+    width: 216px;
+    gap: 8px;
+    padding: 8px;
   }
 
-  .kids-up-next-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .sasa-cinema-upnext-row {
+    gap: 14px;
+  }
+}
+
+/* Bottom navigation */
+.kids-player-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  z-index: 120;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-around;
+  padding: 9px 16px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px 20px 0 0;
+  background: rgba(10, 11, 15, 0.85);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+  isolation: isolate;
+}
+
+.kids-player-bottom-nav button {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-width: 66px;
+  min-height: 54px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 13px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: #8890a0;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.kids-player-bottom-nav button * {
+  pointer-events: none;
+}
+
+.kids-player-bottom-nav button.active {
+  background: var(--player-accent-soft);
+  color: #f2f3f7;
+}
+
+.kids-player-bottom-nav button:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.kids-player-bottom-nav button:active {
+  transform: scale(0.94);
+}
+
+.kids-player-bottom-nav button:focus-visible {
+  outline: 2px solid var(--player-accent);
+  outline-offset: -2px;
+}
+
+/* Desktop */
+@media (min-width: 760px) {
+  .kids-player-page {
+    width: min(1180px, 100%);
+    margin: 0 auto;
   }
 
   .kids-player-bottom-nav {
     left: 50%;
-    width: min(900px, 100%);
+    width: min(1180px, 100%);
     transform: translateX(-50%);
+  }
+
+  /* Theater mode: give the enlarged player extra breathing room. */
+  .kids-player-page.is-theater-mode {
+    width: min(1440px, 100%);
+  }
+
+  .kids-player-page.is-theater-mode .kids-player-bottom-nav {
+    width: min(1440px, 100%);
   }
 }
 
+/* Mobile portrait */
 @media (max-width: 420px) {
-  .kids-up-next-card img {
-    width: 108px;
-    flex-basis: 108px;
+  .sasa-cinema-upnext-card {
+    width: 148px;
   }
 
-  .kids-reaction-grid {
-    gap: 9px;
+  .sasa-cinema-reaction-pill {
+    padding: 7px 11px;
+    font-size: 12px;
+  }
+}
+
+/* Mobile landscape — prioritize the media stage, compact everything else */
+@media (orientation: landscape) and (max-height: 600px) {
+  .sasa-cinema-stage {
+    aspect-ratio: auto;
+    height: calc(100dvh - 120px);
   }
 
-  .kids-reaction-button {
-    border-radius: 19px;
-    font-size: 28px;
+  .sasa-cinema-stage-shell {
+    padding: 8px;
   }
 }
 
@@ -2703,16 +3601,14 @@ button {
   font-size: 34px;
 }
 
-.kids-video-title-row,
-.kids-player-title-line {
+.kids-video-title-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.kids-library-button,
-.kids-player-save {
+.kids-library-button {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
@@ -2723,8 +3619,7 @@ button {
   color: #60707c;
 }
 
-.kids-library-button.saved,
-.kids-player-save.saved {
+.kids-library-button.saved {
   background: #ffdad7;
   color: #ba1724;
 }
@@ -2746,47 +3641,6 @@ button {
 .kids-empty-view p {
   margin: 0;
   color: #60707c;
-}
-
-.kids-player-header {
-  position: sticky;
-}
-
-.kids-player-options {
-  position: absolute;
-  top: 58px;
-  right: 14px;
-  z-index: 100;
-  display: grid;
-  min-width: 210px;
-  gap: 6px;
-  padding: 10px;
-  border-radius: 18px;
-  background: white;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
-}
-
-.kids-player-options button {
-  display: flex;
-  width: 100%;
-  height: auto;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 12px;
-  text-align: left;
-}
-
-.kids-player-title-line > div {
-  min-width: 0;
-}
-
-.kids-player-title-line p {
-  margin: 8px 0 24px;
-  color: #42474e;
-  font-size: 14px;
-  font-weight: 700;
 }
 
 /* Fix clickable layers for header and navigation */
@@ -2994,59 +3848,11 @@ button {
   }
 }
 
-/* Make Parental Settings behave like a normal button */
-.kids-video-header > button {
-  position: relative;
-  z-index: 50;
-  display: inline-flex;
-  min-width: 170px;
-  min-height: 50px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 18px;
-  border: 2px solid rgba(255, 255, 255, 0.45);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.32);
-  color: white;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-  user-select: none;
-}
-
-.kids-video-header > button::after {
-  display: none;
-  content: none;
-}
-
-.kids-video-header > button * {
-  pointer-events: none;
-}
-
-.kids-video-header > button:hover {
-  background: rgba(255, 255, 255, 0.48);
-  transform: translateY(-1px);
-}
-
-.kids-video-header > button:active {
-  background: rgba(255, 255, 255, 0.6);
-  transform: translateY(1px) scale(0.98);
-}
-
-.kids-video-header > button:focus-visible {
-  outline: 4px solid rgba(255, 255, 255, 0.75);
-  outline-offset: 3px;
-}
-
-@media (max-width: 420px) {
-  .kids-video-header > button {
-    min-width: 50px;
-    width: 50px;
-    height: 50px;
-    padding: 0;
-  }
-}
+/* Removed a byte-for-byte duplicate of the ".kids-video-header > button" rule
+   block above (comment, base rule, pseudo-elements, hover/active/focus
+   states, and the 420px media query), confirmed unused/no-op since it
+   repeated the exact same selectors and values immediately after the
+   original. */
 
 .kids-video-title-row {
   position: relative;
@@ -3096,224 +3902,6 @@ button {
   border-color: #ffb4ab;
   background: #ffdad6;
   color: #ba1a1a;
-}
-
-/* Reliable video-player button interactions */
-.kids-player-header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  isolation: isolate;
-}
-
-.kids-player-header > button {
-  position: relative;
-  z-index: 10;
-  width: 48px;
-  height: 48px;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-}
-
-.kids-player-header > button * {
-  pointer-events: none;
-}
-
-.kids-player-play-button {
-  z-index: 20;
-  width: 86px;
-  height: 86px;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-}
-
-.kids-player-play-button * {
-  pointer-events: none;
-}
-
-.kids-player-bottom-nav {
-  z-index: 120;
-  isolation: isolate;
-  pointer-events: auto;
-}
-
-.kids-player-bottom-nav button {
-  position: relative;
-  z-index: 2;
-  min-width: 70px;
-  min-height: 58px;
-  padding: 7px 10px;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-}
-
-.kids-player-bottom-nav button * {
-  pointer-events: none;
-}
-
-.kids-player-header > button:hover,
-.kids-player-bottom-nav button:hover {
-  background: rgba(0, 180, 255, 0.1);
-}
-
-.kids-player-header > button:active,
-.kids-player-bottom-nav button:active {
-  transform: scale(0.94);
-}
-
-.kids-reaction-section {
-  margin: 0 0 32px;
-  padding: 18px 16px;
-  border: 1px solid #f1f5f9;
-  border-radius: 22px;
-  background: #ffffff;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
-}
-
-.kids-reaction-section > h3 {
-  margin: 0 0 15px;
-  color: #94a3b8;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  text-align: center;
-  text-transform: uppercase;
-}
-
-.kids-reaction-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 13px;
-  margin: 0;
-}
-
-.kids-reaction-choice {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  align-items: center;
-  gap: 7px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #64748b;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-}
-
-.kids-reaction-choice * {
-  pointer-events: none;
-}
-
-.kids-reaction-face {
-  display: grid;
-  width: 58px;
-  height: 58px;
-  place-items: center;
-  border: 2px solid;
-  border-bottom-width: 7px;
-  border-radius: 15px;
-  font-size: 31px;
-  line-height: 1;
-  box-shadow: 0 3px 7px rgba(15, 23, 42, 0.08);
-  transition:
-    transform 0.12s ease,
-    border-bottom-width 0.12s ease,
-    box-shadow 0.12s ease;
-}
-
-.kids-reaction-label {
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.kids-reaction-choice.love .kids-reaction-face {
-  border-color: #fecaca;
-  background: #fef2f2;
-}
-
-.kids-reaction-choice.super .kids-reaction-face {
-  border-color: #fde68a;
-  background: #fffbeb;
-}
-
-.kids-reaction-choice.funny .kids-reaction-face {
-  border-color: #bfdbfe;
-  background: #eff6ff;
-}
-
-.kids-reaction-choice.wow .kids-reaction-face {
-  border-color: #ddd6fe;
-  background: #f5f3ff;
-}
-
-.kids-reaction-choice:hover .kids-reaction-face {
-  transform: translateY(-2px) scale(1.05);
-}
-
-.kids-reaction-choice:active .kids-reaction-face {
-  border-bottom-width: 2px;
-  transform: translateY(5px);
-  box-shadow: none;
-}
-
-.kids-reaction-choice.selected .kids-reaction-face {
-  border-color: #3b82f6;
-  outline: 3px solid rgba(59, 130, 246, 0.22);
-  outline-offset: 3px;
-  transform: translateY(3px) scale(1.06);
-}
-
-.kids-reaction-choice.selected .kids-reaction-label {
-  color: #2563eb;
-}
-
-@media (max-width: 390px) {
-  .kids-reaction-grid {
-    gap: 8px;
-  }
-
-  .kids-reaction-face {
-    width: 52px;
-    height: 52px;
-    font-size: 27px;
-  }
-}
-
-.kids-up-next-heading button {
-  min-height: 42px;
-  padding: 8px 14px;
-  border: 0;
-  border-radius: 14px;
-  background: #eaf5ff;
-  color: #2563eb;
-  font-weight: 800;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-}
-
-.kids-up-next-heading button:hover {
-  background: #dbeafe;
-}
-
-.kids-up-next-heading button:active {
-  transform: scale(0.96);
-}
-
-.kids-up-next-card {
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-}
-
-.kids-up-next-card * {
-  pointer-events: none;
 }
 
 .screen-time-quick-control {
@@ -4082,6 +4670,57 @@ button {
 .activity-history-empty p {
   margin: 0;
   color: #64748b;
+}
+
+.activity-history-empty.is-error > span {
+  font-size: 40px;
+}
+
+.activity-retry-btn {
+  margin-top: 14px;
+  padding: 9px 20px;
+  border: 0;
+  border-radius: 12px;
+  background: #4f46e5;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.activity-child-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #475569;
+}
+
+.activity-child-select select {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  font: inherit;
+  font-weight: 700;
+}
+
+.parent-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #475569;
+  cursor: pointer;
+}
+
+.parent-icon-btn:hover {
+  background: #e2e8f0;
 }
 
 @media (max-width: 900px) {
@@ -6373,7 +7012,12 @@ button {
     width: 100%;
     min-width: 0;
     min-height: calc(100dvh - 64px);
-    padding: 0 0 88px !important;
+    /* This rule wins (last + !important) over the earlier 72px/84px-plus-
+       safe-area attempts above, but it had dropped the safe-area-inset-bottom
+       term entirely, letting content sit under the fixed bottom nav on
+       phones with a large home-indicator inset. Restoring the inset here
+       instead of adding another block. */
+    padding: 0 0 calc(88px + env(safe-area-inset-bottom)) !important;
     overflow-x: hidden;
   }
 
@@ -6451,338 +7095,26 @@ button {
   display: none !important;
 }
 
-/* FIT PHOTO AND VIDEO TO AVAILABLE VIEW */
-.kids-player-page {
-  width: min(1180px, 100%);
-}
-
-.kids-player-content {
-  width: 100%;
-  min-width: 0;
-}
-
-.kids-player-media-shell {
-  display: flex;
-  width: 100%;
-  height: clamp(320px, calc(100dvh - 230px), 760px);
-  min-height: 0 !important;
-  align-items: center;
-  justify-content: center;
-  aspect-ratio: auto !important;
-  background: #020617;
-}
-
-.kids-player-media-object {
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain !important;
-  object-position: center;
-  background: #020617;
-}
-
-.kids-player-media-shell:fullscreen {
-  width: 100vw;
-  height: 100dvh;
-  max-width: none;
-  border-radius: 0;
-}
-
-.kids-player-media-shell:fullscreen .kids-player-media-object {
-  width: 100vw;
-  height: 100dvh;
-  object-fit: contain !important;
-}
-
-@media (max-width: 699px) {
-  .kids-player-media-shell {
-    height: min(68dvh, calc(100dvh - 175px));
-    min-height: 260px !important;
-    border-radius: 18px;
-  }
-
-  .kids-player-info {
-    padding-right: 12px;
-    padding-left: 12px;
-  }
-}
-
-@media (orientation: landscape) and (max-height: 600px) {
-  .kids-player-media-shell {
-    height: calc(100dvh - 115px);
-    min-height: 220px !important;
-  }
-}
-
-/* PLAYER AUTO NEXT AND EXTRA COMPACT REACTIONS */
-.kids-auto-next-badge {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 30;
-  padding: 5px 9px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.82);
-  color: white;
-  font-size: 10px;
-  font-weight: 900;
-  pointer-events: none;
-}
-
-.kids-autoplay-sound-button {
-  position: absolute;
-  bottom: 15px;
-  left: 50%;
-  z-index: 45;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 13px;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.95);
-  color: #172033;
-  font-size: 12px;
-  font-weight: 900;
-  transform: translateX(-50%);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-}
-
-.kids-next-media-preview {
-  display: grid;
-  grid-template-columns: 76px minmax(0, 1fr) auto;
-  width: 100%;
-  align-items: center;
-  gap: 9px;
-  margin: 12px 0 8px;
-  padding: 6px;
-  border: 1px solid #dbeafe;
-  border-radius: 13px;
-  background: #f8fbff;
-  color: #172033;
-  text-align: left;
-  cursor: pointer;
-}
-
-.kids-next-media-preview img {
-  width: 76px;
-  height: 46px;
-  border-radius: 9px;
-  object-fit: cover;
-  background: #020617;
-}
-
-.kids-next-media-preview > span {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.kids-next-media-preview small {
-  color: #7c3aed;
-  font-size: 8px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.kids-next-media-preview strong {
-  overflow: hidden;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kids-reaction-section.kids-reaction-compact {
-  margin: 6px 0 12px !important;
-  padding: 7px 8px !important;
-  border-radius: 12px !important;
-}
-
-.kids-reaction-section.kids-reaction-compact > h3 {
-  margin: 0 0 5px !important;
-  font-size: 8px !important;
-}
-
-.kids-reaction-compact .kids-reaction-grid {
-  display: flex !important;
-  justify-content: center;
-  gap: 5px !important;
-  margin: 0 !important;
-}
-
-.kids-reaction-compact .kids-reaction-choice {
-  display: flex !important;
-  width: auto !important;
-  min-width: 54px !important;
-  min-height: 30px !important;
-  flex-direction: row !important;
-  justify-content: center;
-  gap: 3px !important;
-  padding: 3px 5px !important;
-  border-radius: 9px;
-}
-
-.kids-reaction-compact .kids-reaction-face {
-  width: 22px !important;
-  height: 22px !important;
-  border-width: 1px !important;
-  border-bottom-width: 2px !important;
-  border-radius: 7px !important;
-  font-size: 13px !important;
-}
-
-.kids-reaction-compact .kids-reaction-label {
-  font-size: 7px !important;
-  line-height: 1 !important;
-  white-space: nowrap;
-}
-
-.kids-reaction-compact .kids-reaction-choice.selected .kids-reaction-face {
-  outline: 1px solid #3b82f6 !important;
-  outline-offset: 1px !important;
-  transform: none !important;
-}
-
-/* FITTED REACTIONS AND MEDIA NAVIGATION */
-.kids-media-nav-controls {
-  position: absolute;
-  top: 50%;
-  right: 12px;
-  left: 12px;
-  z-index: 38;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  pointer-events: none;
-  transform: translateY(-50%);
-}
-
-.kids-media-nav-button {
-  display: grid;
-  width: 46px;
-  height: 46px;
-  place-items: center;
-  padding: 0;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-radius: 50%;
-  background: rgba(15, 23, 42, 0.78);
-  color: white;
-  box-shadow: 0 7px 22px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(8px);
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-}
-
-.kids-media-nav-button:hover {
-  background: rgba(37, 99, 235, 0.92);
-}
-
-.kids-reaction-section.kids-reaction-compact {
-  width: 100%;
-  max-width: 460px;
-  margin: 8px auto 14px !important;
-  padding: 9px 10px !important;
-}
-
-.kids-reaction-compact .kids-reaction-grid {
-  display: grid !important;
-  width: min(390px, 100%);
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-  gap: 8px !important;
-  margin: 0 auto !important;
-}
-
-.kids-reaction-compact .kids-reaction-choice {
-  display: flex !important;
-  min-width: 0 !important;
-  min-height: 50px !important;
-  flex-direction: column !important;
-  align-items: center;
-  justify-content: center;
-  gap: 3px !important;
-  padding: 4px 2px !important;
-  border-radius: 11px;
-}
-
-.kids-reaction-compact .kids-reaction-face {
-  display: grid !important;
-  width: 30px !important;
-  height: 30px !important;
-  place-items: center !important;
-  border-width: 1px !important;
-  border-bottom-width: 3px !important;
-  border-radius: 9px !important;
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif !important;
-  font-size: 18px !important;
-  line-height: 1 !important;
-}
-
-.kids-reaction-compact .kids-reaction-label {
-  display: block;
-  width: 100%;
-  overflow: hidden;
-  font-size: 9px !important;
-  line-height: 1.1 !important;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kids-reaction-compact .kids-reaction-choice.selected .kids-reaction-face {
-  border-color: #2563eb !important;
-  outline: 2px solid rgba(37, 99, 235, 0.22) !important;
-  outline-offset: 1px !important;
-  transform: none !important;
-}
-
-@media (max-width: 420px) {
-  .kids-media-nav-controls {
-    right: 8px;
-    left: 8px;
-  }
-
-  .kids-media-nav-button {
-    width: 40px;
-    height: 40px;
-  }
-
-  .kids-reaction-compact .kids-reaction-grid {
-    gap: 5px !important;
-  }
-
-  .kids-reaction-compact .kids-reaction-face {
-    width: 27px !important;
-    height: 27px !important;
-    font-size: 16px !important;
-  }
-
-  .kids-reaction-compact .kids-reaction-label {
-    font-size: 8px !important;
-  }
-}
-
-/* YOUTUBE-STYLE PHOTO AND VIDEO PLAYER */
-.sasa-youtube-player {
+/* PROFESSIONAL VIDEO STAGE — photos + uploaded videos (YouTubeStyleMediaPlayer):
+   the media surface, a fading title overlay, and ONE bottom control dock
+   (seek bar + transport controls) shared by both photos and videos. Photos
+   reuse the same seek bar and time readout for their 8-second slideshow
+   timer instead of getting a second bar of their own. */
+.sasa-cinema-player {
   position: relative;
   display: flex;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  max-height: min(74dvh, 760px);
+  height: 100%;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 24px;
   background: #000;
   color: #fff;
-  box-shadow: 0 16px 45px rgba(2, 6, 23, 0.3);
   cursor: pointer;
   user-select: none;
 }
 
-.sasa-youtube-media {
+.sasa-cinema-media {
   display: block;
   width: 100%;
   height: 100%;
@@ -6791,78 +7123,164 @@ button {
   background: #000;
 }
 
-.sasa-youtube-center-button {
+.sasa-cinema-center-play {
   position: absolute;
   top: 50%;
   left: 50%;
   z-index: 40;
   display: grid;
-  width: 76px;
-  height: 76px;
+  width: 84px;
+  height: 84px;
   place-items: center;
   padding: 0;
-  border: 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(10, 11, 15, 0.58);
   color: #fff;
   opacity: 0;
-  transform: translate(-50%, -50%) scale(0.84);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.48),
+    0 0 0 8px rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(6px);
+  transform: translate(-50%, -50%) scale(0.88);
   transition:
     opacity 180ms ease,
-    transform 180ms ease;
+    transform 180ms ease,
+    visibility 180ms;
+  visibility: hidden;
   pointer-events: none;
 }
 
-.sasa-youtube-center-button.visible {
+.sasa-cinema-center-play.visible {
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
+  visibility: visible;
   pointer-events: auto;
 }
 
-.sasa-youtube-controls {
+.sasa-cinema-center-play:hover {
+  background: rgba(10, 11, 15, 0.72);
+}
+
+.sasa-cinema-center-play:active {
+  transform: translate(-50%, -50%) scale(0.92);
+}
+
+.sasa-cinema-center-play:focus-visible {
+  outline: 2px solid var(--player-accent, #818cf8);
+  outline-offset: 3px;
+}
+
+/* Bottom control dock */
+.sasa-cinema-controlbar {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 45;
-  padding: 70px 16px 13px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.94), rgba(0, 0, 0, 0.5) 55%, transparent);
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
+  z-index: 48;
+  padding: 10px 14px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(12, 13, 17, 0.86);
+  backdrop-filter: blur(14px);
   opacity: 0;
   transform: translateY(10px);
   transition:
     opacity 180ms ease,
-    transform 180ms ease;
+    transform 180ms ease,
+    visibility 180ms;
+  visibility: hidden;
   pointer-events: none;
 }
 
-.sasa-youtube-controls.visible {
+.sasa-cinema-controlbar.visible {
   opacity: 1;
   transform: translateY(0);
+  visibility: visible;
   pointer-events: auto;
 }
 
-.sasa-youtube-progress {
+.sasa-cinema-seek {
+  --fill: 0%;
+  --buffered: 0%;
+
   width: 100%;
   height: 5px;
-  margin: 0 0 9px;
+  margin: 0 0 10px;
   padding: 0;
   border: 0;
-  accent-color: #ff1744;
+  border-radius: 999px;
+  /* Three tiers: played (accent) → buffered (soft white) → unbuffered (dim). */
+  background: linear-gradient(
+    to right,
+    var(--player-accent, #818cf8) var(--fill),
+    rgba(255, 255, 255, 0.4) var(--fill),
+    rgba(255, 255, 255, 0.4) var(--buffered),
+    rgba(255, 255, 255, 0.18) var(--buffered)
+  );
+  cursor: pointer;
+  appearance: none;
+  transition: height 0.12s ease;
+}
+
+.sasa-cinema-seek:hover,
+.sasa-cinema-seek:focus-visible {
+  height: 6px;
+}
+
+.sasa-cinema-seek::-webkit-slider-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.22);
+  appearance: none;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.sasa-cinema-seek::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.22);
   cursor: pointer;
 }
 
-.sasa-youtube-control-row {
+.sasa-cinema-seek:hover::-webkit-slider-thumb {
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.18);
+  transform: scale(1.08);
+}
+
+.sasa-cinema-seek:focus-visible {
+  outline: 2px solid var(--player-accent, #818cf8);
+  outline-offset: 4px;
+}
+
+.sasa-cinema-control-row {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 5px;
+  justify-content: space-between;
+  gap: 6px;
 }
 
-.sasa-youtube-control-row button {
+.sasa-cinema-control-group {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+.sasa-cinema-btn {
   display: grid;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
   place-items: center;
   padding: 0;
   border: 0;
@@ -6871,320 +7289,277 @@ button {
   color: #fff;
   cursor: pointer;
   touch-action: manipulation;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
-.sasa-youtube-control-row button:hover {
-  background: rgba(255, 255, 255, 0.18);
+.sasa-cinema-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
-.sasa-youtube-control-row button:disabled {
+.sasa-cinema-btn:active {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.sasa-cinema-btn:disabled {
   opacity: 0.32;
   cursor: default;
 }
 
-.sasa-youtube-time {
-  flex: 0 0 auto;
-  margin-left: 3px;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
+.sasa-cinema-btn:focus-visible {
+  outline: 2px solid var(--player-accent, #818cf8);
+  outline-offset: 2px;
 }
 
-.sasa-youtube-title {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  margin-left: 8px;
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.sasa-cinema-btn.is-active {
+  color: var(--player-accent, #818cf8);
 }
 
-.sasa-youtube-lock-button {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 55;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 13px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+.sasa-cinema-volume-slider {
+  width: 64px;
+  height: 4px;
+  margin-left: 2px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.75);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 900;
+  background: rgba(255, 255, 255, 0.26);
+  appearance: none;
   cursor: pointer;
 }
 
-.sasa-youtube-player:fullscreen {
+.sasa-cinema-volume-slider::-webkit-slider-thumb {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #fff;
+  appearance: none;
+  cursor: pointer;
+}
+
+.sasa-cinema-volume-slider::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
+
+.sasa-cinema-time {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  color: #f2f3f7;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* "3 / 12" media-position readout, right next to the time — tasteful, not a
+   second badge competing with Now Playing. */
+.sasa-cinema-position {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #cbd2e6;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Reused for the photo slideshow's "Next in Xs" hint — sits inline right
+   after the time readout inside the single control dock, never a bar of
+   its own. */
+.sasa-cinema-photo-caption {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  color: #9aa3b5;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sasa-cinema-media-error {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(8, 9, 14, 0.82);
+  color: #fff;
+}
+
+.sasa-cinema-media-error-icon {
+  font-size: 34px;
+}
+
+.sasa-cinema-media-error strong {
+  font-size: 14px;
+  font-weight: 700;
+  max-width: 320px;
+}
+
+.sasa-cinema-media-error-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.sasa-cinema-media-error-actions button {
+  padding: 9px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sasa-cinema-media-error-actions button:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.sasa-cinema-lock-pill {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 55;
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(10, 11, 15, 0.7);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s ease;
+}
+
+.sasa-cinema-lock-pill:hover {
+  background: rgba(10, 11, 15, 0.88);
+}
+
+.sasa-cinema-lock-pill:active {
+  transform: scale(0.95);
+}
+
+.sasa-cinema-lock-pill:focus-visible {
+  outline: 2px solid var(--player-accent, #818cf8);
+  outline-offset: 2px;
+}
+
+.sasa-cinema-player:fullscreen {
   width: 100vw;
   height: 100dvh;
   max-height: none;
   border-radius: 0;
 }
 
-.sasa-youtube-player:fullscreen .sasa-youtube-media {
+.sasa-cinema-player:fullscreen .sasa-cinema-media {
   width: 100vw;
   height: 100dvh;
 }
 
-.sasa-youtube-player:fullscreen .sasa-youtube-controls {
-  padding-right: 24px;
-  padding-bottom: calc(18px + env(safe-area-inset-bottom));
-  padding-left: 24px;
+/* SARA MOBILE FULLSCREEN FINAL V9 */
+/* Landscape fullscreen on notched phones previously pinned the controlbar/
+   lock pill/top overlay at flat 14-20px offsets, ignoring the device
+   safe-area cutout on the left/right edges (only bottom was inset-aware).
+   Adding the missing insets here instead of a new override block. */
+.sasa-cinema-player:fullscreen .sasa-cinema-controlbar {
+  right: calc(20px + env(safe-area-inset-right));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  left: calc(20px + env(safe-area-inset-left));
+}
+
+.sasa-cinema-player:fullscreen .sasa-cinema-lock-pill {
+  top: calc(14px + env(safe-area-inset-top));
+  right: calc(14px + env(safe-area-inset-right));
+}
+
+.sasa-cinema-player:fullscreen .sasa-cinema-top-overlay {
+  padding-left: calc(18px + env(safe-area-inset-left));
+  padding-right: calc(18px + env(safe-area-inset-right));
+  padding-top: calc(14px + env(safe-area-inset-top));
+}
+
+.sasa-cinema-player:fullscreen .sasa-cinema-frame-nav {
+  right: calc(14px + env(safe-area-inset-right));
+  left: calc(14px + env(safe-area-inset-left));
 }
 
 @media (max-width: 699px) {
-  .sasa-youtube-player {
-    min-height: 260px;
-    max-height: 68dvh;
-    border-radius: 18px;
+  .sasa-cinema-center-play {
+    width: 60px;
+    height: 60px;
   }
 
-  .sasa-youtube-center-button {
-    width: 62px;
-    height: 62px;
+  .sasa-cinema-controlbar {
+    right: 6px;
+    bottom: 6px;
+    left: 6px;
+    padding: 8px 10px 8px;
+    border-radius: 14px;
   }
 
-  .sasa-youtube-controls {
-    padding: 55px 8px 8px;
+  /* SARA_MOBILE_ANDROID_V10 — the transport group (prev/play/next/mute/
+     volume/time/position) plus the right group (autoplay/lock/fullscreen)
+     don't both fit on one row under ~390px, especially with the position
+     label ("3 / 12") present or the lock button showing in fullscreen —
+     buttons were being silently clipped by the player's overflow:hidden
+     instead of just looking cramped. Wrapping keeps every control tappable;
+     margin-left:auto right-aligns the second group instead of leaving it
+     stuck at the left edge. */
+  .sasa-cinema-control-row {
+    flex-wrap: wrap;
+    row-gap: 4px;
   }
 
-  .sasa-youtube-control-row {
-    gap: 1px;
+  .sasa-cinema-control-group:last-child {
+    margin-left: auto;
   }
 
-  .sasa-youtube-control-row button {
-    width: 34px;
-    height: 34px;
-    flex-basis: 34px;
+  .sasa-cinema-volume-slider {
+    width: 40px;
   }
 
-  .sasa-youtube-time {
+  .sasa-cinema-time {
     font-size: 10px;
   }
 
-  .sasa-youtube-title {
+  .sasa-cinema-photo-caption {
     display: none;
   }
 
-  .sasa-youtube-lock-button span {
+  .sasa-cinema-top-overlay {
+    padding: 12px 14px;
+  }
+
+  .sasa-cinema-overlay-title {
+    max-width: 55%;
+    font-size: 13px;
+  }
+
+  .sasa-cinema-lock-pill span {
     display: none;
   }
 }
 
-/* PLAYER DETAILS FINAL COMPACT V4 */
+/* COMPLETE ASSIGNED MEDIA NAVIGATION — YouTube embed prev/next arrows */
 
-.kids-player-info {
-  width: min(960px, 100%);
-  margin-inline: auto;
-  padding: 14px 14px 28px !important;
-}
-
-.kids-player-info > h2 {
-  margin: 0 0 7px !important;
-  color: #172033;
-  font-size: clamp(19px, 2.2vw, 24px) !important;
-  line-height: 1.15 !important;
-}
-
-.kids-player-info > p {
-  display: inline-flex !important;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 0 0 13px !important;
-  padding: 6px 11px !important;
-  border: 1px solid #ddd6fe;
-  border-radius: 999px;
-  background: #f5f3ff;
-  color: #6d28d9 !important;
-  font-size: 9px !important;
-  font-weight: 900 !important;
-}
-
-/* Playing-next preview */
-.kids-next-media-preview {
-  display: grid !important;
-  width: min(540px, 100%) !important;
-  max-width: 540px !important;
-  grid-template-columns: 72px minmax(0, 1fr) 28px !important;
-  align-items: center !important;
-  gap: 9px !important;
-  margin: 0 auto 9px !important;
-  padding: 6px !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 12px !important;
-  background: #ffffff !important;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05) !important;
-}
-
-.kids-next-media-preview:hover {
-  border-color: #a78bfa !important;
-  background: #faf8ff !important;
-}
-
-.kids-next-media-preview img {
-  width: 72px !important;
-  height: 43px !important;
-  border-radius: 8px !important;
-  object-fit: cover !important;
-}
-
-.kids-next-media-preview small {
-  font-size: 7px !important;
-  letter-spacing: 0.05em;
-}
-
-.kids-next-media-preview strong {
-  font-size: 10px !important;
-}
-
-/* Compact reaction row */
-.kids-reaction-section.kids-reaction-compact {
-  display: grid !important;
-  width: min(540px, 100%) !important;
-  max-width: 540px !important;
-  grid-template-columns: auto minmax(0, 1fr) !important;
-  align-items: center !important;
-  gap: 10px !important;
-  margin: 0 auto 18px !important;
-  padding: 7px 9px !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 12px !important;
-  background: #ffffff !important;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05) !important;
-}
-
-.kids-reaction-section.kids-reaction-compact > h3 {
-  margin: 0 !important;
-  color: #64748b !important;
-  font-size: 8px !important;
-  font-weight: 900 !important;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.kids-reaction-compact .kids-reaction-grid {
-  display: grid !important;
-  width: 100% !important;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-  gap: 5px !important;
-  margin: 0 !important;
-}
-
-.kids-reaction-compact .kids-reaction-choice {
-  display: flex !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  min-height: 35px !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 4px !important;
-  padding: 4px !important;
-  border: 1px solid #e2e8f0 !important;
-  border-bottom-width: 1px !important;
-  border-radius: 999px !important;
-  background: #f8fafc !important;
-  box-shadow: none !important;
-}
-
-.kids-reaction-compact .kids-reaction-choice:hover {
-  border-color: #a78bfa !important;
-  background: #f5f3ff !important;
-}
-
-.kids-reaction-compact .kids-reaction-face {
-  display: inline-block !important;
-  width: auto !important;
-  height: auto !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif !important;
-  font-size: 18px !important;
-  line-height: 1 !important;
-}
-
-.kids-reaction-compact .kids-reaction-label {
-  display: inline-block !important;
-  width: auto !important;
-  overflow: visible !important;
-  color: #475569 !important;
-  font-size: 7px !important;
-  font-weight: 900 !important;
-  line-height: 1 !important;
-  white-space: nowrap;
-}
-
-.kids-reaction-compact .kids-reaction-choice.selected {
-  border-color: #8b5cf6 !important;
-  background: #ede9fe !important;
-  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.13) !important;
-}
-
-.kids-reaction-compact .kids-reaction-choice.selected .kids-reaction-face {
-  outline: 0 !important;
-  transform: scale(1.08) !important;
-}
-
-/* More-to-watch alignment */
-.kids-up-next-heading,
-.kids-up-next-list {
-  width: min(760px, 100%);
-  margin-right: auto !important;
-  margin-left: auto !important;
-}
-
-.kids-up-next-heading {
-  align-items: center !important;
-  margin-top: 10px !important;
-  margin-bottom: 10px !important;
-}
-
-.kids-up-next-heading h3 {
-  font-size: 17px !important;
-}
-
-@media (max-width: 600px) {
-  .kids-player-info {
-    padding: 11px 8px 24px !important;
-  }
-
-  .kids-player-info > p {
-    border-radius: 12px;
-    font-size: 8px !important;
-  }
-
-  .kids-reaction-section.kids-reaction-compact {
-    display: block !important;
-  }
-
-  .kids-reaction-section.kids-reaction-compact > h3 {
-    margin-bottom: 6px !important;
-    text-align: center;
-  }
-
-  .kids-reaction-compact .kids-reaction-choice {
-    min-height: 43px !important;
-    flex-direction: column !important;
-    gap: 2px !important;
-    border-radius: 9px !important;
-  }
-
-  .kids-reaction-compact .kids-reaction-label {
-    font-size: 6px !important;
-  }
-}
-
-/* COMPLETE ASSIGNED MEDIA NAVIGATION */
-
-.sasa-youtube-frame-nav {
+.sasa-cinema-frame-nav {
   position: absolute;
   top: 50%;
   right: 14px;
@@ -7197,34 +7572,68 @@ button {
   transform: translateY(-50%);
 }
 
-.sasa-youtube-frame-nav button {
+.sasa-cinema-frame-nav button {
   display: grid;
-  width: 46px;
-  height: 46px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.76);
+  background: rgba(10, 11, 15, 0.7);
   color: white;
-  box-shadow: 0 7px 22px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(7px);
   cursor: pointer;
   pointer-events: auto;
+  touch-action: manipulation;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
 }
 
-.sasa-youtube-frame-nav button:hover {
-  background: rgba(124, 58, 237, 0.92);
+.sasa-cinema-frame-nav button:hover {
+  background: rgba(10, 11, 15, 0.92);
+  transform: scale(1.06);
+}
+
+.sasa-cinema-frame-nav button:active {
+  transform: scale(0.92);
+}
+
+.sasa-cinema-frame-nav button:focus-visible {
+  outline: 2px solid var(--player-accent, #818cf8);
+  outline-offset: 2px;
 }
 
 @media (max-width: 600px) {
-  .sasa-youtube-frame-nav {
+  .sasa-cinema-frame-nav {
     right: 8px;
     left: 8px;
   }
 
-  .sasa-youtube-frame-nav button {
+  .sasa-cinema-frame-nav button {
     width: 40px;
     height: 40px;
+  }
+}
+
+/* Reduced-motion fallback: keep every state change (fades, focus, selection)
+   but drop the continuous decorative motion — the ambient glow breathe. */
+@media (prefers-reduced-motion: reduce) {
+  .sasa-cinema-ambient-glow {
+    animation: none !important;
+  }
+
+  .sasa-cinema-bg-image,
+  .sasa-cinema-stage-media,
+  .sasa-cinema-media,
+  .sasa-cinema-center-play,
+  .sasa-cinema-top-overlay,
+  .sasa-cinema-controlbar,
+  .sasa-cinema-upnext-card,
+  .sasa-cinema-upnext-thumb img,
+  .sasa-cinema-reaction-pill {
+    transition-duration: 0.01ms !important;
   }
 }
