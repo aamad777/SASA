@@ -158,11 +158,17 @@ export default function YouTubeStyleMediaPlayer({
   }, []);
 
   useEffect(() => {
+    // SARA_ANDROID_AUTH_RECOVERY_V10 — this used to force setLocked(false)
+    // on every media change, which meant a parent's kiosk lock silently
+    // turned itself off after the very next autoplay-advanced photo/video.
+    // Lock now persists across media changes (see also the KidsVideoPlayer
+    // stage key fix, which stops this component from remounting on every
+    // playlist advance so fullscreen survives too); it's still cleared by
+    // handleFullscreenChange above when fullscreen is actually exited.
     setCurrentTime(0);
     setDuration(0);
     setPhotoProgress(0);
     setControlsVisible(true);
-    setLocked(false);
     setMediaError(false);
     setRetryToken(0);
     setBufferedPercent(0);

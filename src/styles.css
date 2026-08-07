@@ -7514,6 +7514,23 @@ button {
     border-radius: 14px;
   }
 
+  /* SARA_MOBILE_ANDROID_V10 — the transport group (prev/play/next/mute/
+     volume/time/position) plus the right group (autoplay/lock/fullscreen)
+     don't both fit on one row under ~390px, especially with the position
+     label ("3 / 12") present or the lock button showing in fullscreen —
+     buttons were being silently clipped by the player's overflow:hidden
+     instead of just looking cramped. Wrapping keeps every control tappable;
+     margin-left:auto right-aligns the second group instead of leaving it
+     stuck at the left edge. */
+  .sasa-cinema-control-row {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .sasa-cinema-control-group:last-child {
+    margin-left: auto;
+  }
+
   .sasa-cinema-volume-slider {
     width: 40px;
   }

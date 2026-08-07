@@ -659,8 +659,20 @@ export default function ParentLogin({ onSuccess, onGuest }: ParentLoginProps) {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-sky-100 via-purple-100 to-pink-100 flex items-center justify-center px-4 py-8">
-      <section className="relative bg-white rounded-[2rem] shadow-2xl border border-white/80 p-5 sm:p-7 max-w-md w-full">
+    // SARA_ANDROID_AUTH_RECOVERY_V10 — min-h-screen (100vh) left stray
+    // scrollable whitespace on mobile browser/WebView chrome and didn't
+    // resize with the on-screen keyboard; min-h-dvh matches the convention
+    // already used elsewhere (routes/index.tsx, AddProfile, styles.css).
+    // Safe-area padding added so the card never sits under a notch/home
+    // indicator, matching every other screen in the app.
+    <main
+      className="min-h-dvh bg-gradient-to-br from-sky-100 via-purple-100 to-pink-100 flex items-center justify-center px-4 overflow-y-auto"
+      style={{
+        paddingTop: "max(2rem, calc(2rem + env(safe-area-inset-top)))",
+        paddingBottom: "max(2rem, calc(2rem + env(safe-area-inset-bottom)))",
+      }}
+    >
+      <section className="relative bg-white rounded-[2rem] shadow-2xl border border-white/80 p-5 sm:p-7 max-w-md w-full my-auto">
         <button
           type="button"
           onClick={() => {

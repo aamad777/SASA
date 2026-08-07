@@ -541,6 +541,11 @@ export default function DatabaseProfileSelection({
             display: "grid",
             placeItems: "center",
             padding: 20,
+            // SARA_ANDROID_AUTH_RECOVERY_V10 — matches the Manage PIN modal
+            // below: without this, a short viewport (landscape phone, or the
+            // keyboard covering half the screen) had no way to reach the
+            // Create Child button.
+            overflowY: "auto",
             background: "rgba(15,23,42,.6)",
           }}
         >
@@ -676,6 +681,10 @@ export default function DatabaseProfileSelection({
             display: "grid",
             placeItems: "center",
             padding: 20,
+            // SARA_ANDROID_AUTH_RECOVERY_V10 — matches the Manage PIN modal
+            // below: keeps the PIN input/submit button reachable when the
+            // on-screen keyboard shrinks the visible viewport.
+            overflowY: "auto",
             background: "rgba(15,23,42,.65)",
           }}
         >

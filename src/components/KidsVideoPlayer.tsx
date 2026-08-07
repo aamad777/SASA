@@ -581,6 +581,20 @@ export default function KidsVideoPlayer({
   const isNumbersActivity =
     !isYouTubeMedia && !isPlayableMedia && (video.id === 7 || video.category === "Numbers");
 
+  // SARA_ANDROID_AUTH_RECOVERY_V10 — the stage below used to key the
+  // YouTubeStyleMediaPlayer mount by currentMediaIdentity (one key per
+  // photo/video), so every autoplay-advanced or Next/Previous transition
+  // fully unmounted and remounted it. That destroyed its fullscreen DOM
+  // node (the browser auto-exits fullscreen when the element is removed)
+  // and reset its in-player lock, so a parent's kiosk lock silently turned
+  // itself off after the very next item. Photos/uploads all render through
+  // the same YouTubeStyleMediaPlayer instance, so they share one stable
+  // stage key ("playable") and let its own mediaIdentity-keyed effects
+  // handle the per-item reset instead of a remount — fullscreen and lock
+  // now survive playlist navigation. YouTube/Numbers-activity items are
+  // rarer transitions and keep the old per-item key/animation.
+  const stageKey = isPlayableMedia ? "playable" : currentMediaIdentity;
+
   const activeThemeArt = PLAYER_THEMES.find((item) => item.id === theme)?.art;
 
   return (
@@ -907,7 +921,7 @@ export default function KidsVideoPlayer({
               >
                 <AnimatePresence mode="wait">
                   <motion.div
-                    key={currentMediaIdentity}
+                    key={stageKey}
                     className="sasa-cinema-stage-media"
                     initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}

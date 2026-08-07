@@ -9,7 +9,15 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- SARA_ANDROID_AUTH_RECOVERY_V10: without windowSoftInputMode, Android
+             defaults to adjustPan, so the WebView never resizes for the on-screen
+             keyboard — it pans the whole page instead. Combined with the app's
+             dvh-based full-height screens (parent login, PIN modal, forms), that
+             left inputs/submit buttons hidden behind the keyboard. adjustResize
+             makes the WebView's visual viewport actually shrink, which is what
+             100dvh/safe-area CSS in the web app already expects. -->
         <activity
+            android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
