@@ -56,13 +56,26 @@ export type KidsVideoItem = {
 
 export type KidsHomeTab = "home" | "search" | "library" | "songs" | "games" | "studio" | "profile";
 
+// Shared fallback thumbnail for any assigned-media image that fails to load
+// (broken URL, deleted file, network hiccup) — used here and in the player
+// so a bad thumbnail never shows a broken-image icon or blank card.
+export const mediaThumbnailFallback = `data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">
+    <rect width="640" height="360" fill="#94a3b8"/>
+    <text x="320" y="190" text-anchor="middle" font-family="Arial" font-size="26" font-weight="700" fill="white">Media unavailable</text>
+  </svg>`,
+)}`;
+
 type KidsVideoHomeProps = {
   key?: string | number;
   profileName: string;
   profileEmoji: string;
-  profileId?: number;
+  profileId?: number | string;
   profileImage?: string;
   assignedVideos?: KidsVideoItem[];
+  assignedVideosLoading?: boolean;
+  assignedMediaError?: string;
+  onRetryAssignedMedia?: () => void;
   initialTab?: KidsHomeTab;
   activeTab?: KidsHomeTab;
   onTabChange?: (tab: KidsHomeTab) => void;
@@ -229,6 +242,9 @@ export default function KidsVideoHome({
   profileId,
   profileImage,
   assignedVideos = [],
+  assignedVideosLoading = false,
+  assignedMediaError = "",
+  onRetryAssignedMedia,
   initialTab = "home",
   activeTab: activeTabProp,
   onTabChange,
@@ -363,6 +379,14 @@ export default function KidsVideoHome({
     setTimeout(() => setBadgeToast(null), 3500);
   };
 
+  // SARA_ASSIGNED_MEDIA_MAPPING_V5 — "Photos" is a synthetic bucket keyed off
+  // sourceType, not a real category string, so matching it against
+  // video.category (as the filter below used to) always came back empty even
+  // when photos existed. Category matching is also case-insensitive here so
+  // e.g. "animals" and "Animals" from different assigned items land in the
+  // same bucket and both show up when either casing is selected.
+  const isPhotoBucketSelected = (category: string) => category.trim().toLowerCase() === "photos";
+
   const displayedVideos = useMemo(() => {
     const blockedVideoIds = loadBlockedVideoIds();
 
@@ -375,7 +399,14 @@ export default function KidsVideoHome({
     }
 
     if (selectedCategory !== "All") {
-      list = list.filter((video) => video.category === selectedCategory);
+      if (isPhotoBucketSelected(selectedCategory)) {
+        list = list.filter((video) => video.sourceType === "photo");
+      } else {
+        const normalizedCategory = selectedCategory.trim().toLowerCase();
+        list = list.filter(
+          (video) => (video.category || "").trim().toLowerCase() === normalizedCategory,
+        );
+      }
     }
 
     if (searchText.trim()) {
@@ -388,6 +419,36 @@ export default function KidsVideoHome({
 
     return list;
   }, [assignedVideos, currentTab, libraryIds, searchText, selectedCategory]);
+
+  // Same source list + same rules as displayedVideos (minus the tab/search
+  // narrowing) so the counts shown next to each category button always match
+  // what selecting that category will actually reveal.
+  const categoryCounts = useMemo(() => {
+    const blockedVideoIds = loadBlockedVideoIds();
+    const countable = [...assignedVideos, ...kidsVideos].filter(
+      (video) => !blockedVideoIds.includes(video.id),
+    );
+
+    const counts = new Map<string, number>();
+
+    countable.forEach((video) => {
+      if (video.sourceType === "photo") {
+        counts.set("photos", (counts.get("photos") || 0) + 1);
+      }
+
+      const categoryName = video.category?.trim();
+
+      if (!categoryName) return;
+
+      const key = categoryName.toLowerCase();
+
+      if (key === "photos") return;
+
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+
+    return counts;
+  }, [assignedVideos]);
 
   const visibleCategories = useMemo(() => {
     const categoryMap = new Map(
@@ -409,6 +470,11 @@ export default function KidsVideoHome({
       if (!categoryName) return;
 
       const key = categoryName.toLowerCase();
+
+      // "Photos" is reserved for the sourceType-based bucket above — an
+      // assigned item whose own category text happens to be "Photos" should
+      // not create a second, redundant entry.
+      if (key === "photos") return;
 
       if (!categoryMap.has(key)) {
         categoryMap.set(key, {
@@ -704,25 +770,60 @@ export default function KidsVideoHome({
               <strong>All Cartoons</strong>
             </motion.button>
 
-            {visibleCategories.map((category) => (
-              <motion.button
-                whileHover={{ scale: 1.06 }}
-                whileTap={{ scale: 0.93 }}
+            {visibleCategories.map((category) => {
+              const count = categoryCounts.get(category.name.toLowerCase());
+
+              return (
+                <motion.button
+                  whileHover={{ scale: 1.06 }}
+                  whileTap={{ scale: 0.93 }}
+                  type="button"
+                  key={category.name}
+                  className={selectedCategory === category.name ? "selected" : ""}
+                  onClick={() => {
+                    playPopSound();
+                    setSelectedCategory(category.name);
+                  }}
+                >
+                  <span>
+                    <img src={category.image} alt={category.name} />
+                  </span>
+                  <strong>
+                    {category.name}
+                    {typeof count === "number" && count > 0 && (
+                      <span className="kids-category-count"> {count}</span>
+                    )}
+                  </strong>
+                </motion.button>
+              );
+            })}
+          </nav>
+        )}
+
+        {/* Assigned-media loading / error state — built-in cartoons below are
+            unaffected either way, so this never blanks the whole screen. */}
+        {currentTab === "home" && assignedVideosLoading && (
+          <div className="kids-media-status-banner is-loading" role="status">
+            <span className="kids-media-status-spinner" aria-hidden="true" />
+            Loading your videos...
+          </div>
+        )}
+
+        {currentTab === "home" && !assignedVideosLoading && assignedMediaError && (
+          <div className="kids-media-status-banner is-error" role="alert">
+            <span>Couldn&apos;t load your assigned videos.</span>
+            {onRetryAssignedMedia && (
+              <button
                 type="button"
-                key={category.name}
-                className={selectedCategory === category.name ? "selected" : ""}
                 onClick={() => {
                   playPopSound();
-                  setSelectedCategory(category.name);
+                  onRetryAssignedMedia();
                 }}
               >
-                <span>
-                  <img src={category.image} alt={category.name} />
-                </span>
-                <strong>{category.name}</strong>
-              </motion.button>
-            ))}
-          </nav>
+                Retry
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -1037,6 +1138,10 @@ export default function KidsVideoHome({
                         src={video.image}
                         alt={video.title}
                         className="transition-transform duration-300 group-hover:scale-105"
+                        onError={(event) => {
+                          event.currentTarget.onerror = null;
+                          event.currentTarget.src = mediaThumbnailFallback;
+                        }}
                       />
                       <span className="kids-video-dark-overlay" />
 

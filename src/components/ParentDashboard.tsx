@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { playPopSound, playSuccessSound } from "../lib/sound";
+import {
+  clearActivityForProfile,
+  getActivityForProfile,
+  type ActivityEntry,
+} from "../lib/activity";
 import { kidsVideos } from "./KidsVideoHome";
 import {
   addParentYoutubeVideo,
@@ -8,6 +13,7 @@ import {
   deleteParentMedia,
   getApiAssetUrl,
   getParentMedia,
+  setChildPin,
   updateParentMedia,
   updateParentMediaAccess,
   uploadParentVideo,
@@ -21,6 +27,8 @@ import {
   BookOpen,
   Clock3,
   Check,
+  Eye,
+  EyeOff,
   Film,
   Home,
   Info,
@@ -63,18 +71,6 @@ export type ParentControlSettings = {
   requireParentPin: boolean;
 };
 
-type WatchHistoryItem = {
-  historyId: string;
-  profileId: number;
-  profileName: string;
-  videoId: number;
-  title: string;
-  image: string;
-  category: string;
-  duration: string;
-  watchedAt: string;
-};
-
 type ManagedCustomProfile = {
   id: number;
   name: string;
@@ -98,40 +94,30 @@ type ParentDashboardProps = {
   parentToken: string;
   databaseChildren: DatabaseChild[];
   onDatabaseChildDeleted: (childId: string) => void;
+  onChildPinChanged?: (childId: string) => void;
   customProfiles: ManagedCustomProfile[];
   onDeleteCustomProfile: (profileId: number) => void;
   onUpdateCustomProfile: (profile: ManagedCustomProfile) => void;
   onToggleProfileProtection: (profileId: number) => void;
   onClose: () => void;
   settings: ParentControlSettings;
-  profileId: number | null;
+  // The active profile can be a real database child (string id) or a local
+  // custom profile (number id) — see Profile in routes/index.tsx.
+  profileId: number | string | null;
   profileName: string;
   onSettingsChange: (settings: ParentControlSettings) => void;
 };
 
-const historyItems = [
-  {
-    id: 1,
-    title: "Peppa Pig: Muddy Puddles",
-    watched: "10m ago",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuA_XNMAxsUTBKZmh1ejMzKmmL6hQC4jFZvo7bTnfsSFPA1yOt7GLpxsTbjU_SkjawV0GVfdd79-an-CEi5yzse3mVw_P8M4_XITJiGupnCSkqt4vTPs1gIz-HZ7wyLgHEm6W1KJG-20vFJ7oj9hwuyRqG-bjqgOFUEI7XJTUwfoY_XSc_9zOqtrWyANG9mymfvev6_34tfeT1MzYDwgDAzDN4CWqjld4CwpT5rO2MSfQ97aaB63TC1XVVKxN2rxilt6u67kXSJVtR8",
-  },
-  {
-    id: 2,
-    title: "Cocomelon: Bath Song",
-    watched: "25m ago",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuA-wiB4yWnYIg2a7UXCzWONngOSx0l07EKXMERr7wyfA_kqrh4ih2vP24rYFAevIKp6MoMJSfzLS9fXg_jCGPwvjOJTUJZkUBulJ2I4fVuuDsyIgvGBv8N9TTnTw1yUUmsEL56hGWdi9gV4iPMbcfEiDe8xGxEeWAgfgTJFUhc4lFqXXGOSx_3_j_A7g6Hjil2Mz2azQJYapIIfsmQalLyDwYaukUE5ZdbvPfIDFNBkxsD6ZXBuv4nlnxZCijrqUNKsVc18I3Iq7DU",
-  },
-  {
-    id: 3,
-    title: "Bluey: The Pooch",
-    watched: "1h ago",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuCqHn6Ilvqma_Z7cukIpg63qFn-VYpUefNCOE1ti4X4jZ_oNszZQ6mfHbuIzTRxGsS-ylmNqjnBZNANPt_hHJ3Z3CDRpz66DRzfAB0Iq_XA_pK3WORC-42sFaW8K_vxftFft19mzEUv5xyWkblVhpU1Zqi_fpPKsRqrzcmK65z5mZYKn9mPi5llp3L6FIsr-Sdl8t7G9g84oTJf4jpCWy63IAcU4t7MpWiSbyQHoFKdhXfOrluR53c7MZ4oVyUoFVibFTiCtfBO0-o",
-  },
-];
+// SARA_KIDS_ACTIVITY_V7 — the previous "Watch History" preview here was a
+// hardcoded fake list (and, worse, named real copyrighted shows) that was
+// never actually rendered anywhere — dead code masquerading as sample data.
+// Removed in favor of real activity from src/lib/activity.ts.
+const ACTIVITY_MEDIA_LABEL: Record<string, string> = {
+  photo: "📷 Photo",
+  upload: "🎬 Video",
+  youtube: "▶️ YouTube",
+  "built-in": "🌟 Learning",
+};
 
 export const initialBlockedChannels: BlockedChannel[] = [
   {
@@ -175,6 +161,7 @@ export default function ParentDashboard({
   parentToken,
   databaseChildren,
   onDatabaseChildDeleted,
+  onChildPinChanged,
   onClose,
   settings,
   profileId,
@@ -197,7 +184,7 @@ export default function ParentDashboard({
 
   const [mediaFile, setMediaFile] = useState<File | null>(null);
 
-  const [selectedMediaChildIds, setSelectedMediaChildIds] = useState<number[]>([]);
+  const [selectedMediaChildIds, setSelectedMediaChildIds] = useState<string[]>([]);
 
   const [mediaSaving, setMediaSaving] = useState(false);
 
@@ -218,6 +205,19 @@ export default function ParentDashboard({
   const [editingMediaCategory, setEditingMediaCategory] = useState("");
 
   const [deletingDatabaseChildId, setDeletingDatabaseChildId] = useState<string | null>(null);
+
+  // SARA_KIDS_PIN_V7 — "Change PIN" reachable directly from Parent Dashboard →
+  // Profiles → a child card, per the intended flow. Mirrors the validation
+  // already built in DatabaseProfileSelection's "Manage PIN" (new + confirm +
+  // show/hide + min-length) and calls the same underlying API function, so
+  // there is one PIN-reset code path with two entry points.
+  const [pinChild, setPinChild] = useState<DatabaseChild | null>(null);
+  const [newChildPinValue, setNewChildPinValue] = useState("");
+  const [confirmChildPinValue, setConfirmChildPinValue] = useState("");
+  const [showChildPinValue, setShowChildPinValue] = useState(false);
+  const [childPinError, setChildPinError] = useState("");
+  const [childPinSuccess, setChildPinSuccess] = useState("");
+  const [savingChildPin, setSavingChildPin] = useState(false);
 
   const [newBlockedChannel, setNewBlockedChannel] = useState("");
   const [videoFilterQuery, setVideoFilterQuery] = useState("");
@@ -270,33 +270,65 @@ export default function ParentDashboard({
     setEditingProfileId(null);
   };
 
-  const loadWatchHistory = (): WatchHistoryItem[] => {
+  // SARA_KIDS_ACTIVITY_V7 — Activity has no backend endpoint (see
+  // src/lib/activity.ts); it reads the same client-side log the player and
+  // routes/index.tsx write to. The bug that made this look "broken" was
+  // filtering by whatever `profileId` prop happened to be active when the
+  // dashboard opened — which is `null` whenever a parent opens the dashboard
+  // from the "Who's Watching?" screen before picking a child, so activity
+  // always came back empty. A real child selector below fixes that and lets
+  // the parent check any child's activity, not just whichever one (if any)
+  // was already active.
+  const [selectedActivityChildId, setSelectedActivityChildId] = useState<string | null>(null);
+  const [activityEntries, setActivityEntries] = useState<ActivityEntry[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState("");
+
+  const activityProfiles = [
+    ...databaseChildren.map((child) => ({ id: String(child.id), name: child.display_name })),
+    ...customProfiles.map((cp) => ({ id: String(cp.id), name: cp.name })),
+  ];
+
+  // Default to whichever child is currently active in the app (if any),
+  // else the first available profile — never leave the selector empty when
+  // there's a sensible default.
+  useEffect(() => {
+    if (selectedActivityChildId) return;
+
+    const fallback = profileId != null ? String(profileId) : activityProfiles[0]?.id;
+
+    if (fallback) setSelectedActivityChildId(fallback);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, databaseChildren.length, customProfiles.length]);
+
+  const loadActivity = () => {
+    if (!selectedActivityChildId) {
+      setActivityEntries([]);
+      return;
+    }
+
+    setActivityLoading(true);
+    setActivityError("");
+
     try {
-      const saved = localStorage.getItem("sasa-watch-history");
-
-      if (!saved) {
-        return [];
-      }
-
-      const parsed = JSON.parse(saved);
-
-      if (!Array.isArray(parsed)) {
-        return [];
-      }
-
-      return parsed.filter(
-        (item): item is WatchHistoryItem => item && Number(item.profileId) === Number(profileId),
+      setActivityEntries(getActivityForProfile(selectedActivityChildId));
+    } catch (error) {
+      setActivityEntries([]);
+      setActivityError(
+        error instanceof Error ? error.message : "Unable to load activity right now.",
       );
-    } catch {
-      return [];
+    } finally {
+      setActivityLoading(false);
     }
   };
 
-  const [watchHistory, setWatchHistory] = useState<WatchHistoryItem[]>([]);
-
   useEffect(() => {
-    setWatchHistory(loadWatchHistory());
-  }, [profileId, activeSection]);
+    loadActivity();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedActivityChildId, activeSection]);
+
+  const selectedActivityProfileName =
+    activityProfiles.find((entry) => entry.id === selectedActivityChildId)?.name || profileName;
   const {
     screenLimitEnabled,
     screenMinutes,
@@ -421,24 +453,17 @@ export default function ParentDashboard({
     setSettingsMessage("Parental settings restored to defaults.");
   };
 
-  const clearWatchHistory = () => {
+  const clearActivity = () => {
+    if (!selectedActivityChildId) return;
+
     try {
-      const saved = localStorage.getItem("sasa-watch-history");
-
-      const parsed = saved ? JSON.parse(saved) : [];
-      const allHistory = Array.isArray(parsed) ? parsed : [];
-
-      const remaining = allHistory.filter((item) => Number(item.profileId) !== Number(profileId));
-
-      localStorage.setItem("sasa-watch-history", JSON.stringify(remaining));
-
-      setWatchHistory([]);
-    } catch {
-      setWatchHistory([]);
+      clearActivityForProfile(selectedActivityChildId);
+    } finally {
+      setActivityEntries([]);
     }
   };
 
-  const toggleMediaChild = (childId: number) => {
+  const toggleMediaChild = (childId: string) => {
     setSelectedMediaChildIds((current) =>
       current.includes(childId) ? current.filter((id) => id !== childId) : [...current, childId],
     );
@@ -642,6 +667,66 @@ export default function ParentDashboard({
       window.alert(error instanceof Error ? error.message : "Unable to delete child profile.");
     } finally {
       setDeletingDatabaseChildId(null);
+    }
+  };
+
+  const openChangeChildPin = (child: DatabaseChild) => {
+    setPinChild(child);
+    setNewChildPinValue("");
+    setConfirmChildPinValue("");
+    setShowChildPinValue(false);
+    setChildPinError("");
+    setChildPinSuccess("");
+  };
+
+  const closeChangeChildPin = () => {
+    if (savingChildPin) return;
+
+    setPinChild(null);
+    setNewChildPinValue("");
+    setConfirmChildPinValue("");
+    setChildPinError("");
+    setChildPinSuccess("");
+  };
+
+  const isChildPinValid =
+    newChildPinValue.length >= 4 &&
+    /^\d+$/.test(newChildPinValue) &&
+    newChildPinValue === confirmChildPinValue;
+
+  const saveChildPin = async () => {
+    if (!pinChild) return;
+
+    if (!/^\d+$/.test(newChildPinValue) || newChildPinValue.length < 4) {
+      setChildPinError("PIN must be at least 4 digits.");
+      return;
+    }
+
+    if (newChildPinValue !== confirmChildPinValue) {
+      setChildPinError("The two PIN values do not match.");
+      return;
+    }
+
+    setSavingChildPin(true);
+    setChildPinError("");
+    setChildPinSuccess("");
+
+    try {
+      await setChildPin(parentToken, pinChild.id, newChildPinValue);
+
+      onChildPinChanged?.(String(pinChild.id));
+
+      setChildPinSuccess("PIN updated successfully.");
+      setNewChildPinValue("");
+      setConfirmChildPinValue("");
+
+      window.setTimeout(() => {
+        closeChangeChildPin();
+      }, 900);
+    } catch (error) {
+      setChildPinError(error instanceof Error ? error.message : "Unable to update child PIN.");
+    } finally {
+      setSavingChildPin(false);
     }
   };
 
@@ -1361,27 +1446,55 @@ export default function ParentDashboard({
 
           {activeSection === "activity-history" && (
             <section className="activity-history-page">
+              {activityProfiles.length > 0 && (
+                <label className="activity-child-select">
+                  <strong>Viewing activity for</strong>
+                  <select
+                    value={selectedActivityChildId ?? ""}
+                    onChange={(event) => setSelectedActivityChildId(event.target.value || null)}
+                  >
+                    {activityProfiles.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
               <div className="activity-summary-grid">
                 <article className="activity-summary-card">
                   <span>▶️</span>
                   <div>
-                    <strong>{watchHistory.length}</strong>
-                    <p>Total video opens</p>
+                    <strong>
+                      {activityEntries.filter((item) => item.kind === "opened").length}
+                    </strong>
+                    <p>Media opened</p>
                   </div>
                 </article>
 
                 <article className="activity-summary-card">
                   <span>🎬</span>
                   <div>
-                    <strong>{new Set(watchHistory.map((item) => item.videoId)).size}</strong>
-                    <p>Unique videos</p>
+                    <strong>{new Set(activityEntries.map((item) => item.videoId)).size}</strong>
+                    <p>Unique items</p>
+                  </div>
+                </article>
+
+                <article className="activity-summary-card">
+                  <span>💖</span>
+                  <div>
+                    <strong>
+                      {activityEntries.filter((item) => item.kind === "reaction").length}
+                    </strong>
+                    <p>Reactions</p>
                   </div>
                 </article>
 
                 <article className="activity-summary-card">
                   <span>👤</span>
                   <div>
-                    <strong>{profileName}</strong>
+                    <strong>{selectedActivityProfileName}</strong>
                     <p>Selected profile</p>
                   </div>
                 </article>
@@ -1390,37 +1503,69 @@ export default function ParentDashboard({
               <article className="activity-history-card">
                 <div className="activity-history-heading">
                   <div>
-                    <h2>Watch History</h2>
-                    <p>Videos opened by {profileName}.</p>
+                    <h2>Activity</h2>
+                    <p>What {selectedActivityProfileName} has watched and reacted to.</p>
                   </div>
 
-                  <button
-                    type="button"
-                    disabled={watchHistory.length === 0}
-                    onClick={clearWatchHistory}
-                  >
-                    Clear History
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="parent-icon-btn"
+                      onClick={loadActivity}
+                      title="Refresh activity"
+                    >
+                      <RotateCcw size={16} />
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={activityEntries.length === 0}
+                      onClick={clearActivity}
+                    >
+                      Clear History
+                    </button>
+                  </div>
                 </div>
 
-                {watchHistory.length === 0 ? (
+                {activityLoading ? (
+                  <div className="activity-history-empty">
+                    <span>⏳</span>
+                    <h3>Loading activity...</h3>
+                  </div>
+                ) : activityError ? (
+                  <div className="activity-history-empty is-error">
+                    <span>⚠️</span>
+                    <h3>Couldn&apos;t load activity</h3>
+                    <p>{activityError}</p>
+                    <button type="button" onClick={loadActivity} className="activity-retry-btn">
+                      Retry
+                    </button>
+                  </div>
+                ) : activityEntries.length === 0 ? (
                   <div className="activity-history-empty">
                     <span>📺</span>
-                    <h3>No watch history yet</h3>
-                    <p>Videos will appear here after the child opens them.</p>
+                    <h3>No activity yet</h3>
+                    <p>Activity will appear after this child starts watching media.</p>
                   </div>
                 ) : (
                   <div className="activity-history-list">
-                    {watchHistory.map((item) => (
+                    {activityEntries.map((item) => (
                       <article className="activity-history-row" key={item.historyId}>
                         <img src={item.image} alt={item.title} />
 
                         <div className="activity-history-details">
-                          <h3>{item.title}</h3>
+                          <h3>
+                            {item.kind === "reaction"
+                              ? `${item.reactionEmoji || "💖"} Reacted to "${item.title}"`
+                              : item.title}
+                          </h3>
 
                           <div>
-                            <span>{item.category}</span>
-                            <span>{item.duration}</span>
+                            <span>{ACTIVITY_MEDIA_LABEL[item.mediaType] || "Media"}</span>
+                            {item.category && <span>{item.category}</span>}
+                            {item.kind === "reaction" && item.reactionLabel && (
+                              <span>{item.reactionLabel}</span>
+                            )}
                           </div>
                         </div>
 
@@ -1904,39 +2049,189 @@ export default function ParentDashboard({
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {databaseChildren.map((child) => (
-                      <div
-                        key={child.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4 flex items-center gap-3"
-                      >
-                        <div className="w-12 h-12 rounded-full bg-sky-100 flex items-center justify-center text-2xl shrink-0">
-                          👤
-                        </div>
+                    {databaseChildren.map((child) => {
+                      // Parent-facing diagnostic only — how many uploaded/library
+                      // media items are currently assigned to this child. Never
+                      // surfaced on the kids side.
+                      const assignedMediaCount = parentMediaItems.filter((item) =>
+                        item.access.some((entry) => entry.child_id === String(child.id)),
+                      ).length;
 
-                        <div className="min-w-0 flex-1">
-                          <strong className="block text-slate-900 truncate">
-                            {child.display_name}
-                          </strong>
-
-                          <span className="text-xs text-slate-500">
-                            {child.login_name || "No login name"}
-                          </span>
-                        </div>
-
-                        <button
-                          type="button"
-                          disabled={deletingDatabaseChildId === child.id}
-                          onClick={() => removeDatabaseChild(child)}
-                          className="w-10 h-10 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 flex items-center justify-center disabled:opacity-50"
-                          title={`Delete ${child.display_name}`}
+                      return (
+                        <div
+                          key={child.id}
+                          className="rounded-2xl border border-slate-200 bg-slate-50 p-4 flex items-center gap-3"
                         >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    ))}
+                          <div className="w-12 h-12 rounded-full bg-sky-100 flex items-center justify-center text-2xl shrink-0">
+                            👤
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <strong className="block text-slate-900 truncate">
+                              {child.display_name}
+                            </strong>
+
+                            <span className="text-xs text-slate-500">
+                              {child.login_name || "No login name"}
+                            </span>
+
+                            <span className="block text-xs font-bold text-indigo-600 mt-0.5">
+                              {assignedMediaCount} media assigned
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => openChangeChildPin(child)}
+                            className="w-10 h-10 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-800 flex items-center justify-center"
+                            title={`Change ${child.display_name}'s PIN`}
+                          >
+                            <Key size={18} />
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={deletingDatabaseChildId === child.id}
+                            onClick={() => removeDatabaseChild(child)}
+                            className="w-10 h-10 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 flex items-center justify-center disabled:opacity-50"
+                            title={`Delete ${child.display_name}`}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </article>
+
+              {pinChild && (
+                <div
+                  className="fixed inset-0 z-[10020] flex items-center justify-center p-5 bg-slate-900/60"
+                  onMouseDown={(event) => {
+                    if (event.target === event.currentTarget) closeChangeChildPin();
+                  }}
+                >
+                  <section
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="change-child-pin-title"
+                    className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-3">
+                        <span className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                          <Key size={20} />
+                        </span>
+                        <div>
+                          <h2
+                            id="change-child-pin-title"
+                            className="text-lg font-black text-slate-900"
+                          >
+                            Change {pinChild.display_name}&apos;s PIN
+                          </h2>
+                          <p className="text-xs text-slate-500">Set a new PIN for this profile.</p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={closeChangeChildPin}
+                        disabled={savingChildPin}
+                        aria-label="Close"
+                        className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center disabled:opacity-50"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div className="grid gap-3">
+                      <label className="grid gap-1.5 text-left text-sm font-bold text-slate-700">
+                        New PIN
+                        <div className="relative">
+                          <input
+                            type={showChildPinValue ? "text" : "password"}
+                            inputMode="numeric"
+                            autoComplete="new-password"
+                            value={newChildPinValue}
+                            placeholder="Minimum 4 digits"
+                            onChange={(event) => {
+                              setNewChildPinValue(
+                                event.target.value.replace(/\D/g, "").slice(0, 10),
+                              );
+                              setChildPinError("");
+                              setChildPinSuccess("");
+                            }}
+                            className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 pr-11 font-medium"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowChildPinValue((value) => !value)}
+                            aria-label={showChildPinValue ? "Hide PIN" : "Show PIN"}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center"
+                          >
+                            {showChildPinValue ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </label>
+
+                      <label className="grid gap-1.5 text-left text-sm font-bold text-slate-700">
+                        Confirm new PIN
+                        <input
+                          type={showChildPinValue ? "text" : "password"}
+                          inputMode="numeric"
+                          autoComplete="new-password"
+                          value={confirmChildPinValue}
+                          placeholder="Enter the same PIN again"
+                          onChange={(event) => {
+                            setConfirmChildPinValue(
+                              event.target.value.replace(/\D/g, "").slice(0, 10),
+                            );
+                            setChildPinError("");
+                            setChildPinSuccess("");
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") saveChildPin();
+                          }}
+                          className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-medium"
+                        />
+                      </label>
+
+                      {childPinError && (
+                        <div className="rounded-xl bg-red-50 text-red-700 font-bold text-sm px-3.5 py-2.5">
+                          {childPinError}
+                        </div>
+                      )}
+
+                      {childPinSuccess && (
+                        <div className="rounded-xl bg-emerald-50 text-emerald-700 font-bold text-sm px-3.5 py-2.5">
+                          {childPinSuccess}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2.5 mt-1">
+                        <button
+                          type="button"
+                          onClick={closeChangeChildPin}
+                          disabled={savingChildPin}
+                          className="rounded-xl bg-slate-100 text-slate-600 font-black py-2.5 disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={saveChildPin}
+                          disabled={savingChildPin || !isChildPinValid}
+                          className="rounded-xl bg-indigo-600 text-white font-black py-2.5 disabled:opacity-40"
+                        >
+                          {savingChildPin ? "Saving..." : "Save PIN"}
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              )}
 
               <div className="profile-management-grid">
                 {[

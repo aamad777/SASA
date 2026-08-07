@@ -76,7 +76,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      {
+        name: "viewport",
+        // SARA_MOBILE_ANDROID_V1 — viewport-fit=cover lets content draw
+        // edge-to-edge and makes env(safe-area-inset-*) resolve to real
+        // values inside the Android WebView instead of 0px; a no-op on
+        // desktop browsers, which don't have insets to report.
+        content: "width=device-width, initial-scale=1, viewport-fit=cover",
+      },
       { title: "Little Explorers" },
       {
         name: "description",

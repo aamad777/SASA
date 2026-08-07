@@ -1,0 +1,108 @@
+<!-- SARA_CARTOON_THEMES_V7 — original artwork, no copyrighted characters. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <radialGradient id="space-sky" cx="50%" cy="8%" r="90%">
+      <stop offset="0%" stop-color="#241f52" />
+      <stop offset="55%" stop-color="#140f38" />
+      <stop offset="100%" stop-color="#0a0720" />
+    </radialGradient>
+    <radialGradient id="space-moon-shade" cx="35%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="#fff6d8" />
+      <stop offset="100%" stop-color="#ffe49a" />
+    </radialGradient>
+  </defs>
+
+  <style>
+    .star { animation: sara-twinkle 3.6s ease-in-out infinite; transform-origin: center; }
+    .star.d2 { animation-delay: 0.8s; }
+    .star.d3 { animation-delay: 1.6s; }
+    .star.d4 { animation-delay: 2.2s; }
+    .rocket { animation: sara-float 6s ease-in-out infinite; transform-origin: center; }
+    .planet-ring { animation: sara-spin-slow 22s linear infinite; transform-origin: 1330px 190px; }
+    @keyframes sara-twinkle {
+      0%, 100% { opacity: 0.35; transform: scale(0.85); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
+    @keyframes sara-float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-18px); }
+    }
+    @keyframes sara-spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .star, .rocket, .planet-ring { animation: none; }
+    }
+  </style>
+
+  <rect width="1600" height="900" fill="url(#space-sky)" />
+
+  <!-- scattered stars -->
+  <g fill="#ffffff">
+    <circle class="star" cx="120" cy="140" r="3.5" />
+    <circle class="star d2" cx="260" cy="80" r="2.5" />
+    <circle class="star d3" cx="90" cy="320" r="2.5" />
+    <circle class="star d4" cx="220" cy="260" r="3" />
+    <circle class="star" cx="1500" cy="120" r="3" />
+    <circle class="star d3" cx="1420" cy="300" r="2.5" />
+    <circle class="star d2" cx="1550" cy="420" r="2.5" />
+    <circle class="star" cx="60" cy="620" r="2.5" />
+    <circle class="star d4" cx="180" cy="760" r="3" />
+    <circle class="star d2" cx="1480" cy="700" r="3" />
+    <circle class="star" cx="1540" cy="820" r="2.5" />
+    <circle class="star d3" cx="380" cy="60" r="2" />
+    <circle class="star d4" cx="1300" cy="70" r="2" />
+  </g>
+
+  <!-- smiling moon, top right -->
+  <g transform="translate(1330,190)">
+    <circle r="86" fill="url(#space-moon-shade)" />
+    <circle cx="-22" cy="-10" r="8" fill="#7a5b2e" opacity="0.55" />
+    <circle cx="18" cy="18" r="5" fill="#7a5b2e" opacity="0.45" />
+    <circle cx="30" cy="-24" r="4" fill="#7a5b2e" opacity="0.4" />
+    <g fill="#3a2c17">
+      <circle cx="-24" cy="-6" r="6" />
+      <circle cx="16" cy="-6" r="6" />
+      <path d="M -26 20 Q -4 38 18 20" stroke="#3a2c17" stroke-width="5" fill="none" stroke-linecap="round" />
+    </g>
+    <g class="planet-ring" opacity="0.9">
+      <ellipse cx="0" cy="0" rx="130" ry="14" fill="none" stroke="#ffd77a" stroke-width="3" opacity="0.35" />
+    </g>
+  </g>
+
+  <!-- ringed planet, upper-left -->
+  <g transform="translate(210,150)" opacity="0.95">
+    <circle r="34" fill="#8b7bf7" />
+    <circle r="34" fill="#a996ff" cx="-10" cy="-10" opacity="0.5" />
+    <ellipse rx="62" ry="10" fill="none" stroke="#ffd77a" stroke-width="5" transform="rotate(-18)" opacity="0.8" />
+  </g>
+
+  <!-- soft nebula clouds -->
+  <g opacity="0.18" fill="#a996ff">
+    <ellipse cx="1250" cy="560" rx="180" ry="60" />
+    <ellipse cx="1380" cy="600" rx="130" ry="46" />
+  </g>
+  <g opacity="0.14" fill="#5ee6d0">
+    <ellipse cx="220" cy="520" rx="150" ry="50" />
+  </g>
+
+  <!-- little rocket, bottom-left -->
+  <g class="rocket" transform="translate(150,720)">
+    <g transform="rotate(-18)">
+      <path d="M0 -70 C 26 -46 26 10 0 40 C -26 10 -26 -46 0 -70 Z" fill="#f4f6fb" />
+      <circle cx="0" cy="-14" r="14" fill="#8b7bf7" />
+      <circle cx="0" cy="-14" r="8" fill="#c9befe" />
+      <path d="M -14 20 L -34 52 L -6 40 Z" fill="#ef6fb6" />
+      <path d="M 14 20 L 34 52 L 6 40 Z" fill="#ef6fb6" />
+      <path d="M -8 40 L 0 66 L 8 40 Z" fill="#ffb454" opacity="0.9" />
+    </g>
+  </g>
+
+  <!-- bottom-right little planet + moons -->
+  <g transform="translate(1460,780)" opacity="0.9">
+    <circle r="26" fill="#5ee6d0" />
+    <circle cx="42" cy="-18" r="7" fill="#ffffff" opacity="0.8" />
+    <circle cx="-38" cy="10" r="5" fill="#ffffff" opacity="0.7" />
+  </g>
+</svg>
