@@ -9,3 +9,4 @@ routeTree.gen.ts
 
 results.sarif
 *.sarif
+android/app/src/debug/assets/capacitor.config.json
