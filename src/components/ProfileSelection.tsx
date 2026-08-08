@@ -1,5 +1,5 @@
 import { useState, type ReactNode, type MouseEvent } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import confetti from "canvas-confetti";
 import { playPopSound, playSuccessSound } from "../lib/sound";
 
@@ -113,7 +113,13 @@ export default function ProfileSelection({
       <div className="kids-star star-two" />
       <div className="kids-star star-three" />
 
-      <header className="relative z-[60] mx-auto flex w-[calc(100%-2rem)] max-w-[760px] items-center justify-center gap-3 pt-6">
+      {/* SARA WHO IS WATCHING MOBILE V14 — flex-wrap: the two pill buttons
+          here had no wrap, matching the exact overflow bug already fixed on
+          DatabaseProfileSelection's equivalent header (see its "Mobile fit
+          fix" comment); pt-[...] replaces the flat pt-6 with a safe-area
+          floor so the row clears the status bar/notch on edge-to-edge
+          Android instead of just adding a fixed 1.5rem. */}
+      <header className="relative z-[60] mx-auto flex w-[calc(100%-2rem)] max-w-[760px] flex-wrap items-center justify-center gap-3 pt-[max(1.5rem,env(safe-area-inset-top))]">
         <a
           href="/?screen=parent-login"
           className="flex cursor-pointer items-center gap-2 rounded-full border-2 border-slate-400/30 bg-white/90 px-5 py-2.5 shadow-md backdrop-blur-md transition-transform hover:scale-105 active:scale-95"
@@ -188,7 +194,12 @@ export default function ProfileSelection({
           animate={selectingId !== null ? { opacity: 0.35, scale: 0.94 } : { opacity: 1, scale: 1 }}
           transition={{ duration: 0.3 }}
         >
-          <h1 className="flex flex-col items-center text-5xl font-extrabold md:text-6xl">
+          {/* SARA REAL DEVICE MOBILE POLISH V15 pass — text-5xl (48px) was the
+              mobile base size here; real-device screenshots showed this
+              heading alone eating a large share of a normal phone's height.
+              text-4xl (36px) sits inside the requested 32-44px mobile
+              target; sm:/md: keep the larger desktop sizing untouched. */}
+          <h1 className="flex flex-col items-center text-4xl font-extrabold sm:text-5xl md:text-6xl">
             <span className="kids-title-text -mb-2 text-[#8ecae6]">Who&apos;s</span>
 
             <span className="flex">
@@ -408,8 +419,12 @@ export default function ProfileSelection({
 }
 
 function BottomNavigation() {
+  // SARA WHO IS WATCHING MOBILE V14 — this nav sits in normal document flow
+  // (not fixed), so it doesn't need clearance from other content, but its
+  // own bottom/side edges can still land under the Android gesture-nav bar
+  // or a landscape cutout without a safe-area floor on the padding.
   return (
-    <nav className="relative z-20 flex w-full items-center justify-between rounded-t-3xl bg-white px-8 pb-8 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+    <nav className="relative z-20 flex w-full items-center justify-between rounded-t-3xl bg-white pt-3 pr-[max(2rem,env(safe-area-inset-right))] pb-[max(2rem,env(safe-area-inset-bottom))] pl-[max(2rem,env(safe-area-inset-left))] shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
       <NavigationItem
         label="Home"
         color="text-[#8ecae6]"

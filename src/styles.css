@@ -759,6 +759,11 @@ button {
   }
 }
 
+/* SARA WHO IS WATCHING MOBILE V14 — guest/local profile picker
+   (ProfileSelection.tsx). Root stays min-height (never height/max-height)
+   so the document remains the single scroll surface; only left/right inset
+   is added here since the header/bottom nav already carry their own
+   top/bottom safe-area padding (see below). */
 .kids-profile-page {
   position: relative;
   display: flex;
@@ -768,9 +773,54 @@ button {
   align-items: center;
   justify-content: space-between;
   overflow: hidden;
+  padding-right: env(safe-area-inset-right);
+  padding-left: env(safe-area-inset-left);
   font-family: "Fredoka", sans-serif;
   background-color: #a4e5ff;
   background-image: radial-gradient(circle at center, #b9edff 0%, #a4e5ff 100%);
+}
+
+/* SARA WHO IS WATCHING MOBILE V14 — DatabaseProfileSelection.tsx's profile
+   grid (the parent-account "Who's Watching" screen). That component is
+   plain inline styles, so these two classes are the only CSS hooks added to
+   it; the 180px card width below max-width:480px is a plain override
+   (no !important needed — a later class selector already beats an earlier
+   inline style only when marked important, so it stays !important to win
+   over the inline `width: 180` reliably). Un-set at wider widths so desktop
+   keeps its original fixed 180px centered layout untouched. */
+/* SARA REAL DEVICE MOBILE POLISH V15 — real device screenshots showed this
+   screen's 70px section margin + 48px heading + 115px avatars + 35px grid
+   margin together pushing most/all profile cards below the fold on a
+   normal phone. Every value below is !important for the same reason the
+   V14 block above already needed it: these are all plain inline styles on
+   DatabaseProfileSelection.tsx, so a class rule only wins if it out-ranks
+   the inline style explicitly. Desktop (>480px) keeps the original inline
+   values untouched. */
+@media (max-width: 480px) {
+  .sara-who-section {
+    margin: 28px auto 0 !important;
+  }
+
+  .sara-who-heading {
+    font-size: 34px !important;
+    margin: 8px 0 !important;
+  }
+
+  .sara-who-profile-grid {
+    gap: 14px !important;
+    margin-top: 20px !important;
+  }
+
+  .sara-who-card {
+    padding: 14px !important;
+    min-height: 0 !important;
+  }
+
+  .sara-who-avatar {
+    width: 92px !important;
+    height: 92px !important;
+    font-size: 42px !important;
+  }
 }
 
 .kids-title-text {
@@ -1888,9 +1938,21 @@ button {
   }
 }
 
+/* SARA KIDS MOBILE SAFE LAYOUT V14 — extends the V13 Parent Controls safe
+   viewport/single-scroll strategy to the kid-facing screens (Who's Watching,
+   Kids Home + its Search/Library/Profile tabs, the watch player's outer
+   padding). Same doctrine as the V13 comment above: env(safe-area-inset-*)
+   fed by viewport-fit=cover is the ONE inset strategy, applied directly on
+   the fixed/sticky chrome; page-root containers keep min-height (never
+   height/max-height) so the document stays the single scroll surface. */
+/* SARA KIDS HOME MOBILE V14 */
 .kids-video-home {
   min-height: 100dvh;
-  padding-bottom: 105px;
+  /* .kids-home-bottom-nav below already grows its own padding-bottom with
+     env(safe-area-inset-bottom); this flat 105px didn't, so on a device
+     with a tall gesture-nav inset the fixed nav could grow taller than the
+     page's reserved clearance and start covering the last grid row. */
+  padding-bottom: calc(105px + env(safe-area-inset-bottom));
   color: #1f2937;
   background: #eef8ff;
   font-family: "Quicksand", sans-serif;
@@ -1907,6 +1969,19 @@ button {
   box-shadow: 0 3px 12px rgba(31, 41, 55, 0.08);
 }
 
+/* SARA ANDROID SAFE VIEWPORT V13 — confirmed strategy for this app: the
+   native layer (AndroidManifest.xml / styles.xml / MainActivity) has no
+   WindowCompat/EdgeToEdge/fitsSystemWindows/windowTranslucentStatus calls at
+   all, so it never pushes native insets into the WebView. Because
+   targetSdk/compileSdk are 36, Android itself force-enables edge-to-edge on
+   API 35+ regardless — content draws behind the status bar/cutout and the
+   gesture nav bar whether we opt in or not. The single place insets are
+   handled is CSS, via env(safe-area-inset-*) fed by the "viewport-fit=cover"
+   meta tag in src/routes/__root.tsx. That is the ONE inset strategy for the
+   whole app: no native padding is ever added, so there is nothing here to
+   double up with. Do not add WindowCompat/fitsSystemWindows natively
+   without removing the equivalent CSS padding below (and vice versa) — the
+   two must never both apply to the same edge. */
 .kids-video-header {
   display: flex;
   align-items: center;
@@ -1915,8 +1990,13 @@ button {
   /* SARA_MOBILE_ANDROID_V1 — env(safe-area-inset-top) is 0px on desktop (and
      in browsers generally), so this only adds real space on devices with an
      edge-to-edge status bar/notch; the existing 32px design padding is
-     untouched otherwise. */
-  padding: calc(32px + env(safe-area-inset-top)) 22px 18px;
+     untouched otherwise. SARA KIDS HOME MOBILE V14 — split into longhand so
+     landscape cutout devices also get left/right inset instead of just top
+     (mobile landscape has no notch on top, but can have one on the side). */
+  padding-top: calc(32px + env(safe-area-inset-top));
+  padding-right: max(22px, env(safe-area-inset-right));
+  padding-bottom: 18px;
+  padding-left: max(22px, env(safe-area-inset-left));
   border-radius: 0 0 32px 32px;
   background: linear-gradient(90deg, #89b4f8, #b8b8ff);
 }
@@ -2171,8 +2251,15 @@ button {
   align-items: center;
   justify-content: space-between;
   /* SARA_MOBILE_ANDROID_V1 — see .kids-video-header above; keeps the bottom
-     tab bar clear of the gesture nav bar on edge-to-edge Android. */
-  padding: 12px 24px calc(28px + env(safe-area-inset-bottom));
+     tab bar clear of the gesture nav bar on edge-to-edge Android.
+     SARA KIDS HOME MOBILE V14 — split into longhand to also add left/right
+     inset for landscape cutout devices (see the max-width:420px override
+     further below, which must carry the same env() term or it silently
+     wins on every phone-width screen and strips this out). */
+  padding-top: 12px;
+  padding-right: max(24px, env(safe-area-inset-right));
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  padding-left: max(24px, env(safe-area-inset-left));
   border-radius: 28px 28px 0 0;
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
@@ -2275,6 +2362,19 @@ button {
   }
 }
 
+/* SARA REAL DEVICE MOBILE POLISH V15 pass — the task asks for 2 columns on
+   360-430px phones (kept above/untouched) but "1 or 2 columns depending on
+   actual available card width" at ~320px. auto-fit with a 140px minimum
+   does that without a second fixed breakpoint to maintain: at ~320px two
+   140px columns plus the 12px gap/padding above don't fit, so it falls
+   back to 1; at 360px+ they do, so it's still 2 — same outcome as a manual
+   breakpoint, but self-adjusting for anything in between. */
+@media (max-width: 359px) {
+  .kids-video-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+}
+
 /* SARA CINEMATIC PLAYER V3 */
 /* ============================================================
    KIDS CINEMATIC MEDIA PLAYER — dark theater page chrome, ambient
@@ -2304,7 +2404,11 @@ button {
   --player-bg-3: #05060a;
 
   min-height: 100dvh;
-  padding-bottom: 96px;
+  /* SARA KIDS HOME MOBILE V14 — flat value, same gap as .kids-video-home
+     above; without the safe-area term the page's own bottom padding can
+     end up shorter than the fixed control dock on a large-inset device. No
+     other player layout touched here — see the V4 header comment above. */
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
   color: #f2f3f7;
   background: var(--player-bg-3);
   font-family: "Plus Jakarta Sans", sans-serif;
@@ -3755,6 +3859,26 @@ button {
   cursor: pointer;
 }
 
+/* SARA REAL DEVICE MOBILE POLISH V15 pass — the 7-item bottom nav's 12px top
+   padding + 28px bottom padding + 52px button min-height (both set
+   unconditionally above, not just at a breakpoint) added up to ~92px of
+   visual height plus the safe-area inset on a real phone, against the
+   ~56-68px target from the task. Tightening padding/min-height here keeps
+   every one of the 7 tabs, icon, and label — just in less vertical space.
+   Placed before the 420px block below so 420px's own overrides still win
+   at even smaller widths (matches the source-order convention already
+   used by every other max-width block in this file). */
+@media (max-width: 480px) {
+  .kids-home-bottom-nav {
+    padding-top: 8px;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+
+  .kids-home-bottom-nav button {
+    min-height: 48px;
+  }
+}
+
 @media (max-width: 420px) {
   .kids-video-header {
     gap: 10px;
@@ -3766,9 +3890,16 @@ button {
     flex-basis: 48px;
   }
 
+  /* SARA KIDS HOME MOBILE V14 — this used to hardcode 10px, which matches
+     every phone at <=420px and so always won over the base rule's
+     env(safe-area-inset-right/left) term above (same source-order pitfall
+     the V13 comments elsewhere in this file describe): the compact 10px
+     was correct for the design, but it silently dropped landscape-cutout
+     safety exactly where it mattered most. max() keeps the compact value
+     everywhere the inset is 0 and only grows it where the inset is real. */
   .kids-home-bottom-nav {
-    padding-right: 10px;
-    padding-left: 10px;
+    padding-right: max(10px, env(safe-area-inset-right));
+    padding-left: max(10px, env(safe-area-inset-left));
   }
 
   .kids-home-bottom-nav button {
@@ -6306,7 +6437,20 @@ button {
   width: min(1000px, calc(100% - 24px));
   margin-right: auto;
   margin-left: auto;
-  padding: 22px 18px;
+  /* SARA REAL DEVICE MOBILE POLISH V15 pass — this two-class selector has higher
+     specificity than the plain `.kids-video-header` rule above (which is
+     the one carrying the env(safe-area-inset-*) terms per the SARA ANDROID
+     SAFE VIEWPORT V13 doctrine), so it always wins — a `padding: 22px 18px`
+     shorthand here was silently resetting every side back to a flat value
+     and dropping the status-bar/notch/landscape-cutout insets on the one
+     header this kids-facing component actually renders (`kids-video-header
+     kids-centered-header` together, always). Longhand sides restore the
+     safe-area terms while keeping the same design values everywhere the
+     inset is 0. */
+  padding-top: calc(22px + env(safe-area-inset-top));
+  padding-right: max(18px, env(safe-area-inset-right));
+  padding-bottom: 22px;
+  padding-left: max(18px, env(safe-area-inset-left));
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -6393,7 +6537,14 @@ button {
 @media (max-width: 699px) {
   .kids-video-header.kids-centered-header {
     width: 100%;
-    padding: 17px 12px;
+    padding-bottom: 17px;
+    /* SARA REAL DEVICE MOBILE POLISH V15 pass — same shorthand-resets-safe-area
+       issue as the base rule above, repeated here since this breakpoint's
+       own shorthand would otherwise re-strip it. Longhand sides keep the
+       17px/12px design values while restoring the env() terms. */
+    padding-top: calc(17px + env(safe-area-inset-top));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-left: max(12px, env(safe-area-inset-left));
     border-radius: 0 0 25px 25px;
   }
 
@@ -6411,6 +6562,33 @@ button {
     width: 100%;
     padding: 9px 10px;
     justify-content: flex-start;
+  }
+}
+
+/* SARA REAL DEVICE MOBILE POLISH V15 pass — real-device screenshots showed the
+   Kids Home header (greeting + title + theme/sound/account/parental row)
+   still using near-desktop padding/gap on a normal phone, squeezing the
+   category row and media grid between it and the bottom nav. This only
+   tightens spacing already present in the 699px block above — no rows are
+   removed or restructured. Placed before the 420px block below so an even
+   smaller phone still gets that block's tighter values (source order, not
+   just specificity, decides ties between two max-width blocks that are
+   both true at once). */
+@media (max-width: 480px) {
+  .kids-video-header.kids-centered-header {
+    gap: 8px;
+    padding-top: calc(12px + env(safe-area-inset-top));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: 10px;
+    padding-left: max(12px, env(safe-area-inset-left));
+  }
+
+  .kids-header-main {
+    gap: 6px;
+  }
+
+  .topbar-actions.kids-centered-actions {
+    gap: 6px;
   }
 }
 
@@ -6456,16 +6634,25 @@ button {
     padding-top: max(12px, env(safe-area-inset-top));
   }
 
+  /* SARA PARENT SINGLE SCROLL V13 — this block used to set overflow-y: auto
+     (plus overscroll-behavior-y/-webkit-overflow-scrolling touch helpers)
+     on .parent-dashboard-main, i.e. an inner scroll container for every
+     Parent Controls tab (Screen Time, Activity, Media, etc.). Once the
+     "RECOVERY V12" block further below resets .parent-dashboard-main's
+     height to grow with its content (min-height instead of a hard height),
+     that overflow-y: auto had no fixed box to clip against and stopped
+     doing anything on its own — but leaving it in place meant any future
+     height/max-height edit here would silently turn it back into a nested
+     scrollbar inside the page. Removed so the ONLY scroll container for
+     Parent Controls is the document itself; .flex leftover (this element
+     is no longer a flex child now that .parent-dashboard is display:block)
+     removed too. */
   .parent-dashboard-main {
     display: block;
-    flex: 1 1 auto;
     width: 100%;
     min-width: 0;
     min-height: 0;
     overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
-    -webkit-overflow-scrolling: touch;
     padding-bottom: calc(72px + env(safe-area-inset-bottom));
   }
 
@@ -6983,6 +7170,7 @@ button {
 }
 
 /* Final mobile parent-dashboard layout correction */
+/* SARA PARENT MOBILE RECOVERY V12 */
 @media (max-width: 767px) {
   /* Hide the legacy desktop navigation completely */
   .parent-dashboard .parent-sidebar,
@@ -7003,8 +7191,20 @@ button {
   .parent-dashboard {
     display: block !important;
     width: 100%;
+    /* An earlier "viewport fix" block above still sets height/max-height:
+       100dvh with overflow: hidden on this same selector. Those longhand
+       properties aren't touched by this later block, so they were winning
+       the cascade and pinning the whole dashboard to exactly one screen
+       tall — silently clipping any tab (Screen Time, Kids Media, Activity,
+       etc.) whose content ran past the first viewport, with no way to
+       scroll to it. Reset them here so the dashboard grows with its
+       content and the document scrolls normally, per SARA PARENT MOBILE
+       RECOVERY V12. */
+    height: auto;
     min-height: 100dvh;
+    max-height: none;
     overflow-x: hidden;
+    overflow-y: visible;
   }
 
   .parent-dashboard-main {
@@ -7050,6 +7250,22 @@ button {
     left: 0;
     z-index: 80;
     width: 100%;
+  }
+}
+
+/* SARA PARENT SINGLE SCROLL V13 — the small-phone ".parent-dashboard-content"
+   rule in the "@media (max-width: 390px)" block above (padding-right/left:
+   9px) was being silently overridden on every small phone by the
+   "padding: 16px 12px 28px !important" shorthand in the RECOVERY V12 block:
+   both match at <=390px, the shorthand is !important, and it comes later in
+   source, so it always won — the tighter 9px side padding intended for
+   small screens never actually applied. Re-asserting it here (after V12,
+   also !important) restores the intended small-phone padding without
+   touching the V12 block's own safe-area-critical padding values. */
+@media (max-width: 390px) {
+  .parent-dashboard-content {
+    padding-right: 9px !important;
+    padding-left: 9px !important;
   }
 }
 
