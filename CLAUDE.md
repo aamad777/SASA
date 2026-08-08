@@ -5,6 +5,7 @@
 SARA is a child-focused media and learning application.
 
 Main technologies:
+
 - React
 - TypeScript
 - Vite / TanStack
@@ -85,6 +86,7 @@ Treat these as protected:
 Do not modify them unless a verified functional bug requires it.
 
 If a protected file appears to require modification:
+
 1. explain why,
 2. inspect the existing contract,
 3. make the minimum possible change.
@@ -228,6 +230,7 @@ Do not replace real assigned media with mock data.
 SARA may contain:
 
 ## Photo
+
 - object-fit contain
 - never crop
 - slideshow timer
@@ -235,6 +238,7 @@ SARA may contain:
 - previous/next
 
 ## Uploaded Video
+
 - playback
 - seeking
 - volume
@@ -242,12 +246,14 @@ SARA may contain:
 - fullscreen
 
 ## YouTube
+
 - supported assigned YouTube items
 - correct video ID parsing
 - playback
 - playlist navigation
 
 ## Built-In Media
+
 Existing learning/media content must remain functional.
 
 ---
@@ -275,8 +281,8 @@ Do not hard-code parent-created category names.
 The watching page should be:
 
 Professional video-platform usability
-+
-kid-friendly visual identity
+
+- kid-friendly visual identity
 
 Do not copy YouTube logos or branding.
 
@@ -318,11 +324,13 @@ Preserve:
 Up Next belongs BELOW the player.
 
 Desktop:
+
 - horizontal card row
 - 4-5 cards when space permits
 - horizontal scroll when needed
 
 Mobile:
+
 - horizontal swipe/scroll
 - approximately 1.5-2.5 cards visible
 
