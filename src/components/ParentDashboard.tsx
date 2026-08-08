@@ -2106,8 +2106,14 @@ export default function ParentDashboard({
               </article>
 
               {pinChild && (
+                // SARA_ANDROID_KEYBOARD_DIALOG_V15 — top/right/left + a
+                // visualViewport-driven height replaces `inset-0` so this
+                // overlay tracks the actual visible viewport (shrunk by the
+                // numeric keyboard) rather than the layout viewport, which
+                // real-device testing showed 100dvh alone doesn't reliably
+                // do in this WebView; see use-visible-viewport-height.ts.
                 <div
-                  className="fixed inset-0 z-[10020] flex items-center justify-center p-5 bg-slate-900/60"
+                  className="fixed top-0 right-0 left-0 h-[var(--app-visible-height,100dvh)] z-[10020] flex items-center justify-center px-4 py-[max(1rem,env(safe-area-inset-top))] bg-slate-900/60"
                   onMouseDown={(event) => {
                     if (event.target === event.currentTarget) closeChangeChildPin();
                   }}
@@ -2116,7 +2122,7 @@ export default function ParentDashboard({
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="change-child-pin-title"
-                    className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+                    className="w-full max-w-md max-h-[calc(var(--app-visible-height,100dvh)-2rem)] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
                   >
                     <div className="flex items-center justify-between gap-3 mb-4">
                       <div className="flex items-center gap-3">

@@ -277,8 +277,17 @@ export default function DatabaseProfileSelection({
   return (
     <main
       style={{
-        minHeight: "100vh",
-        padding: 24,
+        // SARA WHO IS WATCHING MOBILE V14 — 100vh includes the mobile
+        // browser's collapsible address-bar height, and a flat 24px padding
+        // ignored the status bar / notch and Android gesture-nav area
+        // entirely (this screen has no bottom nav of its own, so the
+        // bottom inset only matters when the page is short enough that the
+        // last content sits at the true device edge).
+        minHeight: "100dvh",
+        paddingTop: "max(24px, env(safe-area-inset-top))",
+        paddingRight: "max(24px, env(safe-area-inset-right))",
+        paddingBottom: "max(24px, env(safe-area-inset-bottom))",
+        paddingLeft: "max(24px, env(safe-area-inset-left))",
         background: "linear-gradient(135deg, #eff6ff, #fdf2f8)",
       }}
     >
@@ -389,7 +398,14 @@ export default function DatabaseProfileSelection({
         </div>
       </header>
 
+      {/* SARA REAL DEVICE MOBILE POLISH V15 pass — sara-who-section/-heading are
+          new CSS hooks so the @media (max-width: 480px) rule in styles.css
+          can shrink the 70px top margin and 48px heading (real-device
+          screenshots showed this consuming most of the screen before any
+          profile card was visible) without touching the desktop layout,
+          which keeps its original inline values. */}
       <section
+        className="sara-who-section"
         style={{
           maxWidth: 1050,
           margin: "70px auto 0",
@@ -398,7 +414,9 @@ export default function DatabaseProfileSelection({
       >
         <div style={{ fontSize: 30 }}>☁️ ⭐ 🌈</div>
 
-        <h1 style={{ fontSize: 48, margin: "10px 0" }}>Who&apos;s Watching?</h1>
+        <h1 className="sara-who-heading" style={{ fontSize: 48, margin: "10px 0" }}>
+          Who&apos;s Watching?
+        </h1>
 
         <p style={{ color: "#64748b" }}>Select an existing child or create a new profile.</p>
 
@@ -451,7 +469,14 @@ export default function DatabaseProfileSelection({
         )}
 
         {!loading && !error && children.length > 0 && (
+          // SARA WHO IS WATCHING MOBILE V14 — sara-who-profile-grid/-card
+          // classes let a @media (max-width: 480px) rule in styles.css
+          // shrink the fixed 180px card to a compact size that fits two per
+          // row on 360-430px phones, falling back to one per row at 320px
+          // via the existing flexWrap (no card is ever forced narrower than
+          // 132px, so it stays readable rather than tiny).
           <div
+            className="sara-who-profile-grid"
             style={{
               display: "flex",
               justifyContent: "center",
@@ -464,6 +489,7 @@ export default function DatabaseProfileSelection({
               <button
                 type="button"
                 key={child.id}
+                className="sara-who-card"
                 onClick={() => openChildProfile(child)}
                 style={{
                   width: 180,
@@ -476,6 +502,7 @@ export default function DatabaseProfileSelection({
                 }}
               >
                 <div
+                  className="sara-who-avatar"
                   style={{
                     width: 115,
                     height: 115,
@@ -513,6 +540,7 @@ export default function DatabaseProfileSelection({
 
             <button
               type="button"
+              className="sara-who-card"
               onClick={() => setShowForm(true)}
               style={{
                 width: 180,
@@ -537,21 +565,42 @@ export default function DatabaseProfileSelection({
           style={{
             position: "fixed",
             zIndex: 9999,
-            inset: 0,
+            top: 0,
+            right: 0,
+            left: 0,
+            // SARA_ANDROID_KEYBOARD_DIALOG_V15 — `inset: 0` sized this
+            // overlay to the layout viewport, which real-device testing
+            // showed does not reliably shrink when the Android keyboard
+            // opens (100dvh has the same problem in this WebView). Using
+            // the visualViewport-driven height here means the overlay
+            // itself is never taller than what's actually visible, so the
+            // section's own maxHeight/overflow below has real overflow to
+            // scroll rather than content silently sitting behind the
+            // keyboard with nothing to trigger a scrollbar.
+            height: "var(--app-visible-height, 100dvh)",
             display: "grid",
             placeItems: "center",
-            padding: 20,
             // SARA_ANDROID_AUTH_RECOVERY_V10 — matches the Manage PIN modal
             // below: without this, a short viewport (landscape phone, or the
             // keyboard covering half the screen) had no way to reach the
             // Create Child button.
             overflowY: "auto",
+            // SARA WHO IS WATCHING MOBILE V14 — landscape cutout devices.
+            padding:
+              "max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left))",
             background: "rgba(15,23,42,.6)",
           }}
         >
           <section
             style={{
               width: "min(500px, 100%)",
+              // SARA_ANDROID_KEYBOARD_DIALOG_V15 — lets this dialog's own
+              // content scroll internally once it's taller than the visible
+              // (keyboard-aware) viewport, instead of relying solely on the
+              // overlay's scroll (which centers the section and so never
+              // shows a scrollbar for overflow past its own edges).
+              maxHeight: "calc(var(--app-visible-height, 100dvh) - 40px)",
+              overflowY: "auto",
               padding: 25,
               borderRadius: 24,
               background: "white",
@@ -677,20 +726,32 @@ export default function DatabaseProfileSelection({
           style={{
             position: "fixed",
             zIndex: 10000,
-            inset: 0,
+            top: 0,
+            right: 0,
+            left: 0,
+            // SARA_ANDROID_KEYBOARD_DIALOG_V15 — see the Add Child modal
+            // above for why this replaces `inset: 0`.
+            height: "var(--app-visible-height, 100dvh)",
             display: "grid",
             placeItems: "center",
-            padding: 20,
             // SARA_ANDROID_AUTH_RECOVERY_V10 — matches the Manage PIN modal
             // below: keeps the PIN input/submit button reachable when the
             // on-screen keyboard shrinks the visible viewport.
             overflowY: "auto",
+            // SARA WHO IS WATCHING MOBILE V14 — landscape cutout devices.
+            padding:
+              "max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left))",
             background: "rgba(15,23,42,.65)",
           }}
         >
           <section
             style={{
               width: "min(430px, 100%)",
+              // SARA_ANDROID_KEYBOARD_DIALOG_V15 — see the Add Child modal
+              // above; keeps Cancel/Open Profile reachable under the numeric
+              // keyboard.
+              maxHeight: "calc(var(--app-visible-height, 100dvh) - 40px)",
+              overflowY: "auto",
               padding: 27,
               borderRadius: 25,
               background: "#ffffff",
@@ -867,11 +928,18 @@ export default function DatabaseProfileSelection({
           style={{
             position: "fixed",
             zIndex: 10020,
-            inset: 0,
+            top: 0,
+            right: 0,
+            left: 0,
+            // SARA_ANDROID_KEYBOARD_DIALOG_V15 — see the Add Child modal
+            // above for why this replaces `inset: 0`.
+            height: "var(--app-visible-height, 100dvh)",
             display: "grid",
             placeItems: "center",
-            padding: 20,
             overflowY: "auto",
+            // SARA WHO IS WATCHING MOBILE V14 — landscape cutout devices.
+            padding:
+              "max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left))",
             background: "rgba(15,23,42,.65)",
           }}
           onMouseDown={(event) => {
@@ -886,6 +954,11 @@ export default function DatabaseProfileSelection({
             aria-labelledby="manage-pin-title"
             style={{
               width: "min(470px, 100%)",
+              // SARA_ANDROID_KEYBOARD_DIALOG_V15 — keeps Update PIN/Cancel
+              // reachable under the numeric keyboard; see the Add Child
+              // modal above for the full rationale.
+              maxHeight: "calc(var(--app-visible-height, 100dvh) - 40px)",
+              overflowY: "auto",
               padding: 26,
               borderRadius: 25,
               background: "#ffffff",

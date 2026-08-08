@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { useVisibleViewportHeight } from "../hooks/use-visible-viewport-height";
 
 function NotFoundComponent() {
   return (
@@ -137,6 +138,12 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // SARA_ANDROID_KEYBOARD_DIALOG_V15 — mounted once at the app root so the
+  // --app-visible-height CSS var it maintains is available to every
+  // keyboard-aware dialog (Add Kid Profile, PIN dialogs) without each one
+  // re-registering a visualViewport listener.
+  useVisibleViewportHeight();
 
   return (
     <QueryClientProvider client={queryClient}>

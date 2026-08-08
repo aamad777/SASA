@@ -21,11 +21,17 @@
   backdrop-filter: blur(10px);
 }
 
+/* SARA_ANDROID_KEYBOARD_DIALOG_V15 — var(--app-visible-height) is set by
+   useVisibleViewportHeight (mounted once at the app root) from
+   window.visualViewport, which tracks the Android keyboard reliably where
+   100dvh alone did not on the real device this was tested on; the ", 100dvh"
+   fallback keeps this identical to before on desktop/browsers where the var
+   is never set. */
 .add-profile-dialog {
   position: relative;
   z-index: 1;
   width: min(480px, 100%);
-  max-height: calc(100dvh - 32px);
+  max-height: calc(var(--app-visible-height, 100dvh) - 32px);
   overflow-y: auto;
   border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: 32px;
@@ -280,16 +286,21 @@
 
   .add-profile-dialog {
     margin-top: 10px;
-    max-height: calc(100dvh - 20px);
+    /* SARA_ANDROID_KEYBOARD_DIALOG_V15 — same var() fallback as the base
+       rule above; this is the value that actually applies at mobile
+       widths, so the keyboard-aware height has to be repeated here rather
+       than left on the base rule alone. */
+    max-height: calc(var(--app-visible-height, 100dvh) - 20px);
     border-radius: 26px;
   }
 
   .add-profile-content {
-    padding: 36px 18px 28px;
+    padding: 28px 16px 22px;
   }
 
   .add-profile-content h1 {
-    font-size: 27px;
+    margin-bottom: 20px;
+    font-size: 26px;
   }
 
   .add-profile-close {
@@ -297,9 +308,34 @@
     right: 14px;
   }
 
-  .add-avatar-emoji {
+  /* SARA REAL DEVICE MOBILE POLISH V15 pass — the form's 28px field gap and
+     14-30px per-field internal spacing were sized for the desktop dialog;
+     on a real phone with the keyboard open every extra px of gap is a px
+     the user has to scroll past to reach the next field. Bring it down to
+     the 12-20px range requested for mobile form groups without touching
+     any field, input type, or validation. */
+  .add-profile-form {
+    gap: 18px;
+  }
+
+  .add-profile-field {
+    gap: 8px;
+  }
+
+  .add-profile-field input[type="text"] {
+    height: 54px;
+    font-size: 17px;
+  }
+
+  .add-avatar-emoji,
+  .add-avatar-frame {
     width: 68px;
     height: 68px;
     font-size: 37px;
+  }
+
+  .create-buddy-button {
+    height: 54px;
+    font-size: 18px;
   }
 }
