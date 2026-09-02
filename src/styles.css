@@ -775,15 +775,25 @@ button {
   position: relative;
   display: flex;
   width: 100%;
-  /* Mobile fit fix: the forced 884px floor made this PIN gate taller than
-     the viewport on most phones (portrait heights run ~600-800px), forcing
-     a scroll just to reach the keypad. Real content height, dvh-based like
-     the rest of the app. */
-  min-height: 100dvh;
+  /* SASA_PIN_MOBILE_FIT_V17 — the gate must fit the *visible* viewport, not
+     just the layout viewport: `100dvh` alone still left "Unlock Dashboard"
+     below the fold (measured 270px of overflow at 360x800, 202px at 390x844)
+     and does not shrink when the Android keyboard opens. `--app-visible-height`
+     is mirrored from window.visualViewport by useVisibleViewportHeight()
+     (src/hooks/use-visible-viewport-height.ts, mounted in __root.tsx) and
+     falls back to 100dvh wherever that hook is a no-op. Padding carries the
+     safe-area insets so the header clears the status bar and the footer
+     clears the home indicator / bottom nav. */
+  min-height: var(--app-visible-height, 100dvh);
+  padding-top: var(--sasa-sat, env(safe-area-inset-top, 0px));
+  padding-bottom: var(--sasa-sab, env(safe-area-inset-bottom, 0px));
+  padding-left: var(--sasa-sal, env(safe-area-inset-left, 0px));
+  padding-right: var(--sasa-sar, env(safe-area-inset-right, 0px));
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   font-family: "Fredoka", sans-serif;
   background: linear-gradient(to bottom, #aee4ff 0%, #aee4ff 40%, #fff9e1 60%, #fff9e1 100%);
   -webkit-tap-highlight-color: transparent;
@@ -935,6 +945,11 @@ button {
 .parent-mobile-header button,
 .parent-round-button {
   display: grid;
+  /* SASA_PIN_MOBILE_FIT_V17 — these icon buttons (account area, header close)
+     inherited only their icon's box and measured 42x32, under the 44px
+     minimum touch target. Sizing the button itself keeps the icon centred. */
+  min-width: 44px;
+  min-height: 44px;
   place-items: center;
   border: 0;
   border-radius: 50%;
@@ -4365,8 +4380,15 @@ button {
   }
 
   .parent-dashboard-mobile-header {
-    position: relative;
-    top: auto;
+    /* SASA_PIN_MOBILE_FIT_V17 — sticky, not relative: the dashboard body is
+       long enough to scroll on every phone, and a relative header scrolled
+       out of reach, taking the drawer toggle and the exit button with it.
+       Sticky keeps them on screen without adding a second scroll container
+       (see SARA PARENT SINGLE SCROLL V13 below). The bottom nav is already
+       fixed, so both ends of the chrome now stay put. */
+    position: sticky;
+    z-index: 30;
+    top: 0;
     left: auto;
     flex: 0 0 auto;
     width: 100%;
@@ -4949,8 +4971,17 @@ button {
     height: auto;
     min-height: 100dvh;
     max-height: none;
-    overflow-x: hidden;
-    overflow-y: visible;
+    /* SASA_PIN_MOBILE_FIT_V17 — `overflow-x: hidden` here forced the computed
+       `overflow-y` to `auto` (CSS makes a visible/hidden pair compute to
+       auto), quietly turning this element into the page's scroll container.
+       That is what stopped the sticky mobile header from ever sticking: it
+       sticks to its nearest scrolling ancestor, and that ancestor was as tall
+       as its own content, so it never scrolled. Horizontal clipping is
+       already handled one level down by .parent-dashboard-main and
+       .parent-dashboard-content, both of which still set overflow-x: hidden,
+       so dropping it here changes nothing visually and hands scrolling back
+       to the document (which SARA PARENT SINGLE SCROLL V13 already wanted). */
+    overflow: visible;
   }
 
   .parent-dashboard-main {
