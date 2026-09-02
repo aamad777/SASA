@@ -1,33 +1,25 @@
-import { useMemo, useState, useEffect, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
-  BookOpen,
-  Heart,
-  Home,
-  Palette,
-  Play,
-  Search,
-  Settings,
-  Volume2,
-  VolumeX,
-  X,
-  Gamepad2,
-  Paintbrush,
-  User,
-  Sparkles,
-  Trophy,
-  Award,
-  ShieldCheck,
-  RotateCcw,
-  Edit3,
   Check,
-  Star,
   Crown,
-  Plus,
-  Music,
+  Edit3,
+  Heart,
+  Image as ImageIcon,
+  Info,
   LogIn,
   LogOut,
+  Palette,
+  Paintbrush,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Trophy,
+  User,
+  Volume2,
+  VolumeX,
+  WifiOff,
+  X,
 } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
 import confetti from "canvas-confetti";
 import {
   playHeartSound,
@@ -36,7 +28,21 @@ import {
   isSoundEnabled,
   setSoundEnabled,
 } from "../lib/sound";
-import { appThemes, getStoredTheme, setStoredTheme, type AppThemeId } from "../lib/theme";
+import {
+  appThemes,
+  applyThemeAttribute,
+  getStoredTheme,
+  isNightTheme,
+  setStoredTheme,
+  type AppThemeId,
+} from "../lib/theme";
+import { useDismiss } from "../hooks/use-dismiss";
+import AppShell from "./layout/AppShell";
+import AccountMenu, { type AccountMenuItem } from "./layout/AccountMenu";
+import { KIDS_SECTIONS, type KidsSectionId } from "./layout/nav-sections";
+import MediaCard from "./media/MediaCard";
+import MediaCardSkeleton from "./media/MediaCardSkeleton";
+import EmptyState from "./media/EmptyState";
 import KidsDrawingStudio from "./KidsDrawingStudio";
 import KidsGamesStudio from "./KidsGamesStudio";
 import KidsSongsStudio from "./KidsSongsStudio";
@@ -52,17 +58,21 @@ export type KidsVideoItem = {
   sourceType?: "built-in" | "upload" | "youtube" | "photo";
   sourceUrl?: string;
   youtubeVideoId?: string;
+  /** ISO timestamp straight from the backend media record, when it sends one. */
+  createdAt?: string;
+  /** Byline shown under a card title. Never invented — see media-meta.ts. */
+  sourceLabel?: string;
 };
 
-export type KidsHomeTab = "home" | "search" | "library" | "songs" | "games" | "studio" | "profile";
+export type KidsHomeTab = KidsSectionId;
 
 // Shared fallback thumbnail for any assigned-media image that fails to load
 // (broken URL, deleted file, network hiccup) — used here and in the player
 // so a bad thumbnail never shows a broken-image icon or blank card.
 export const mediaThumbnailFallback = `data:image/svg+xml,${encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">
-    <rect width="640" height="360" fill="#94a3b8"/>
-    <text x="320" y="190" text-anchor="middle" font-family="Arial" font-size="26" font-weight="700" fill="white">Media unavailable</text>
+    <rect width="640" height="360" fill="#e6e8ec"/>
+    <text x="320" y="190" text-anchor="middle" font-family="Manrope, Arial" font-size="24" font-weight="700" fill="#79808a">Media unavailable</text>
   </svg>`,
 )}`;
 
@@ -172,6 +182,61 @@ export const kidsVideos: KidsVideoItem[] = [
   },
 ];
 
+const GRID_SECTIONS: KidsSectionId[] = ["home", "search", "library"];
+
+const QUICK_TOPICS = [
+  "Numbers",
+  "Dinosaurs",
+  "Solar System",
+  "Sing-Along",
+  "Experiment",
+  "Animals",
+];
+
+const KID_AVATARS = [
+  "🦁",
+  "🐼",
+  "🐰",
+  "🐶",
+  "🐧",
+  "🐱",
+  "🐒",
+  "🐨",
+  "🦄",
+  "🐥",
+  "🚀",
+  "🌟",
+  "👑",
+  "🎨",
+];
+
+const CHARACTER_AVATARS = [
+  {
+    name: "Leo",
+    emoji: "🦁",
+    image:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBXKmBbTEschT2fVlXzamCeETx0M3rctPouvJQ6jyWboczUe-WXt302CDJtMx5T_L9-zEaxhM_vxlITgSZt9_ApPXqHF9Vx39tEHo5gDXRFuGHRZ_rrEz6fOH5KlalMKiv82rUKm_4IRONsQ-wF064xYk_0ZIzAijLaovdE2H-qhe86S9qU1K70VcVvqOQ7GxR9ujHTTCg5GPHGI4VYoTLTPpwFitUSQ7JP8kSUjWRij6OOEIBXNKbLcaKkBrH4y-J_4PM1zmklxnA",
+  },
+  {
+    name: "Poppy",
+    emoji: "🐼",
+    image:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuCONd4umMhgrulZ5f-ZZt2Uuy9-ach-KvWVrVKGmgiL58eNixQ0RjTvy4dEfDeZ1J7AjEKiLqrUKdXuuqdwFo-IF87mvFkdWZwpDs4hfs2FGU19CtmN6-k04UQXX4ibVERtYQS4ejdOmmIu6QKvrqVw2lGKdJHCiNNzzQGpdSP3Zir5sHO0B2Dt0_hf7PLpsbxeTuzJbU0-bxuCDZ2egbgYTHvpvt7p7Nl-GMz8P2cZlpqKbDqaybqBQFAYBqN6KlDGvQr8Yd7diDQ",
+  },
+  {
+    name: "Ruby",
+    emoji: "🐰",
+    image:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBSpgsSIXN0d0LIyQMwB5SQbDUf6iitsVRQwTNbcaYYxamCvTLMt2omcQa9RPFVNaWlGDX2OTgHS9ZHHumfzn4jTOqF8IM0wzwTvI6lEkYLR5e4j1moqa0_Wrartxg-46lIyoXuBdsEFX9pa7gJgLs0L0SshcnaM8a_OnasZM-Uogwwpf5DOLftEcb2sg4fUl5uLX5o-g-g9wxt8QgqtmJ1Zii35Iibp-f7PH3ACFzlM57Cuf4m8MVAwA0J5c_n1YsiT4-gFfBgNg0",
+  },
+];
+
+const KID_BADGES = [
+  { title: "Star Watcher", icon: "⭐" },
+  { title: "Junior Artist", icon: "🎨" },
+  { title: "Super Kid", icon: "🚀" },
+];
+
 function loadLibrary(): number[] {
   try {
     const value = localStorage.getItem("sasa-video-library");
@@ -192,49 +257,72 @@ function loadBlockedVideoIds(): number[] {
   }
 }
 
-const KID_AVATARS = [
-  "🦁",
-  "🐼",
-  "🐰",
-  "🐶",
-  "🐧",
-  "🐱",
-  "🐒",
-  "🐨",
-  "🦄",
-  "🐥",
-  "🚀",
-  "🌟",
-  "👑",
-  "🎨",
-];
+/** Header popover for the kid theme picker. */
+function ThemeMenu({
+  currentTheme,
+  onSelect,
+}: {
+  currentTheme: AppThemeId;
+  onSelect: (themeId: AppThemeId) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const close = useCallback(() => setOpen(false), []);
 
-const BANNER_THEMES = [
-  {
-    id: "rainbow",
-    name: "Rainbow",
-    gradient: "from-purple-600 via-pink-500 to-amber-400",
-    border: "border-amber-300",
-  },
-  {
-    id: "ocean",
-    name: "Ocean Sky",
-    gradient: "from-sky-500 via-blue-600 to-indigo-700",
-    border: "border-sky-300",
-  },
-  {
-    id: "sunshine",
-    name: "Sunshine",
-    gradient: "from-amber-400 via-orange-500 to-red-500",
-    border: "border-orange-300",
-  },
-  {
-    id: "forest",
-    name: "Mint Meadow",
-    gradient: "from-emerald-400 via-teal-500 to-cyan-600",
-    border: "border-emerald-300",
-  },
-];
+  useDismiss(open, wrapRef, close);
+
+  return (
+    <div className="sasa-menu-wrap" ref={wrapRef}>
+      <button
+        type="button"
+        className="sasa-iconbtn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Choose a theme"
+        title="Theme"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <Palette size={22} />
+      </button>
+
+      {open && (
+        <div className="sasa-menu" role="menu">
+          <div className="sasa-menu-head">
+            <span className="sasa-avatar">
+              <Palette size={18} />
+            </span>
+            <span style={{ minWidth: 0 }}>
+              <strong>Theme</strong>
+              <span>Changes the app colours only</span>
+            </span>
+          </div>
+
+          {appThemes.map((theme) => (
+            <button
+              key={theme.id}
+              type="button"
+              role="menuitemradio"
+              aria-checked={currentTheme === theme.id}
+              className={currentTheme === theme.id ? "sasa-menu-item is-current" : "sasa-menu-item"}
+              onClick={() => {
+                onSelect(theme.id);
+                close();
+              }}
+            >
+              <span aria-hidden="true" style={{ fontSize: 16, width: 18 }}>
+                {theme.emoji}
+              </span>
+              <span>{theme.name}</span>
+              {currentTheme === theme.id && (
+                <Check size={16} style={{ marginInlineStart: "auto" }} />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function KidsVideoHome({
   profileName,
@@ -262,7 +350,6 @@ export default function KidsVideoHome({
   const [searchText, setSearchText] = useState("");
   const [libraryIds, setLibraryIds] = useState<number[]>(loadLibrary);
   const [soundOn, setSoundOn] = useState<boolean>(isSoundEnabled);
-  const [showThemePicker, setShowThemePicker] = useState(false);
   const [showFreeModal, setShowFreeModal] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<AppThemeId>(getStoredTheme);
 
@@ -272,6 +359,12 @@ export default function KidsVideoHome({
       setCurrentTab(activeTabProp);
     }
   }, [activeTabProp]);
+
+  // The picker persisted a theme id that nothing ever applied on load, so a
+  // chosen theme was forgotten on every visit. Re-apply it on mount.
+  useEffect(() => {
+    applyThemeAttribute(currentTheme);
+  }, [currentTheme]);
 
   // Kid Profile Customization State
   const [activeEmoji, setActiveEmoji] = useState<string>(() => {
@@ -311,15 +404,8 @@ export default function KidsVideoHome({
 
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
   const [tempName, setTempName] = useState<string>(activeName);
-  const [bannerThemeId, setBannerThemeId] = useState<string>(() => {
-    return localStorage.getItem("sasa-kid-banner-theme") || "rainbow";
-  });
   const [showAvatarPicker, setShowAvatarPicker] = useState<boolean>(false);
   const [badgeToast, setBadgeToast] = useState<string | null>(null);
-
-  const selectedBannerTheme = useMemo(() => {
-    return BANNER_THEMES.find((t) => t.id === bannerThemeId) || BANNER_THEMES[0];
-  }, [bannerThemeId]);
 
   const savedArtworksCount = useMemo(() => {
     try {
@@ -329,10 +415,6 @@ export default function KidsVideoHome({
       return 0;
     }
   }, [currentTab]);
-
-  const savedVideos = useMemo(() => {
-    return kidsVideos.filter((v) => libraryIds.includes(v.id));
-  }, [libraryIds]);
 
   const handleSelectAvatar = (emoji: string, imageUrl?: string) => {
     playSuccessSound();
@@ -357,12 +439,6 @@ export default function KidsVideoHome({
     setIsEditingName(false);
   };
 
-  const handleSelectBannerTheme = (themeId: string) => {
-    playPopSound();
-    setBannerThemeId(themeId);
-    localStorage.setItem("sasa-kid-banner-theme", themeId);
-  };
-
   const handleTapBadge = (title: string, msg: string, event: MouseEvent) => {
     playSuccessSound();
     const rect = event.currentTarget.getBoundingClientRect();
@@ -375,7 +451,7 @@ export default function KidsVideoHome({
       colors: ["#ff8fa3", "#ffa62b", "#ffde59", "#95d5b2", "#8ecae6"],
     });
 
-    setBadgeToast(`🌟 Unlocked: ${title}! ${msg}`);
+    setBadgeToast(`Unlocked: ${title}! ${msg}`);
     setTimeout(() => setBadgeToast(null), 3500);
   };
 
@@ -421,7 +497,7 @@ export default function KidsVideoHome({
   }, [assignedVideos, currentTab, libraryIds, searchText, selectedCategory]);
 
   // Same source list + same rules as displayedVideos (minus the tab/search
-  // narrowing) so the counts shown next to each category button always match
+  // narrowing) so the counts shown next to each category chip always match
   // what selecting that category will actually reveal.
   const categoryCounts = useMemo(() => {
     const blockedVideoIds = loadBlockedVideoIds();
@@ -511,14 +587,21 @@ export default function KidsVideoHome({
     }
   };
 
-  const changeTab = (tab: KidsHomeTab) => {
+  /**
+   * Section navigation. The search text is dropped on a deliberate section
+   * change so a filter can never stay applied invisibly behind the collapsed
+   * mobile search field — `keepSearch` is set only when the navigation was
+   * itself triggered by submitting a search.
+   */
+  const goToSection = (tab: KidsHomeTab, options?: { keepSearch?: boolean }) => {
     playPopSound();
     setCurrentTab(tab);
-    if (onTabChange) {
-      onTabChange(tab);
-    }
-    setSearchText("");
+    onTabChange?.(tab);
     setSelectedCategory("All");
+
+    if (!options?.keepSearch) {
+      setSearchText("");
+    }
   };
 
   const handleToggleSound = () => {
@@ -534,284 +617,439 @@ export default function KidsVideoHome({
     playPopSound();
     setCurrentTheme(themeId);
     setStoredTheme(themeId);
-    setShowThemePicker(false);
   };
 
-  return (
-    <motion.div
-      className="kids-video-home"
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
-    >
-      <div className="kids-video-sticky">
-        <header className="kids-video-header kids-centered-header">
-          {/* Left Side: Hello Greeting, Title & Free Account Button */}
-          <div className="kids-header-main">
-            <div className="kids-header-title">
-              <span className="flex items-center justify-center gap-1.5 font-bold text-amber-200 text-xs sm:text-sm">
-                <span className="text-lg sm:text-xl">{profileEmoji}</span> Hello, {profileName}!
-              </span>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight drop-shadow-xs">
-                {currentTab === "library"
-                  ? "My Library ❤️"
-                  : currentTab === "search"
-                    ? "Search Cartoons 🔍"
-                    : currentTab === "songs"
-                      ? "Sing-Along Songs 🎵"
-                      : currentTab === "games"
-                        ? "Fun Arcade 🎮"
-                        : currentTab === "studio"
-                          ? "Drawing Studio 🎨"
-                          : currentTab === "profile"
-                            ? "Kid Profile 👤"
-                            : "Kids Video 🌟"}
-              </h1>
-            </div>
+  const openVideo = (video: KidsVideoItem) => {
+    playPopSound();
+    onOpenVideo(video);
+  };
 
-            {/* Free Account button is visible only in guest mode */}
-            {isGuestAccount && (
-              <motion.button
+  const section = KIDS_SECTIONS[currentTab];
+  const showsGrid = GRID_SECTIONS.includes(currentTab);
+
+  const accountItems: AccountMenuItem[] = [
+    {
+      id: "switch",
+      label: "Switch profile",
+      icon: User,
+      onSelect: () => {
+        playPopSound();
+        onChangeProfile();
+      },
+    },
+    {
+      id: "parent",
+      label: "Parent controls",
+      icon: ShieldCheck,
+      onSelect: () => {
+        playPopSound();
+        onOpenParentalControls();
+      },
+    },
+  ];
+
+  if (isGuestAccount) {
+    accountItems.push(
+      {
+        id: "free-info",
+        label: "About the free account",
+        icon: Info,
+        onSelect: () => setShowFreeModal(true),
+      },
+      {
+        id: "create-account",
+        label: "Create a parent account",
+        icon: Sparkles,
+        onSelect: () => {
+          playSuccessSound();
+          onOpenFreeAccount();
+        },
+      },
+    );
+  }
+
+  accountItems.push({
+    id: "account-action",
+    label: accountActionLabel === "Login" ? "Log in" : "Sign out",
+    icon: accountActionLabel === "Login" ? LogIn : LogOut,
+    tone: accountActionLabel === "Login" ? "default" : "danger",
+    onSelect: () => {
+      playPopSound();
+      onAccountAction();
+    },
+  });
+
+  const renderGrid = () => {
+    if (currentTab === "home" && assignedVideosLoading && assignedVideos.length === 0) {
+      return (
+        <div className="sasa-grid">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <MediaCardSkeleton key={index} />
+          ))}
+        </div>
+      );
+    }
+
+    if (displayedVideos.length === 0) {
+      if (currentTab === "library") {
+        return (
+          <EmptyState
+            icon={Heart}
+            title="Nothing saved yet"
+            description="Tap the heart on any video or photo and it will wait for you here."
+            action={
+              <button
                 type="button"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.94 }}
-                onClick={() => {
-                  playSuccessSound();
-                  onOpenFreeAccount();
-                }}
-                className="bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-xs sm:text-sm px-3.5 py-2 rounded-2xl shadow-md border-2 border-white flex items-center gap-1.5 cursor-pointer shrink-0"
-                title="Create a parent account"
+                className="sasa-btn is-primary"
+                onClick={() => goToSection("home")}
               >
-                <Sparkles size={16} className="text-amber-900 fill-amber-300" />
-                <span>Create Free Account</span>
-              </motion.button>
-            )}
-          </div>
+                Browse home
+              </button>
+            }
+          />
+        );
+      }
 
-          {/* Right Side: Theme, Volume, Parental Settings */}
-          <div className="topbar-actions kids-centered-actions">
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.92 }}
-              className="icon-button shadow-sm cursor-pointer"
-              onClick={() => {
-                playPopSound();
-                setShowThemePicker((v) => !v);
-              }}
-              title="Change Theme & Background"
-              aria-label="Theme selector"
-            >
-              <Palette size={20} className="text-purple-600" />
-            </motion.button>
+      if (searchText.trim()) {
+        return (
+          <EmptyState
+            icon={Search}
+            title={`No results for “${searchText.trim()}”`}
+            description="Try a shorter word, or pick one of the quick topics above."
+            action={
+              <button type="button" className="sasa-btn" onClick={() => setSearchText("")}>
+                Clear search
+              </button>
+            }
+          />
+        );
+      }
 
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.92 }}
-              className="icon-button shadow-sm cursor-pointer"
-              onClick={handleToggleSound}
-              title={soundOn ? "Mute Sound Effects" : "Enable Sound Effects"}
-              aria-label="Toggle Sound"
-            >
-              {soundOn ? (
-                <Volume2 size={20} className="text-teal-600" />
-              ) : (
-                <VolumeX size={20} className="text-slate-400" />
-              )}
-            </motion.button>
+      if (selectedCategory !== "All") {
+        return (
+          <EmptyState
+            icon={ImageIcon}
+            title={`Nothing in ${selectedCategory} yet`}
+            description="Choose another category, or ask a grown-up to share something new."
+            action={
+              <button type="button" className="sasa-btn" onClick={() => setSelectedCategory("All")}>
+                Show everything
+              </button>
+            }
+          />
+        );
+      }
 
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.94 }}
-              className="kids-account-btn font-extrabold text-white bg-slate-800 hover:bg-slate-700 shadow-md rounded-2xl px-4 py-2 flex items-center gap-2 cursor-pointer shrink-0"
-              onClick={() => {
-                playPopSound();
-                onAccountAction();
-              }}
-              title={accountActionLabel}
-            >
-              {accountActionLabel === "Login" ? <LogIn size={18} /> : <LogOut size={18} />}
-              <span>{accountActionLabel}</span>
-            </motion.button>
+      return (
+        <EmptyState
+          icon={ImageIcon}
+          title="Nothing to watch yet"
+          description="When a grown-up shares videos or photos with this profile, they show up right here."
+        />
+      );
+    }
 
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.94 }}
-              className="kids-parent-btn font-extrabold text-white bg-gradient-to-r from-pink-500 to-purple-600 shadow-md rounded-2xl px-4 py-2 flex items-center gap-2 cursor-pointer shrink-0"
-              onClick={() => {
-                playPopSound();
-                onOpenParentalControls();
-              }}
-            >
-              <Settings size={18} />
-              <span>Parental Settings</span>
-            </motion.button>
-          </div>
-        </header>
+    return (
+      <div className="sasa-grid">
+        {displayedVideos.map((video) => (
+          <MediaCard
+            key={video.id}
+            item={video}
+            saved={libraryIds.includes(video.id)}
+            onOpen={openVideo}
+            onToggleSave={toggleLibrary}
+          />
+        ))}
+      </div>
+    );
+  };
 
-        <AnimatePresence>
-          {showThemePicker && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: -10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: -10 }}
-              className="mx-4 my-2 p-4 rounded-3xl bg-white/95 backdrop-blur-md shadow-2xl border border-purple-200/60 z-30 flex flex-wrap items-center justify-between gap-3"
-            >
-              <div className="flex items-center gap-2 font-extrabold text-slate-800">
-                <Palette size={20} className="text-purple-500" />
-                <span>Choose Cartoon Theme:</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {appThemes.map((theme) => {
-                  const active = currentTheme === theme.id;
-                  return (
-                    <motion.button
-                      key={theme.id}
-                      type="button"
-                      whileHover={{ scale: 1.06 }}
-                      whileTap={{ scale: 0.94 }}
-                      onClick={() => handleSelectTheme(theme.id)}
-                      className={`px-3 py-1.5 rounded-2xl font-bold text-xs flex items-center gap-1.5 border-2 transition-all ${
-                        active
-                          ? "border-purple-600 bg-purple-100 text-purple-900 shadow-sm"
-                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                      }`}
-                    >
-                      <span className="text-base">{theme.emoji}</span>
-                      <span>{theme.name}</span>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+  const renderProfile = () => (
+    <div style={{ display: "grid", gap: 16, maxWidth: 720, paddingBlock: 8 }}>
+      <section className="sasa-panel" style={{ gap: 14 }}>
+        <button
+          type="button"
+          className="sasa-avatar is-lg"
+          style={{ width: 64, height: 64, fontSize: 30 }}
+          onClick={() => {
+            playPopSound();
+            setShowAvatarPicker((value) => !value);
+          }}
+          aria-expanded={showAvatarPicker}
+          aria-label="Change avatar"
+        >
+          {activeImage ? <img src={activeImage} alt="" /> : activeEmoji}
+        </button>
 
-        {currentTab === "search" && (
-          <div className="flex flex-col gap-2 p-3 bg-white/70 backdrop-blur-md rounded-3xl border border-purple-100/80 mx-2 my-2 shadow-sm">
-            <motion.div
-              className="kids-search-panel"
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-            >
-              <Search size={21} />
+        <div className="sasa-panel-text">
+          {isEditingName ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
-                type="search"
-                value={searchText}
-                placeholder="Search cartoons, numbers, dinos, music..."
+                type="text"
+                value={tempName}
+                onChange={(event) => setTempName(event.target.value)}
+                className="sasa-input"
                 autoFocus
-                onChange={(event) => setSearchText(event.target.value)}
+                maxLength={16}
+                aria-label="Profile name"
               />
-              {searchText && (
-                <motion.button
-                  whileTap={{ scale: 0.85 }}
-                  type="button"
-                  onClick={() => {
-                    playPopSound();
-                    setSearchText("");
-                  }}
-                  aria-label="Clear search"
-                >
-                  <X size={20} />
-                </motion.button>
-              )}
-            </motion.div>
-
-            {/* Quick Topic Search Pills */}
-            <div className="flex items-center gap-2 overflow-x-auto py-1 px-1 scrollbar-none">
-              <span className="text-[11px] font-black text-slate-400 shrink-0 uppercase tracking-wider">
-                Quick Topics:
-              </span>
-              {[
-                { label: "Numbers", icon: "🔢" },
-                { label: "Dinosaurs", icon: "🦕" },
-                { label: "Solar System", icon: "🪐" },
-                { label: "Sing-Along", icon: "🎵" },
-                { label: "Experiment", icon: "🧪" },
-                { label: "Animals", icon: "🐾" },
-              ].map((topic) => (
-                <button
-                  key={topic.label}
-                  type="button"
-                  onClick={() => {
-                    playPopSound();
-                    setSearchText(topic.label);
-                  }}
-                  className={`px-3 py-1 rounded-xl text-xs font-black shrink-0 border transition flex items-center gap-1 ${
-                    searchText.toLowerCase() === topic.label.toLowerCase()
-                      ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
-                  }`}
-                >
-                  <span>{topic.icon}</span>
-                  <span>{topic.label}</span>
-                </button>
-              ))}
+              <button
+                type="button"
+                className="sasa-btn is-primary"
+                onClick={handleSaveName}
+                aria-label="Save name"
+              >
+                <Check size={18} />
+              </button>
             </div>
+          ) : (
+            <div style={{ display: "flex", gap: 6, alignItems: "center", minWidth: 0 }}>
+              <strong style={{ fontSize: 18 }}>{activeName}</strong>
+              <button
+                type="button"
+                className="sasa-iconbtn"
+                onClick={() => {
+                  playPopSound();
+                  setTempName(activeName);
+                  setIsEditingName(true);
+                }}
+                aria-label="Edit profile name"
+              >
+                <Edit3 size={16} />
+              </button>
+            </div>
+          )}
+          <span>Kid profile · parent-approved content only</span>
+        </div>
+      </section>
+
+      {showAvatarPicker && (
+        <section
+          style={{
+            display: "grid",
+            gap: 12,
+            padding: 14,
+            border: "1px solid var(--sasa-line)",
+            borderRadius: "var(--sasa-radius)",
+            background: "var(--sasa-surface)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "var(--sasa-ink-2)",
+              }}
+            >
+              <Crown size={14} /> Choose your avatar
+            </span>
+            <button
+              type="button"
+              className="sasa-iconbtn"
+              onClick={() => setShowAvatarPicker(false)}
+              aria-label="Close avatar picker"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {CHARACTER_AVATARS.map((item) => (
+              <button
+                key={item.name}
+                type="button"
+                className={activeImage === item.image ? "sasa-chip is-selected" : "sasa-chip"}
+                onClick={() => handleSelectAvatar(item.emoji, item.image)}
+                aria-pressed={activeImage === item.image}
+              >
+                <img className="sasa-chip-thumb" src={item.image} alt="" />
+                {item.name}
+              </button>
+            ))}
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(44px, 1fr))",
+              gap: 6,
+            }}
+          >
+            {KID_AVATARS.map((emoji) => {
+              const selected = activeEmoji === emoji && !activeImage;
+
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  className={selected ? "sasa-chip is-selected" : "sasa-chip"}
+                  style={{ justifyContent: "center", padding: 6, fontSize: 20 }}
+                  onClick={() => handleSelectAvatar(emoji, undefined)}
+                  aria-pressed={selected}
+                  aria-label={`Use ${emoji} as avatar`}
+                >
+                  {emoji}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+        <button type="button" className="sasa-panel is-stat" onClick={() => goToSection("library")}>
+          <Heart size={18} style={{ color: "var(--sasa-pink)" }} />
+          <strong style={{ fontSize: 22 }}>{libraryIds.length}</strong>
+          <span style={{ color: "var(--sasa-ink-2)", fontSize: 12.5 }}>Saved items</span>
+        </button>
+
+        <button type="button" className="sasa-panel is-stat" onClick={() => goToSection("studio")}>
+          <Paintbrush size={18} style={{ color: "var(--sasa-brand)" }} />
+          <strong style={{ fontSize: 22 }}>{savedArtworksCount}</strong>
+          <span style={{ color: "var(--sasa-ink-2)", fontSize: 12.5 }}>Artworks drawn</span>
+        </button>
+      </div>
+
+      <section>
+        <h2 className="sasa-watch-block-title">
+          <Trophy size={13} style={{ verticalAlign: "-2px", marginInlineEnd: 4 }} />
+          Badges
+        </h2>
+        <div className="sasa-hscroll">
+          {KID_BADGES.map((badge) => (
+            <button
+              key={badge.title}
+              type="button"
+              className="sasa-chip"
+              onClick={(event) => handleTapBadge(badge.title, "Great job!", event)}
+            >
+              <span aria-hidden="true" style={{ fontSize: 16 }}>
+                {badge.icon}
+              </span>
+              {badge.title}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+        <button
+          type="button"
+          className="sasa-btn is-primary"
+          onClick={() => {
+            playPopSound();
+            onChangeProfile();
+          }}
+        >
+          <User size={18} />
+          Switch profile
+        </button>
+
+        <button
+          type="button"
+          className="sasa-btn"
+          onClick={() => {
+            playPopSound();
+            onOpenParentalControls();
+          }}
+        >
+          <ShieldCheck size={18} />
+          Parent controls
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderSection = () => {
+    if (currentTab === "games") return <KidsGamesStudio />;
+    if (currentTab === "studio") return <KidsDrawingStudio />;
+    if (currentTab === "songs") return <KidsSongsStudio />;
+    if (currentTab === "profile") return renderProfile();
+
+    return (
+      <>
+        {currentTab === "search" && (
+          <div className="sasa-hscroll" style={{ paddingBlockEnd: 4 }}>
+            {QUICK_TOPICS.map((topic) => {
+              const selected = searchText.trim().toLowerCase() === topic.toLowerCase();
+
+              return (
+                <button
+                  key={topic}
+                  type="button"
+                  className={selected ? "sasa-chip is-selected" : "sasa-chip"}
+                  aria-pressed={selected}
+                  onClick={() => {
+                    playPopSound();
+                    setSearchText(topic);
+                  }}
+                >
+                  {topic}
+                </button>
+              );
+            })}
           </div>
         )}
 
-        {(currentTab === "home" || currentTab === "search" || currentTab === "library") && (
-          <nav className="kids-category-nav">
-            <motion.button
-              whileHover={{ scale: 1.06 }}
-              whileTap={{ scale: 0.93 }}
+        <div className="sasa-chiprow">
+          <div className="sasa-hscroll">
+            <button
               type="button"
-              className={selectedCategory === "All" ? "selected" : ""}
+              className={selectedCategory === "All" ? "sasa-chip is-selected" : "sasa-chip"}
+              aria-pressed={selectedCategory === "All"}
               onClick={() => {
                 playPopSound();
                 setSelectedCategory("All");
               }}
             >
-              <span className="kids-all-category">🌈</span>
-              <strong>All Cartoons</strong>
-            </motion.button>
+              All
+            </button>
 
             {visibleCategories.map((category) => {
               const count = categoryCounts.get(category.name.toLowerCase());
+              const selected = selectedCategory === category.name;
 
               return (
-                <motion.button
-                  whileHover={{ scale: 1.06 }}
-                  whileTap={{ scale: 0.93 }}
-                  type="button"
+                <button
                   key={category.name}
-                  className={selectedCategory === category.name ? "selected" : ""}
+                  type="button"
+                  className={selected ? "sasa-chip is-selected" : "sasa-chip"}
+                  aria-pressed={selected}
                   onClick={() => {
                     playPopSound();
                     setSelectedCategory(category.name);
                   }}
                 >
-                  <span>
-                    <img src={category.image} alt={category.name} />
-                  </span>
-                  <strong>
-                    {category.name}
-                    {typeof count === "number" && count > 0 && (
-                      <span className="kids-category-count"> {count}</span>
-                    )}
-                  </strong>
-                </motion.button>
+                  {category.image && (
+                    <img className="sasa-chip-thumb" src={category.image} alt="" loading="lazy" />
+                  )}
+                  {category.name}
+                  {typeof count === "number" && count > 0 && (
+                    <span className="sasa-chip-count">{count}</span>
+                  )}
+                </button>
               );
             })}
-          </nav>
-        )}
+          </div>
+        </div>
 
-        {/* Assigned-media loading / error state — built-in cartoons below are
-            unaffected either way, so this never blanks the whole screen. */}
-        {currentTab === "home" && assignedVideosLoading && (
-          <div className="kids-media-status-banner is-loading" role="status">
-            <span className="kids-media-status-spinner" aria-hidden="true" />
-            Loading your videos...
+        {currentTab === "home" && assignedVideosLoading && assignedVideos.length > 0 && (
+          <div className="sasa-notice" role="status">
+            <span className="sasa-spinner" aria-hidden="true" />
+            Refreshing your videos…
           </div>
         )}
 
         {currentTab === "home" && !assignedVideosLoading && assignedMediaError && (
-          <div className="kids-media-status-banner is-error" role="alert">
-            <span>Couldn&apos;t load your assigned videos.</span>
+          <div className="sasa-notice is-error" role="alert">
+            <WifiOff size={16} aria-hidden="true" />
+            <span>Couldn&apos;t load the videos shared with you.</span>
             {onRetryAssignedMedia && (
               <button
                 type="button"
@@ -825,548 +1063,206 @@ export default function KidsVideoHome({
             )}
           </div>
         )}
+
+        {renderGrid()}
+      </>
+    );
+  };
+
+  return (
+    <AppShell
+      tone={isNightTheme(currentTheme) ? "dark" : "light"}
+      activeSection={currentTab}
+      onNavigate={(next) => goToSection(next)}
+      onOpenParentControls={() => {
+        playPopSound();
+        onOpenParentalControls();
+      }}
+      searchValue={searchText}
+      onSearchChange={setSearchText}
+      onSearchSubmit={() => {
+        if (currentTab !== "search") {
+          goToSection("search", { keepSearch: true });
+        }
+      }}
+      searchPlaceholder="Search videos and photos"
+      profileLabel="You"
+      profileEmoji={activeEmoji}
+      profileImage={activeImage}
+      headerActions={
+        <>
+          <button
+            type="button"
+            className="sasa-iconbtn"
+            onClick={handleToggleSound}
+            aria-pressed={soundOn}
+            aria-label={soundOn ? "Turn sound effects off" : "Turn sound effects on"}
+            title={soundOn ? "Sound effects on" : "Sound effects off"}
+          >
+            {soundOn ? <Volume2 size={22} /> : <VolumeX size={22} />}
+          </button>
+
+          <ThemeMenu currentTheme={currentTheme} onSelect={handleSelectTheme} />
+        </>
+      }
+      accountSlot={
+        <AccountMenu
+          name={activeName}
+          subtitle={isGuestAccount ? "Guest profile" : "Kid profile"}
+          avatarEmoji={activeEmoji}
+          avatarImage={activeImage}
+          items={accountItems}
+        />
+      }
+    >
+      <div className="sasa-page-head">
+        <div style={{ minWidth: 0 }}>
+          <h1>{section.title}</h1>
+          <p>
+            {currentTab === "home" ? `Hello ${activeName} — ${section.subtitle}` : section.subtitle}
+          </p>
+        </div>
+
+        {showsGrid && displayedVideos.length > 0 && (
+          <p style={{ flex: "0 0 auto", color: "var(--sasa-ink-3)", fontSize: 12.5 }}>
+            {displayedVideos.length} {displayedVideos.length === 1 ? "item" : "items"}
+          </p>
+        )}
       </div>
 
-      <main
-        key={currentTab}
-        className={`pb-28 ${["home", "search", "library"].includes(currentTab) ? "kids-video-grid" : "w-full px-3 sm:px-6 py-4"}`}
+      {isGuestAccount && currentTab === "home" && (
+        <div className="sasa-notice">
+          <Sparkles size={16} aria-hidden="true" />
+          <span>You&apos;re browsing as a guest. A parent account keeps saved items in sync.</span>
+          <button type="button" onClick={() => onOpenFreeAccount()}>
+            Create account
+          </button>
+        </div>
+      )}
+
+      {renderSection()}
+
+      {badgeToast && (
+        <div className="sasa-toast" role="status">
+          <div>
+            <Trophy size={14} aria-hidden="true" />
+            {badgeToast}
+          </div>
+        </div>
+      )}
+
+      {isGuestAccount && showFreeModal && (
+        <FreeAccountDialog
+          onClose={() => setShowFreeModal(false)}
+          onOpenParentControls={() => {
+            setShowFreeModal(false);
+            onOpenParentalControls();
+          }}
+        />
+      )}
+    </AppShell>
+  );
+}
+
+/** Explains what the free guest experience includes. */
+function FreeAccountDialog({
+  onClose,
+  onOpenParentControls,
+}: {
+  onClose: () => void;
+  onOpenParentControls: () => void;
+}) {
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  useDismiss(true, cardRef, onClose);
+
+  return (
+    <>
+      <button type="button" className="sasa-sheet-scrim" aria-label="Close" onClick={onClose} />
+      <div
+        ref={cardRef}
+        role="dialog"
+        aria-label="About the free account"
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 92,
+          display: "grid",
+          placeItems: "center",
+          padding: 16,
+          pointerEvents: "none",
+        }}
       >
-        {currentTab === "games" ? (
-          <KidsGamesStudio />
-        ) : currentTab === "studio" ? (
-          <KidsDrawingStudio />
-        ) : currentTab === "songs" ? (
-          <KidsSongsStudio />
-        ) : currentTab === "profile" ? (
-          <div className="max-w-lg mx-auto w-full flex flex-col items-center text-center gap-6 p-6 sm:p-8 bg-white/95 backdrop-blur-md rounded-3xl border-4 border-amber-300 shadow-2xl my-4">
-            {/* Large Centered Character Profile Image or Emoji */}
-            <div className="relative flex flex-col items-center">
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="relative cursor-pointer group"
-                onClick={() => {
-                  playPopSound();
-                  setShowAvatarPicker(!showAvatarPicker);
-                }}
-                title="Tap to change avatar!"
-              >
-                {/* Outer Halo/Glow */}
-                <div className="absolute -inset-2 rounded-full bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 opacity-75 blur-md group-hover:opacity-100 transition duration-300 animate-pulse" />
-
-                {/* Circle Container */}
-                <div className="relative z-10 w-32 h-32 sm:w-36 sm:h-36 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-gradient-to-tr from-amber-100 to-orange-100 flex items-center justify-center">
-                  {activeImage ? (
-                    <img
-                      src={activeImage}
-                      alt={activeName}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                    />
-                  ) : (
-                    <span className="text-6xl sm:text-7xl select-none">{activeEmoji}</span>
-                  )}
-                </div>
-
-                {/* Edit Badge Button */}
-                <button
-                  type="button"
-                  className="absolute bottom-1 right-1 z-20 bg-amber-400 hover:bg-amber-300 text-amber-950 p-2.5 rounded-full border-2 border-white shadow-lg transition transform group-hover:scale-110 cursor-pointer"
-                  title="Change profile avatar"
-                >
-                  <Edit3 size={16} />
-                </button>
-              </motion.div>
-            </div>
-
-            {/* Kid Profile Name & Status */}
-            <div className="flex flex-col items-center gap-1.5 w-full">
-              {isEditingName ? (
-                <div className="flex items-center justify-center gap-2 w-full max-w-xs">
-                  <input
-                    type="text"
-                    value={tempName}
-                    onChange={(e) => setTempName(e.target.value)}
-                    className="w-full bg-slate-100 text-slate-900 font-black text-2xl px-4 py-2 rounded-2xl border-2 border-amber-400 focus:outline-none text-center shadow-inner"
-                    autoFocus
-                    maxLength={16}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSaveName}
-                    className="p-2.5 bg-amber-400 text-amber-950 rounded-2xl font-bold shadow-md hover:bg-amber-300 cursor-pointer shrink-0"
-                  >
-                    <Check size={20} />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center gap-2">
-                  <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-                    {activeName}
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playPopSound();
-                      setTempName(activeName);
-                      setIsEditingName(true);
-                    }}
-                    className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full transition text-slate-600 cursor-pointer"
-                    title="Edit profile name"
-                  >
-                    <Edit3 size={16} />
-                  </button>
-                </div>
-              )}
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black tracking-wide border border-emerald-300">
-                <ShieldCheck size={14} className="text-emerald-600" />
-                100% Safe Kid Account
+        <div
+          style={{
+            width: "min(420px, 100%)",
+            maxHeight: "calc(var(--app-visible-height, 100dvh) - 32px)",
+            overflowY: "auto",
+            padding: 20,
+            border: "1px solid var(--sasa-line)",
+            borderRadius: 16,
+            background: "var(--sasa-surface)",
+            pointerEvents: "auto",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <span className="sasa-avatar is-lg">
+              <Sparkles size={20} />
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <strong style={{ display: "block", fontSize: 16 }}>Free kid experience</strong>
+              <span style={{ color: "var(--sasa-ink-2)", fontSize: 12.5 }}>
+                No subscription needed
               </span>
             </div>
-
-            {/* Avatar Selection Picker Sheet */}
-            <AnimatePresence>
-              {showAvatarPicker && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="w-full bg-amber-50 border-2 border-amber-200 p-4 rounded-3xl flex flex-col gap-3 shadow-inner"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-amber-900 flex items-center gap-1.5">
-                      <Crown size={16} className="text-amber-600" /> Choose Character or Emoji
-                      Avatar:
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowAvatarPicker(false)}
-                      className="text-amber-800 p-1 rounded-xl hover:bg-amber-200 cursor-pointer"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-
-                  {/* Default Character Portraits */}
-                  <div className="flex items-center justify-center gap-3 py-1">
-                    {[
-                      {
-                        name: "Leo",
-                        emoji: "🦁",
-                        image:
-                          "https://lh3.googleusercontent.com/aida-public/AB6AXuBXKmBbTEschT2fVlXzamCeETx0M3rctPouvJQ6jyWboczUe-WXt302CDJtMx5T_L9-zEaxhM_vxlITgSZt9_ApPXqHF9Vx39tEHo5gDXRFuGHRZ_rrEz6fOH5KlalMKiv82rUKm_4IRONsQ-wF064xYk_0ZIzAijLaovdE2H-qhe86S9qU1K70VcVvqOQ7GxR9ujHTTCg5GPHGI4VYoTLTPpwFitUSQ7JP8kSUjWRij6OOEIBXNKbLcaKkBrH4y-J_4PM1zmklxnA",
-                      },
-                      {
-                        name: "Poppy",
-                        emoji: "🐼",
-                        image:
-                          "https://lh3.googleusercontent.com/aida-public/AB6AXuCONd4umMhgrulZ5f-ZZt2Uuy9-ach-KvWVrVKGmgiL58eNixQ0RjTvy4dEfDeZ1J7AjEKiLqrUKdXuuqdwFo-IF87mvFkdWZwpDs4hfs2FGU19CtmN6-k04UQXX4ibVERtYQS4ejdOmmIu6QKvrqVw2lGKdJHCiNNzzQGpdSP3Zir5sHO0B2Dt0_hf7PLpsbxeTuzJbU0-bxuCDZ2egbgYTHvpvt7p7Nl-GMz8P2cZlpqKbDqaybqBQFAYBqN6KlDGvQr8Yd7diDQ",
-                      },
-                      {
-                        name: "Ruby",
-                        emoji: "🐰",
-                        image:
-                          "https://lh3.googleusercontent.com/aida-public/AB6AXuBSpgsSIXN0d0LIyQMwB5SQbDUf6iitsVRQwTNbcaYYxamCvTLMt2omcQa9RPFVNaWlGDX2OTgHS9ZHHumfzn4jTOqF8IM0wzwTvI6lEkYLR5e4j1moqa0_Wrartxg-46lIyoXuBdsEFX9pa7gJgLs0L0SshcnaM8a_OnasZM-Uogwwpf5DOLftEcb2sg4fUl5uLX5o-g-g9wxt8QgqtmJ1Zii35Iibp-f7PH3ACFzlM57Cuf4m8MVAwA0J5c_n1YsiT4-gFfBgNg0",
-                      },
-                    ].map((item) => (
-                      <button
-                        key={item.name}
-                        type="button"
-                        onClick={() => handleSelectAvatar(item.emoji, item.image)}
-                        className={`flex flex-col items-center gap-1 p-2 rounded-2xl border-2 transition cursor-pointer ${
-                          activeImage === item.image
-                            ? "bg-amber-300 border-amber-600 shadow-md scale-105"
-                            : "bg-white hover:bg-amber-100 border-amber-200"
-                        }`}
-                      >
-                        <div className="w-12 h-12 rounded-full overflow-hidden border border-white shadow-xs">
-                          <img
-                            src={item.image}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <span className="text-xs font-black text-amber-950">{item.name}</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="border-t border-amber-200 my-1" />
-
-                  {/* Emoji Options */}
-                  <div className="grid grid-cols-7 gap-2">
-                    {KID_AVATARS.map((emoji) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => handleSelectAvatar(emoji, undefined)}
-                        className={`text-2xl p-2 rounded-2xl transition cursor-pointer flex items-center justify-center ${
-                          activeEmoji === emoji && !activeImage
-                            ? "bg-amber-400 border-2 border-amber-600 shadow-md scale-110"
-                            : "bg-white hover:bg-amber-100 border border-amber-200"
-                        }`}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Activity & Fun Stats Grid */}
-            <div className="grid grid-cols-2 gap-3 w-full">
-              <button
-                type="button"
-                onClick={() => changeTab("library")}
-                className="p-4 rounded-2xl bg-pink-50 border-2 border-pink-200 hover:bg-pink-100 transition text-center flex flex-col items-center gap-1 cursor-pointer shadow-sm group"
-              >
-                <span className="text-3xl group-hover:scale-110 transition-transform">❤️</span>
-                <strong className="text-2xl font-black text-pink-700">{libraryIds.length}</strong>
-                <span className="text-xs font-black text-pink-800 uppercase tracking-wider">
-                  Saved Cartoons
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => changeTab("studio")}
-                className="p-4 rounded-2xl bg-purple-50 border-2 border-purple-200 hover:bg-purple-100 transition text-center flex flex-col items-center gap-1 cursor-pointer shadow-sm group"
-              >
-                <span className="text-3xl group-hover:scale-110 transition-transform">🎨</span>
-                <strong className="text-2xl font-black text-purple-700">
-                  {savedArtworksCount}
-                </strong>
-                <span className="text-xs font-black text-purple-800 uppercase tracking-wider">
-                  Artworks Drawn
-                </span>
-              </button>
-            </div>
-
-            {/* Kid Badges Section */}
-            <div className="flex flex-col gap-3 w-full bg-slate-50 p-4 rounded-3xl border border-slate-200">
-              <h3 className="text-xs font-black text-slate-700 uppercase tracking-wide flex items-center justify-center gap-1.5">
-                <Trophy size={16} className="text-amber-500" />
-                <span>Kid Badges (Tap to celebrate!)</span>
-              </h3>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  {
-                    title: "Star Watcher",
-                    icon: "⭐",
-                    bg: "bg-amber-100 text-amber-900 border-amber-300",
-                  },
-                  {
-                    title: "Junior Artist",
-                    icon: "🎨",
-                    bg: "bg-purple-100 text-purple-900 border-purple-300",
-                  },
-                  {
-                    title: "Super Kid",
-                    icon: "🚀",
-                    bg: "bg-indigo-100 text-indigo-900 border-indigo-300",
-                  },
-                ].map((b) => (
-                  <motion.button
-                    key={b.title}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="button"
-                    onClick={(e) => handleTapBadge(b.title, "Great job!", e)}
-                    className={`p-3 rounded-2xl border-2 font-black text-xs flex flex-col items-center gap-1 cursor-pointer shadow-xs ${b.bg}`}
-                  >
-                    <span className="text-2xl">{b.icon}</span>
-                    <span>{b.title}</span>
-                  </motion.button>
-                ))}
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 w-full pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  playPopSound();
-                  onChangeProfile();
-                }}
-                className="flex-1 py-3.5 px-5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-black text-sm shadow-md flex items-center justify-center gap-2 cursor-pointer transition active:scale-95"
-              >
-                <User size={18} />
-                <span>Switch Profile</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  playPopSound();
-                  onOpenParentalControls();
-                }}
-                className="flex-1 py-3.5 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transition border border-slate-300 active:scale-95"
-              >
-                <ShieldCheck size={18} className="text-purple-600" />
-                <span>Parent Controls</span>
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* Main Video Cards Grid */
-          <>
-            <AnimatePresence mode="popLayout">
-              {displayedVideos.map((video, index) => {
-                const saved = libraryIds.includes(video.id);
-
-                return (
-                  <motion.article
-                    key={video.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.9, y: 15 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                    transition={{ duration: 0.28, delay: index * 0.04 }}
-                    whileHover={{ y: -6 }}
-                    className="group"
-                  >
-                    <button
-                      type="button"
-                      className="kids-video-thumbnail overflow-hidden relative"
-                      onClick={() => {
-                        playPopSound();
-                        onOpenVideo(video);
-                      }}
-                    >
-                      <img
-                        src={video.image}
-                        alt={video.title}
-                        className="transition-transform duration-300 group-hover:scale-105"
-                        onError={(event) => {
-                          event.currentTarget.onerror = null;
-                          event.currentTarget.src = mediaThumbnailFallback;
-                        }}
-                      />
-                      <span className="kids-video-dark-overlay" />
-
-                      <motion.span
-                        className="kids-video-main-play"
-                        whileHover={{ scale: 1.15 }}
-                        whileTap={{ scale: 0.9 }}
-                      >
-                        <Play size={24} fill="currentColor" />
-                      </motion.span>
-
-                      <span className="kids-video-duration">{video.duration}</span>
-
-                      <span className="kids-video-small-play">
-                        <Play size={11} fill="currentColor" />
-                      </span>
-                    </button>
-
-                    <div className="kids-video-title-row flex items-center justify-between">
-                      <h2>{video.title}</h2>
-
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.25, rotate: 10 }}
-                        whileTap={{ scale: 0.8 }}
-                        className={saved ? "kids-library-button saved" : "kids-library-button"}
-                        onClick={(e) => toggleLibrary(video.id, e)}
-                        aria-label={saved ? "Remove from library" : "Add to library"}
-                      >
-                        <Heart size={22} fill={saved ? "currentColor" : "none"} />
-                      </motion.button>
-                    </div>
-                  </motion.article>
-                );
-              })}
-            </AnimatePresence>
-
-            {displayedVideos.length === 0 && (
-              <motion.section
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="kids-empty-view"
-              >
-                <span>{currentTab === "library" ? "📚" : "🔍"}</span>
-                <h2>{currentTab === "library" ? "Your library is empty" : "No cartoons found"}</h2>
-                <p>
-                  {currentTab === "library"
-                    ? "Tap the heart on any video to save it to your library!"
-                    : 'Try searching another title or select "All Cartoons".'}
-                </p>
-                {currentTab === "library" && (
-                  <button
-                    type="button"
-                    onClick={() => changeTab("home")}
-                    className="mt-3 px-5 py-2.5 rounded-2xl bg-amber-400 text-amber-950 font-black text-sm shadow-md hover:bg-amber-500 transition cursor-pointer"
-                  >
-                    Browse Cartoons 🚀
-                  </button>
-                )}
-              </motion.section>
-            )}
-          </>
-        )}
-      </main>
-
-      <nav className="kids-home-bottom-nav">
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          className={currentTab === "home" ? "active" : ""}
-          type="button"
-          onClick={() => changeTab("home")}
-        >
-          <span>
-            <Home size={20} fill={currentTab === "home" ? "currentColor" : "none"} />
-          </span>
-          Home
-        </motion.button>
-
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          className={currentTab === "search" ? "active" : ""}
-          type="button"
-          onClick={() => changeTab("search")}
-        >
-          <Search size={20} />
-          Search
-        </motion.button>
-
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          className={currentTab === "library" ? "active" : ""}
-          type="button"
-          onClick={() => changeTab("library")}
-        >
-          <BookOpen size={20} />
-          Library
-        </motion.button>
-
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          className={currentTab === "songs" ? "active" : ""}
-          type="button"
-          onClick={() => changeTab("songs")}
-        >
-          <Music size={20} />
-          Songs
-        </motion.button>
-
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          className={currentTab === "games" ? "active" : ""}
-          type="button"
-          onClick={() => changeTab("games")}
-        >
-          <Gamepad2 size={20} />
-          Games
-        </motion.button>
-
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          className={currentTab === "studio" ? "active" : ""}
-          type="button"
-          onClick={() => changeTab("studio")}
-        >
-          <Paintbrush size={20} />
-          Studio
-        </motion.button>
-
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          className={currentTab === "profile" ? "active" : ""}
-          type="button"
-          onClick={() => changeTab("profile")}
-        >
-          <span className="kids-nav-profile flex items-center justify-center w-6 h-6 rounded-full overflow-hidden shrink-0">
-            {activeImage ? (
-              <img src={activeImage} alt={activeName} className="w-full h-full object-cover" />
-            ) : (
-              activeEmoji || profileEmoji
-            )}
-          </span>
-          Profile
-        </motion.button>
-      </nav>
-
-      {/* Free Account Information Modal */}
-      <AnimatePresence>
-        {isGuestAccount && showFreeModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
-            onClick={() => setShowFreeModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border-4 border-amber-300 flex flex-col items-center text-center gap-4 relative"
+            <button
+              type="button"
+              className="sasa-iconbtn"
+              style={{ marginInlineStart: "auto" }}
+              onClick={onClose}
+              aria-label="Close"
             >
-              <button
-                type="button"
-                onClick={() => setShowFreeModal(false)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 cursor-pointer transition"
-              >
-                <X size={20} />
-              </button>
+              <X size={20} />
+            </button>
+          </div>
 
-              <div className="w-16 h-16 rounded-3xl bg-amber-100 border-2 border-amber-300 flex items-center justify-center text-amber-800 shadow-md">
-                <Sparkles size={32} className="fill-amber-400 text-amber-600" />
-              </div>
+          <ul
+            style={{
+              display: "grid",
+              gap: 8,
+              margin: "0 0 16px",
+              padding: 0,
+              listStyle: "none",
+              color: "var(--sasa-ink-2)",
+              fontSize: 13.5,
+            }}
+          >
+            {[
+              "Built-in videos, songs and games",
+              "Drawing studio with saved artwork",
+              "Parent controls with a grown-up gate",
+            ].map((line) => (
+              <li key={line} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <Check
+                  size={16}
+                  style={{ color: "var(--sasa-ok)", flex: "0 0 auto", marginTop: 2 }}
+                />
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
 
-              <div className="flex flex-col gap-1">
-                <h2 className="text-2xl font-black text-slate-900">100% Free Kid Account</h2>
-                <span className="text-xs font-black uppercase text-amber-600 tracking-wider">
-                  Safe • Unlimited • Fun
-                </span>
-              </div>
-
-              <p className="text-slate-600 text-sm font-medium leading-relaxed">
-                You are enjoying the 100% Free Kids Experience! Stream endless cartoons, play
-                learning games, and create custom kid avatars without any subscription.
-              </p>
-
-              <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex flex-col gap-2 text-left">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                  <Check size={16} className="text-emerald-600 shrink-0" />
-                  <span>Unlimited Kid Videos & Sing-Along Songs</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                  <Check size={16} className="text-emerald-600 shrink-0" />
-                  <span>Interactive Drawing & Arcade Games</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                  <Check size={16} className="text-emerald-600 shrink-0" />
-                  <span>100% Safe Parent-Controlled Environment</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-2 w-full pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowFreeModal(false);
-                    onOpenParentalControls();
-                  }}
-                  className="flex-1 py-3 px-4 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer transition"
-                >
-                  <ShieldCheck size={16} />
-                  <span>Parent Settings</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowFreeModal(false)}
-                  className="flex-1 py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs border border-slate-300 cursor-pointer transition"
-                >
-                  Awesome!
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" className="sasa-btn is-primary" onClick={onOpenParentControls}>
+              <ShieldCheck size={18} />
+              Parent controls
+            </button>
+            <button type="button" className="sasa-btn" onClick={onClose}>
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

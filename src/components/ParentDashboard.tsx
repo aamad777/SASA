@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { playPopSound, playSuccessSound } from "../lib/sound";
 import {
@@ -91,7 +91,13 @@ type ParentSection =
   | "settings";
 
 type ParentDashboardProps = {
-  parentToken: string;
+  /**
+   * SARA_PARENT_CONTROLS_GUARD_V16 — this is genuinely null when a parent
+   * opens the controls from guest mode (routes/index.tsx used to cast it with
+   * `parentToken!`). Every authenticated call below now checks it instead of
+   * sending `Authorization: Bearer null` and surfacing a raw API error.
+   */
+  parentToken: string | null;
   databaseChildren: DatabaseChild[];
   onDatabaseChildDeleted: (childId: string) => void;
   onChildPinChanged?: (childId: string) => void;
@@ -134,6 +140,11 @@ export const initialBlockedChannels: BlockedChannel[] = [
   },
 ];
 
+/** Shown instead of an API error when the controls are opened as a guest. */
+const SIGNED_OUT_MEDIA_MESSAGE =
+  "Sign in with a parent account to upload media and manage what each child can see. " +
+  "Screen time, bedtime and the app lock below work without signing in.";
+
 export const defaultParentControlSettings: ParentControlSettings = {
   screenLimitEnabled: true,
   screenMinutes: 90,
@@ -147,15 +158,62 @@ export const defaultParentControlSettings: ParentControlSettings = {
   requireParentPin: true,
 };
 
-const chartData = [
-  { day: "Mon", videos: 10, games: 40, reading: 30 },
-  { day: "Tue", videos: 20, games: 50, reading: 20 },
-  { day: "Wed", videos: 15, games: 30, reading: 40 },
-  { day: "Thu", videos: 10, games: 60, reading: 10 },
-  { day: "Fri", videos: 25, games: 40, reading: 30 },
-  { day: "Sat", videos: 5, games: 20, reading: 50 },
-  { day: "Sun", videos: 15, games: 35, reading: 25 },
-];
+/**
+ * Weekly overview buckets, built from the real activity log
+ * (src/lib/activity.ts). This chart previously rendered a hard-coded set of
+ * percentages and a "14h 25m total" badge — invented engagement data. There
+ * is no backend endpoint for watch time and the client only records the
+ * moment an item is opened or reacted to, so the chart counts real events
+ * and never claims a duration.
+ */
+type ActivityDay = {
+  key: string;
+  label: string;
+  videos: number;
+  photos: number;
+  reactions: number;
+  total: number;
+};
+
+function buildWeeklyActivity(entries: ActivityEntry[]): ActivityDay[] {
+  const days: ActivityDay[] = [];
+  const today = new Date();
+
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - offset);
+
+    days.push({
+      key: date.toISOString().slice(0, 10),
+      label: date.toLocaleDateString(undefined, { weekday: "short" }),
+      videos: 0,
+      photos: 0,
+      reactions: 0,
+      total: 0,
+    });
+  }
+
+  const index = new Map(days.map((day) => [day.key, day]));
+
+  entries.forEach((entry) => {
+    const key = entry.watchedAt.slice(0, 10);
+    const day = index.get(key);
+
+    if (!day) return;
+
+    if (entry.kind === "reaction") {
+      day.reactions += 1;
+    } else if (entry.mediaType === "photo") {
+      day.photos += 1;
+    } else {
+      day.videos += 1;
+    }
+
+    day.total += 1;
+  });
+
+  return days;
+}
 
 export default function ParentDashboard({
   parentToken,
@@ -283,6 +341,12 @@ export default function ParentDashboard({
   const [activityEntries, setActivityEntries] = useState<ActivityEntry[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityError, setActivityError] = useState("");
+
+  const weeklyActivity = useMemo(() => buildWeeklyActivity(activityEntries), [activityEntries]);
+
+  const weeklyActivityTotal = weeklyActivity.reduce((sum, day) => sum + day.total, 0);
+
+  const weeklyActivityMax = Math.max(1, ...weeklyActivity.map((day) => day.total));
 
   const activityProfiles = [
     ...databaseChildren.map((child) => ({ id: String(child.id), name: child.display_name })),
@@ -493,6 +557,11 @@ export default function ParentDashboard({
       return;
     }
 
+    if (!parentToken) {
+      setMediaError(SIGNED_OUT_MEDIA_MESSAGE);
+      return;
+    }
+
     setMediaSaving(true);
 
     try {
@@ -535,7 +604,14 @@ export default function ParentDashboard({
   };
 
   const loadParentMedia = async () => {
+    if (!parentToken) {
+      setParentMediaItems([]);
+      setMediaError(SIGNED_OUT_MEDIA_MESSAGE);
+      return;
+    }
+
     setParentMediaLoading(true);
+    setMediaError("");
 
     try {
       const items = await getParentMedia(parentToken);
@@ -551,6 +627,7 @@ export default function ParentDashboard({
     if (activeSection === "kids-media" || activeSection === "content-filters") {
       loadParentMedia();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, parentToken]);
 
   const startEditingParentMedia = (item: ParentMediaItem) => {
@@ -564,6 +641,11 @@ export default function ParentDashboard({
   const saveParentMediaDetails = async (item: ParentMediaItem) => {
     if (!editingMediaTitle.trim()) {
       setMediaError("Enter a media title.");
+      return;
+    }
+
+    if (!parentToken) {
+      setMediaError(SIGNED_OUT_MEDIA_MESSAGE);
       return;
     }
 
@@ -589,6 +671,11 @@ export default function ParentDashboard({
   };
 
   const setParentMediaChildren = async (item: ParentMediaItem, childIds: string[]) => {
+    if (!parentToken) {
+      setMediaError(SIGNED_OUT_MEDIA_MESSAGE);
+      return;
+    }
+
     setParentMediaActionId(item.id);
     setMediaError("");
     setMediaMessage("");
@@ -622,6 +709,11 @@ export default function ParentDashboard({
   };
 
   const removeParentMediaItem = async (item: ParentMediaItem) => {
+    if (!parentToken) {
+      setMediaError(SIGNED_OUT_MEDIA_MESSAGE);
+      return;
+    }
+
     const confirmed = window.confirm(
       `Delete "${item.title || item.original_name || "this media"}" permanently?`,
     );
@@ -646,6 +738,11 @@ export default function ParentDashboard({
   };
 
   const removeDatabaseChild = async (child: DatabaseChild) => {
+    if (!parentToken) {
+      window.alert(SIGNED_OUT_MEDIA_MESSAGE);
+      return;
+    }
+
     const confirmed = window.confirm(`Delete ${child.display_name}'s profile permanently?`);
 
     if (!confirmed) {
@@ -704,6 +801,13 @@ export default function ParentDashboard({
 
     if (newChildPinValue !== confirmChildPinValue) {
       setChildPinError("The two PIN values do not match.");
+      return;
+    }
+
+    if (!parentToken) {
+      setChildPinError(
+        "Sign in with a parent account to change a child PIN — the PIN is stored by the API.",
+      );
       return;
     }
 
@@ -1107,50 +1211,70 @@ export default function ParentDashboard({
 
               {/* Grid Layout: Weekly Overview & Side Cards */}
               <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Weekly Analytics Chart Card */}
+                {/* Weekly Activity Chart Card — real recorded events only */}
                 <div className="lg:col-span-2 bg-white rounded-3xl p-6 sm:p-8 shadow-md border border-slate-100">
-                  <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-100">
                     <div>
-                      <h3 className="text-xl font-black text-slate-800">Weekly Usage Overview</h3>
+                      <h3 className="text-xl font-black text-slate-800">Weekly activity</h3>
                       <p className="text-xs text-slate-500 font-medium">
-                        Total watch & play activity this week
+                        Items opened and reactions recorded in the last 7 days
                       </p>
                     </div>
                     <span className="px-3 py-1 bg-sky-50 text-sky-700 font-bold text-xs rounded-full border border-sky-200">
-                      14h 25m total
+                      {weeklyActivityTotal} {weeklyActivityTotal === 1 ? "event" : "events"}
                     </span>
                   </div>
 
-                  <div className="parent-chart">
-                    {chartData.map((item) => (
-                      <div className="parent-chart-column" key={item.day}>
-                        <div className="parent-bars">
-                          <div
-                            className="bar videos"
-                            style={{ height: `${item.videos}%` }}
-                            title={`Videos: ${item.videos}%`}
-                          />
-                          <div
-                            className="bar reading"
-                            style={{ height: `${item.reading}%` }}
-                            title={`Reading: ${item.reading}%`}
-                          />
-                          <div
-                            className="bar games"
-                            style={{ height: `${item.games}%` }}
-                            title={`Games: ${item.games}%`}
-                          />
+                  {weeklyActivityTotal === 0 ? (
+                    <div className="sasa-notice" role="status">
+                      No activity recorded for this profile in the last 7 days.
+                    </div>
+                  ) : (
+                    <div className="sasa-chart">
+                      {weeklyActivity.map((day) => (
+                        <div className="sasa-chart-col" key={day.key}>
+                          <div className="sasa-chart-bars">
+                            {(
+                              [
+                                ["videos", day.videos],
+                                ["photos", day.photos],
+                                ["reactions", day.reactions],
+                              ] as const
+                            ).map(([kind, value]) =>
+                              value > 0 ? (
+                                <span
+                                  key={kind}
+                                  className={`sasa-chart-bar is-${kind}`}
+                                  style={{
+                                    height: `${(value / weeklyActivityMax) * 100}%`,
+                                  }}
+                                  title={`${kind}: ${value}`}
+                                />
+                              ) : null,
+                            )}
+                          </div>
+                          <span className="sasa-chart-label">{day.label}</span>
                         </div>
-                        <span>{item.day}</span>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="sasa-chart-legend">
+                    <span>
+                      <i className="is-videos" /> Videos
+                    </span>
+                    <span>
+                      <i className="is-photos" /> Photos
+                    </span>
+                    <span>
+                      <i className="is-reactions" /> Reactions
+                    </span>
                   </div>
 
-                  <div className="chart-legend">
-                    <Legend colorClass="videos" label="Videos" />
-                    <Legend colorClass="games" label="Games" />
-                    <Legend colorClass="reading" label="Reading" />
-                  </div>
+                  <p className="text-xs text-slate-500 font-medium mt-3">
+                    Watch duration is not recorded by the backend, so this chart counts events
+                    rather than minutes.
+                  </p>
                 </div>
 
                 {/* Right Column: Bedtime & Instant Lock */}
@@ -2738,15 +2862,6 @@ function MobileBottomNavigation({
         );
       })}
     </nav>
-  );
-}
-
-function Legend({ colorClass, label }: { colorClass: string; label: string }) {
-  return (
-    <div>
-      <span className={`legend-color ${colorClass}`} />
-      <strong>{label}</strong>
-    </div>
   );
 }
 

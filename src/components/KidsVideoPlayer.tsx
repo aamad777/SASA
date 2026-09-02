@@ -1,31 +1,35 @@
 import YouTubeStyleMediaPlayer from "./YouTubeStyleMediaPlayer";
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import {
-  ArrowLeft,
   Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   Clapperboard,
-  BookOpen,
-  Home,
+  Heart,
+  Image as ImageIcon,
+  ListVideo,
   Palette,
   Pause,
   Play,
-  Search,
-  Sparkles,
-  UserCircle,
-  Users,
   Radio,
-  X,
+  Repeat,
+  ShieldCheck,
+  SkipBack,
+  SkipForward,
+  User,
+  Users,
+  Video,
 } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import confetti from "canvas-confetti";
 import { playHeartSound, playPopSound } from "../lib/sound";
 import { recordActivity } from "../lib/activity";
-import type { KidsVideoItem } from "./KidsVideoHome";
+import { useDismiss } from "../hooks/use-dismiss";
+import type { KidsVideoItem, KidsHomeTab } from "./KidsVideoHome";
 import { kidsVideos, mediaThumbnailFallback } from "./KidsVideoHome";
+import AppShell from "./layout/AppShell";
+import AccountMenu, { type AccountMenuItem } from "./layout/AccountMenu";
+import { getMediaByline, getMediaKindLabel, getMediaMetaLine } from "./media/media-meta";
 import WatchPartyModal, { type WatchPartyBuddy } from "./WatchPartyModal";
 import NumbersLearningVideo from "./NumbersLearningVideo";
 
@@ -36,9 +40,8 @@ import monkeyImg from "../assets/images/monkey_avatar_1784920076703.jpg";
 import koalaImg from "../assets/images/koala_avatar_1784920089417.jpg";
 
 // SARA_CARTOON_THEMES_V7 — original, local SVG illustrations (no internet
-// images, no copyrighted characters). Lightweight: pure vector shapes +
-// gradients, animated only via CSS transform/opacity inside each SVG's own
-// <style> block (which already respects prefers-reduced-motion internally).
+// images, no copyrighted characters). Used as the theme swatches in the
+// picker below; lightweight pure-vector art.
 import spaceThemeArt from "../assets/themes/space/background.svg";
 import oceanThemeArt from "../assets/themes/ocean/background.svg";
 import jungleThemeArt from "../assets/themes/jungle/background.svg";
@@ -65,7 +68,7 @@ type KidsVideoPlayerProps = {
   playlist?: KidsVideoItem[];
   onBack: () => void;
   onOpenVideo: (video: KidsVideoItem) => void;
-  onOpenHomeTab: (tab: "home" | "search" | "library") => void;
+  onOpenHomeTab: (tab: KidsHomeTab) => void;
   onChangeProfile: () => void;
 };
 
@@ -132,79 +135,16 @@ const defaultBuddies: WatchPartyBuddy[] = [
 ];
 
 const reactions = [
-  {
-    id: "love",
-    label: "Love it",
-    emoji: "💖",
-    className: "love",
-  },
-  {
-    id: "amazing",
-    label: "Amazing",
-    emoji: "🤩",
-    className: "amazing",
-  },
-  {
-    id: "funny",
-    label: "Funny",
-    emoji: "😂",
-    className: "funny",
-  },
-  {
-    id: "favorite",
-    label: "Favorite",
-    emoji: "🌟",
-    className: "favorite",
-  },
+  { id: "love", label: "Love it", emoji: "💖" },
+  { id: "amazing", label: "Amazing", emoji: "🤩" },
+  { id: "funny", label: "Funny", emoji: "😂" },
+  { id: "favorite", label: "Favorite", emoji: "🌟" },
 ];
 
-// Small icon + label pair describing what kind of media is playing, used by
-// both the compact metadata bar and the Up Next queue cards.
-function getMediaTypeMeta(item: KidsVideoItem) {
-  if (item.sourceType === "photo") {
-    return { icon: "📷", label: "Photo" };
-  }
-
-  return { icon: "▶", label: "Video" };
-}
-
-// Shared title/category/type/parent-approved overlay for the stage branches
-// that don't manage their own fading controls (YouTube embed, built-in demo
-// image, Numbers Learning). Always visible — there's no controlbar to fade
-// with — mirroring the fading overlay YouTubeStyleMediaPlayer renders itself
-// for photos/uploaded videos.
-function CinemaTopOverlay({
-  title,
-  category,
-  typeLabel,
-}: {
-  title: string;
-  category?: string;
-  typeLabel: string;
-}) {
-  return (
-    <div className="sasa-cinema-top-overlay is-static visible">
-      <span className="sasa-cinema-now-playing">
-        <span className="sasa-cinema-now-playing-dot" aria-hidden="true" />
-        Now Playing
-      </span>
-
-      <strong className="sasa-cinema-overlay-title">{title}</strong>
-
-      <span className="sasa-cinema-overlay-chips">
-        {category && <span className="sasa-cinema-overlay-chip">{category}</span>}
-        <span className="sasa-cinema-overlay-chip is-type">{typeLabel}</span>
-        <span className="sasa-cinema-overlay-chip is-approved">🛡 Parent Approved</span>
-      </span>
-    </div>
-  );
-}
-
 // Built-in watching-page themes. Each swaps a small set of CSS custom
-// properties (background gradient stops + accent color) applied via
-// `data-theme` on the player root — see the "SARA PROFESSIONAL PLAYER V4"
-// theme block in styles.css. Purely cosmetic: never touches media, API
-// calls, or layout behavior.
+// properties (surface tint + accent color) applied via `data-theme` on the
+// watch root — see the theme block in styles.css. Purely cosmetic: never
+// touches media, API calls, or layout behavior.
 const PLAYER_THEMES = [
   {
     id: "space",
@@ -262,12 +202,109 @@ function readStoredTheme(): PlayerThemeId {
   );
 }
 
+function loadLibraryIds(): number[] {
+  try {
+    const value = localStorage.getItem("sasa-video-library");
+    return value ? JSON.parse(value) : [];
+  } catch {
+    return [];
+  }
+}
+
 type FloatingEmoji = {
   id: number;
   emoji: string;
   left: number;
   sender: string;
 };
+
+/** Static title overlay for the stage branches without fading controls. */
+function StageOverlay({
+  title,
+  category,
+  typeLabel,
+}: {
+  title: string;
+  category?: string;
+  typeLabel: string;
+}) {
+  return (
+    <div className="sasa-stage-overlay">
+      <strong>{title}</strong>
+      <span className="sasa-stage-overlay-chips">
+        {category && <span>{category}</span>}
+        <span>{typeLabel}</span>
+        <span>Parent approved</span>
+      </span>
+    </div>
+  );
+}
+
+/** Watch-screen theme picker. */
+function ThemeButton({
+  theme,
+  onSelect,
+}: {
+  theme: PlayerThemeId;
+  onSelect: (id: PlayerThemeId) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const close = useCallback(() => setOpen(false), []);
+
+  useDismiss(open, wrapRef, close);
+
+  return (
+    <div className="sasa-menu-wrap" ref={wrapRef} style={{ flex: "0 0 auto" }}>
+      <button
+        type="button"
+        className="sasa-btn"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => {
+          playPopSound();
+          setOpen((value) => !value);
+        }}
+      >
+        <Palette size={18} />
+        <span className="sasa-watch-actionlabel">Theme</span>
+      </button>
+
+      {open && (
+        <div className="sasa-themepop" role="dialog" aria-label="Choose a watch theme">
+          <div className="sasa-themepop-grid">
+            {PLAYER_THEMES.map((item) => {
+              const selected = theme === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={selected ? "sasa-themecard is-selected" : "sasa-themecard"}
+                  aria-pressed={selected}
+                  onClick={() => {
+                    playPopSound();
+                    onSelect(item.id);
+                    close();
+                  }}
+                >
+                  <span
+                    className="sasa-themecard-swatch"
+                    style={{ backgroundImage: `${item.gradient}, url(${item.art})` }}
+                    aria-hidden="true"
+                  >
+                    {selected && <Check size={14} />}
+                  </span>
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function KidsVideoPlayer({
   video,
@@ -290,18 +327,18 @@ export default function KidsVideoPlayer({
     return stored === null ? true : stored === "true";
   });
   const [theaterMode, setTheaterMode] = useState(false);
-  const [queueCollapsed, setQueueCollapsed] = useState(false);
+  const [relatedHidden, setRelatedHidden] = useState(false);
   // SARA_LOCKED_AUTOPLAY_V9 — mirrors YouTubeStyleMediaPlayer's in-player
   // lock state so the app-level Theater/Next/Previous keyboard shortcuts
   // below can respect it too (autoplay/timer logic lives entirely inside
   // that component and was never gated by lock in the first place).
   const [playerLocked, setPlayerLocked] = useState(false);
   const [theme, setTheme] = useState<PlayerThemeId>(readStoredTheme);
-  const [showThemePicker, setShowThemePicker] = useState(false);
   const [showWatchPartyModal, setShowWatchPartyModal] = useState(false);
   const [activeWatchPartyBuddy, setActiveWatchPartyBuddy] = useState<WatchPartyBuddy | null>(null);
   const [syncToast, setSyncToast] = useState<string | null>(null);
   const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
+  const [libraryIds, setLibraryIds] = useState<number[]>(loadLibraryIds);
   const [reaction, setReaction] = useState(() => {
     return localStorage.getItem(`sasa-video-reaction-${video.id}`) ?? "";
   });
@@ -326,7 +363,7 @@ export default function KidsVideoPlayer({
   const rawMediaPlaylist = playlist.length > 0 ? playlist : kidsVideos;
 
   // De-duplicate by identity so a media item assigned more than once never shows
-  // up twice in "More to Watch"/"Playing Next" and never produces duplicate React keys.
+  // up twice in the related list and never produces duplicate React keys.
   const mediaPlaylist = rawMediaPlaylist.filter((item, index, items) => {
     const identity = getMediaIdentity(item);
 
@@ -345,13 +382,7 @@ export default function KidsVideoPlayer({
     (item) => getMediaIdentity(item) === currentMediaIdentity,
   );
 
-  const otherQueueItems = mediaPlaylist.filter(
-    (item) => getMediaIdentity(item) !== currentMediaIdentity,
-  );
-
-  // Horizontal "Up Next" row scrolls, so every remaining item is rendered —
-  // no separate "See All" pagination needed like the old vertical list had.
-  const upNext = otherQueueItems;
+  const upNext = mediaPlaylist.filter((item) => getMediaIdentity(item) !== currentMediaIdentity);
 
   const hasAdjacentMedia = navigableMedia.length > 1;
 
@@ -373,8 +404,8 @@ export default function KidsVideoPlayer({
   };
 
   // Reset per-video UI state whenever the active media changes — whether that
-  // happens via Previous/Next, autoplay-advance, or a "More to Watch" pick —
-  // so a stale reaction never leaks from the previous item.
+  // happens via Previous/Next, autoplay-advance, or a related pick — so a
+  // stale reaction never leaks from the previous item.
   useEffect(() => {
     setReaction(localStorage.getItem(`sasa-video-reaction-${video.id}`) ?? "");
 
@@ -427,7 +458,7 @@ export default function KidsVideoPlayer({
   // no matter which stage branch is mounted — YouTubeStyleMediaPlayer owns
   // Space/Arrow/M/F itself for photos + uploads. Kept in a ref, refreshed
   // every render, so the single window listener never closes over stale
-  // playlist/video state (mirrors the nextRef/previousRef pattern below it).
+  // playlist/video state.
   const globalShortcutsRef = useRef({
     toggleTheater: () => {},
     next: () => {},
@@ -451,11 +482,6 @@ export default function KidsVideoPlayer({
         target?.tagName === "TEXTAREA" ||
         target?.tagName === "SELECT"
       ) {
-        return;
-      }
-
-      if (event.key === "Escape" && showThemePicker) {
-        setShowThemePicker(false);
         return;
       }
 
@@ -485,7 +511,7 @@ export default function KidsVideoPlayer({
     window.addEventListener("keydown", handleGlobalKeydown);
 
     return () => window.removeEventListener("keydown", handleGlobalKeydown);
-  }, [showThemePicker, playerLocked]);
+  }, [playerLocked]);
 
   const handleTogglePlay = () => {
     playPopSound();
@@ -569,7 +595,32 @@ export default function KidsVideoPlayer({
     }
   };
 
-  const cinemaBackdrop = video.image || video.sourceUrl;
+  const saved = libraryIds.includes(video.id);
+
+  const toggleSaved = (event: MouseEvent) => {
+    const updated = saved ? libraryIds.filter((id) => id !== video.id) : [...libraryIds, video.id];
+
+    setLibraryIds(updated);
+    localStorage.setItem("sasa-video-library", JSON.stringify(updated));
+
+    if (saved) {
+      playPopSound();
+      return;
+    }
+
+    playHeartSound();
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    confetti({
+      particleCount: 22,
+      spread: 60,
+      origin: {
+        x: (rect.left + rect.width / 2) / window.innerWidth,
+        y: (rect.top + rect.height / 2) / window.innerHeight,
+      },
+      colors: ["#ff72aa", "#8b7cff", "#ffc107", "#2563eb"],
+    });
+  };
 
   // Same branch conditions used below to pick the stage renderer — hoisted so
   // the stage shell can decide whether to hold a strict 16:9 crop (photos,
@@ -591,342 +642,130 @@ export default function KidsVideoPlayer({
   // the same YouTubeStyleMediaPlayer instance, so they share one stable
   // stage key ("playable") and let its own mediaIdentity-keyed effects
   // handle the per-item reset instead of a remount — fullscreen and lock
-  // now survive playlist navigation. YouTube/Numbers-activity items are
-  // rarer transitions and keep the old per-item key/animation.
+  // now survive playlist navigation.
   const stageKey = isPlayableMedia ? "playable" : currentMediaIdentity;
 
-  const activeThemeArt = PLAYER_THEMES.find((item) => item.id === theme)?.art;
+  const showAside = !theaterMode && !relatedHidden && upNext.length > 0;
+
+  const accountItems: AccountMenuItem[] = [
+    {
+      id: "profile",
+      label: "Kid profile",
+      icon: User,
+      onSelect: () => onOpenHomeTab("profile"),
+    },
+    {
+      id: "switch",
+      label: "Switch profile",
+      icon: Users,
+      onSelect: () => {
+        playPopSound();
+        onChangeProfile();
+      },
+    },
+  ];
 
   return (
-    <motion.div
-      className={[
-        "kids-player-page sasa-professional-player-v4 relative overflow-hidden",
-        theaterMode ? "is-theater-mode" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      data-theme={theme}
-      style={
-        activeThemeArt
-          ? ({ "--player-art": `url(${activeThemeArt})` } as React.CSSProperties)
-          : undefined
-      }
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      {/* Theater backdrop: a softly blurred still from the active media behind
-          a readability scrim, plus a single low-opacity ambient glow tinted by
-          the selected theme. Crossfades whenever the selected media changes. */}
-      <div className="sasa-cinema-bg" aria-hidden="true">
-        {/* SARA_CARTOON_THEMES_V7 — cute original per-theme illustration,
-            confined to the edges by design (each SVG keeps its center calm)
-            and faded further toward the middle by the mask below so it never
-            competes with the media/controls for attention. Remounted (via
-            `key`) on theme change for a subtle fade rather than an instant
-            swap. */}
-        <motion.div
-          key={theme}
-          className="sasa-cinema-theme-art"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.5 }}
-          transition={{ duration: reduceMotion ? 0.01 : 0.6, ease: "easeOut" }}
-        />
-        <AnimatePresence>
-          <motion.div
-            key={currentMediaIdentity}
-            className="sasa-cinema-bg-image"
-            style={cinemaBackdrop ? { backgroundImage: `url(${cinemaBackdrop})` } : undefined}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: reduceMotion ? 0.01 : 1.1, ease: "easeOut" }}
-          />
-        </AnimatePresence>
-        <div className="sasa-cinema-bg-overlay" />
-        <div className="sasa-cinema-ambient-glow" />
-      </div>
-
-      <header className="kids-player-header flex items-center justify-between">
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
+    <AppShell
+      tone="dark"
+      watchTheme={theme}
+      railMode="drawer"
+      onBack={() => {
+        playPopSound();
+        onBack();
+      }}
+      backLabel="Back to home"
+      onNavigate={(section) => onOpenHomeTab(section)}
+      profileLabel="You"
+      profileEmoji={profileEmoji}
+      headerActions={
+        <button
           type="button"
+          className={activeWatchPartyBuddy ? "sasa-iconbtn is-active" : "sasa-iconbtn"}
           onClick={() => {
             playPopSound();
-            onBack();
+            setShowWatchPartyModal(true);
           }}
-          aria-label="Go back"
+          aria-label={activeWatchPartyBuddy ? "Watch party is active" : "Invite someone to watch"}
+          title="Watch party"
         >
-          <ArrowLeft size={22} />
-        </motion.button>
-
-        <h1 className="sasa-player-brand">
-          WonderWatch <Sparkles size={15} aria-hidden="true" />
-        </h1>
-
-        <div className="sasa-player-header-actions">
-          <div className="sasa-theme-picker-wrap">
-            <motion.button
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.94 }}
-              type="button"
-              className="sasa-player-header-btn"
-              onClick={() => {
-                playPopSound();
-                setShowThemePicker((value) => !value);
-              }}
-              aria-haspopup="dialog"
-              aria-expanded={showThemePicker}
-              aria-label="Choose a theme"
-            >
-              <Palette size={15} />
-              <span>Theme</span>
-            </motion.button>
-
-            <AnimatePresence>
-              {showThemePicker && (
-                <>
-                  <button
-                    type="button"
-                    className="sasa-theme-picker-backdrop"
-                    aria-label="Close theme picker"
-                    onClick={() => setShowThemePicker(false)}
-                  />
-
-                  <motion.div
-                    initial={{ opacity: 0, y: -6, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -6, scale: 0.97 }}
-                    transition={{ duration: 0.15, ease: "easeOut" }}
-                    className="sasa-theme-picker"
-                    role="dialog"
-                    aria-label="Choose a player theme"
-                  >
-                    <div className="sasa-theme-picker-header">
-                      <h4>Player Theme</h4>
-                      <button
-                        type="button"
-                        onClick={() => setShowThemePicker(false)}
-                        aria-label="Close theme picker"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-
-                    <div className="sasa-theme-picker-grid">
-                      {PLAYER_THEMES.map((item) => {
-                        const selected = theme === item.id;
-
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            className={["sasa-theme-card", selected ? "selected" : ""]
-                              .filter(Boolean)
-                              .join(" ")}
-                            onClick={() => {
-                              playPopSound();
-                              setTheme(item.id);
-                              setShowThemePicker(false);
-                            }}
-                            aria-pressed={selected}
-                          >
-                            <span
-                              className="sasa-theme-card-swatch"
-                              style={{
-                                background: item.gradient,
-                                backgroundImage: `${item.gradient}, url(${item.art})`,
-                              }}
-                              aria-hidden="true"
-                            >
-                              {selected && <Check size={13} />}
-                            </span>
-                            <span className="sasa-theme-card-label">
-                              {item.emoji} {item.label}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Watch Party Quick Trigger Button */}
-          <motion.button
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.94 }}
-            type="button"
-            onClick={() => {
-              playPopSound();
-              setShowWatchPartyModal(true);
-            }}
-            className={["sasa-player-header-btn", activeWatchPartyBuddy ? "is-active" : ""]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <Users size={15} />
-            <span>{activeWatchPartyBuddy ? "Watch Party Active" : "Invite to Watch"}</span>
-            {activeWatchPartyBuddy && (
-              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
-            )}
-          </motion.button>
-        </div>
-      </header>
-
-      {/* Sync Status Toast Banner */}
-      <AnimatePresence>
-        {syncToast && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 text-white px-4 py-2 rounded-2xl shadow-xl text-xs font-black flex items-center gap-2 border border-sky-400/40 backdrop-blur-md"
-          >
-            <Radio size={14} className="text-emerald-400 animate-pulse" />
-            <span>{syncToast}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <main className="kids-player-content">
-        {/* Watch Party Active Top Bar */}
+          <Users size={22} />
+        </button>
+      }
+      accountSlot={
+        <AccountMenu
+          name={profileName}
+          subtitle="Kid profile"
+          avatarEmoji={profileEmoji}
+          items={accountItems}
+        />
+      }
+    >
+      <div className={theaterMode ? "sasa-watch is-theater" : "sasa-watch"}>
         {activeWatchPartyBuddy && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-2xl p-3 text-white flex items-center justify-between shadow-lg"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="flex -space-x-2">
-                <div className="w-8 h-8 rounded-full border-2 border-white bg-amber-400 flex items-center justify-center text-sm shadow">
-                  {profileEmoji}
-                </div>
-                <div
-                  className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-sm shadow overflow-hidden"
-                  style={{ backgroundColor: activeWatchPartyBuddy.color || "#bae6fd" }}
-                >
-                  {activeWatchPartyBuddy.avatarUrl || activeWatchPartyBuddy.image ? (
-                    <img
-                      src={activeWatchPartyBuddy.avatarUrl || activeWatchPartyBuddy.image}
-                      alt={activeWatchPartyBuddy.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    activeWatchPartyBuddy.emoji
-                  )}
-                </div>
-              </div>
+          <section className="sasa-party">
+            <span className="sasa-party-stack">
+              <span className="sasa-avatar">{profileEmoji}</span>
+              <span
+                className="sasa-avatar"
+                style={{ backgroundColor: activeWatchPartyBuddy.color || undefined }}
+              >
+                {activeWatchPartyBuddy.avatarUrl || activeWatchPartyBuddy.image ? (
+                  <img
+                    src={activeWatchPartyBuddy.avatarUrl || activeWatchPartyBuddy.image}
+                    alt=""
+                  />
+                ) : (
+                  activeWatchPartyBuddy.emoji
+                )}
+              </span>
+            </span>
 
-              <div>
-                <span className="text-xs font-black tracking-tight block">
-                  {profileName} & {activeWatchPartyBuddy.name}'s Party
-                </span>
-                <span className="text-[10px] text-purple-200 font-bold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-ping" />
-                  Synced Playback Active
-                </span>
-              </div>
-            </div>
+            <span className="sasa-party-text">
+              <strong>
+                {profileName} &amp; {activeWatchPartyBuddy.name}
+              </strong>
+              <span>Synced playback</span>
+            </span>
 
-            <div className="flex items-center gap-1.5">
-              {/* Quick Party Reactions */}
+            <span className="sasa-party-actions">
               {["🍿", "🎉", "💖", "👏"].map((emoji) => (
                 <button
                   key={emoji}
                   type="button"
+                  className="sasa-party-emoji"
                   onClick={() => handleSendEmojiReaction(emoji)}
-                  className="p-1.5 hover:bg-white/20 rounded-xl text-sm transition active:scale-90"
-                  title={`Send ${emoji}`}
+                  aria-label={`Send ${emoji}`}
                 >
                   {emoji}
                 </button>
               ))}
-
               <button
                 type="button"
+                className="sasa-btn is-quiet"
                 onClick={() => {
                   playPopSound();
                   setShowWatchPartyModal(true);
                 }}
-                className="ml-1 px-2.5 py-1 bg-white/20 hover:bg-white/30 rounded-xl text-[11px] font-bold text-white transition"
               >
                 Manage
               </button>
-            </div>
-          </motion.div>
+            </span>
+          </section>
         )}
 
-        {/* Full-width stage, stacked top-to-bottom: player → media info →
-            reactions → Up Next row. Up Next is a horizontally scrolling
-            recommendation row on every breakpoint, not a side column. */}
-        <div className="sasa-cinema-layout">
-          <div className="sasa-cinema-stage-col">
-            <div className="sasa-player-toolbar">
-              <div className="sasa-player-toolbar-left">
-                {currentNavigableIndex >= 0 && navigableMedia.length > 0 && (
-                  <span className="sasa-player-position-pill">
-                    {currentNavigableIndex + 1} / {navigableMedia.length}
-                  </span>
-                )}
-              </div>
-
-              <div className="sasa-player-toolbar-right">
-                <motion.button
-                  whileTap={{ scale: 0.94 }}
-                  type="button"
-                  className={["sasa-player-toolbar-btn", theaterMode ? "is-active" : ""]
-                    .filter(Boolean)
-                    .join(" ")}
-                  onClick={() => {
-                    playPopSound();
-                    setTheaterMode((value) => !value);
-                  }}
-                  aria-pressed={theaterMode}
-                  aria-label={theaterMode ? "Exit theater mode" : "Theater mode"}
-                  title="Theater mode (T)"
-                >
-                  <Clapperboard size={15} />
-                  <span>Theater</span>
-                </motion.button>
-
-                <motion.button
-                  whileTap={{ scale: 0.94 }}
-                  type="button"
-                  className="sasa-player-toolbar-btn sasa-desktop-only"
-                  onClick={() => {
-                    playPopSound();
-                    setQueueCollapsed((value) => !value);
-                  }}
-                  aria-pressed={queueCollapsed}
-                  aria-label={queueCollapsed ? "Show up next queue" : "Hide up next queue"}
-                >
-                  {queueCollapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
-                  <span>{queueCollapsed ? "Show queue" : "Hide queue"}</span>
-                </motion.button>
-              </div>
-            </div>
-
-            <div className="sasa-cinema-stage-shell">
-              <div className="sasa-cinema-stage-glow" aria-hidden="true" />
-
-              <div
-                className={["sasa-cinema-stage", isNumbersActivity ? "is-fluid" : ""]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
+        <div className={showAside ? "sasa-watch-grid has-aside" : "sasa-watch-grid"}>
+          <div className="sasa-watch-primary">
+            <div className="sasa-watch-stagewrap">
+              <div className={isNumbersActivity ? "sasa-watch-stage is-fluid" : "sasa-watch-stage"}>
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={stageKey}
-                    className="sasa-cinema-stage-media"
-                    initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
+                    className="sasa-watch-stage-media"
+                    initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.99 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 1.01 }}
-                    transition={{ duration: reduceMotion ? 0.01 : 0.3, ease: "easeOut" }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: reduceMotion ? 0.01 : 0.25, ease: "easeOut" }}
                   >
                     {isYouTubeMedia ? (
                       <section className="sasa-cinema-frame">
@@ -938,28 +777,22 @@ export default function KidsVideoPlayer({
                           allowFullScreen
                         />
 
-                        <CinemaTopOverlay
-                          title={video.title}
-                          category={video.category}
-                          typeLabel="Video"
-                        />
-
                         {hasAdjacentMedia && (
-                          <div className="sasa-cinema-frame-nav">
+                          <div className="sasa-stage-nav">
                             <button
                               type="button"
                               onClick={() => openMedia(getPreviousPlayableMedia())}
-                              aria-label="Previous assigned media"
+                              aria-label="Previous item"
                             >
-                              <ChevronLeft size={28} />
+                              <ChevronLeft size={24} />
                             </button>
 
                             <button
                               type="button"
                               onClick={() => openMedia(getNextPlayableMedia())}
-                              aria-label="Next assigned media"
+                              aria-label="Next item"
                             >
-                              <ChevronRight size={28} />
+                              <ChevronRight size={24} />
                             </button>
                           </div>
                         )}
@@ -986,17 +819,13 @@ export default function KidsVideoPlayer({
                         }
                       />
                     ) : isNumbersActivity ? (
-                      <div className="sasa-cinema-frame is-fluid">
-                        <CinemaTopOverlay
-                          title={video.title}
-                          category={video.category}
-                          typeLabel="Activity"
-                        />
-
+                      // The activity draws its own heading, so no stage
+                      // overlay here — two stacked titles collided.
+                      <div className="sasa-watch-activity">
                         <NumbersLearningVideo isPlaying={playing} onTogglePlay={handleTogglePlay} />
                       </div>
                     ) : (
-                      <section className="sasa-cinema-frame group">
+                      <section className="sasa-cinema-frame">
                         <img
                           src={video.image}
                           alt={video.title}
@@ -1007,192 +836,231 @@ export default function KidsVideoPlayer({
                           }}
                         />
 
-                        <CinemaTopOverlay
+                        <StageOverlay
                           title={video.title}
                           category={video.category}
                           typeLabel="Video"
                         />
 
-                        {/* Floating Emoji Reactions Overlay (watch-party — untouched) */}
-                        <div className="absolute inset-0 pointer-events-none overflow-hidden z-20">
-                          <AnimatePresence>
-                            {floatingEmojis.map((item) => (
-                              <motion.div
-                                key={item.id}
-                                initial={{ opacity: 1, y: 160, scale: 0.5 }}
-                                animate={{ opacity: 0, y: -100, scale: 1.8 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 1.8, ease: "easeOut" }}
-                                style={{ left: `${item.left}%` }}
-                                className="absolute bottom-10 text-4xl filter drop-shadow-lg flex flex-col items-center"
-                              >
-                                <span>{item.emoji}</span>
-                                <span className="text-[10px] font-black bg-slate-900/80 text-white px-1.5 py-0.5 rounded-md mt-0.5">
-                                  {item.sender}
-                                </span>
-                              </motion.div>
-                            ))}
-                          </AnimatePresence>
-                        </div>
-
-                        <motion.button
-                          whileHover={{ scale: 1.12 }}
-                          whileTap={{ scale: 0.88 }}
+                        <button
                           type="button"
-                          className="kids-player-play-button shadow-2xl z-30"
+                          className="sasa-stage-play"
                           onClick={handleTogglePlay}
-                          aria-label={playing ? "Pause video" : "Play video"}
+                          aria-label={playing ? "Pause" : "Play"}
                         >
                           {playing ? (
-                            <Pause size={42} fill="currentColor" />
+                            <Pause size={30} fill="currentColor" />
                           ) : (
-                            <Play size={42} fill="currentColor" />
+                            <Play size={30} fill="currentColor" />
                           )}
-                        </motion.button>
+                        </button>
                       </section>
                     )}
+
+                    {/* Watch-party floating reactions, kept over the stage. */}
+                    <div className="sasa-floatlayer">
+                      <AnimatePresence>
+                        {floatingEmojis.map((item) => (
+                          <motion.div
+                            key={item.id}
+                            initial={{ opacity: 1, y: 120, scale: 0.6 }}
+                            animate={{ opacity: 0, y: -80, scale: 1.6 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 1.8, ease: "easeOut" }}
+                            style={{ left: `${item.left}%` }}
+                          >
+                            <span>{item.emoji}</span>
+                            <span>{item.sender}</span>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
                   </motion.div>
                 </AnimatePresence>
               </div>
             </div>
 
-            <section className="sasa-cinema-meta-strip" aria-label="Media details">
-              <span className="sasa-cinema-meta-chip is-type">
-                {getMediaTypeMeta(video).icon} {getMediaTypeMeta(video).label}
+            <h1 className="sasa-watch-title">{video.title}</h1>
+
+            <p className="sasa-watch-meta">
+              {getMediaMetaLine(video)}
+              {currentNavigableIndex >= 0 && navigableMedia.length > 1 && (
+                <>
+                  <span className="sasa-watch-meta-dot">·</span>
+                  {currentNavigableIndex + 1} of {navigableMedia.length} in this playlist
+                </>
+              )}
+            </p>
+
+            <div className="sasa-watch-actions sasa-hscroll">
+              <button
+                type="button"
+                className="sasa-btn"
+                onClick={toggleSaved}
+                aria-pressed={saved}
+                aria-label={saved ? "Remove from library" : "Save to library"}
+              >
+                <Heart
+                  size={18}
+                  fill={saved ? "currentColor" : "none"}
+                  style={saved ? { color: "var(--sasa-pink)" } : undefined}
+                />
+                <span className="sasa-watch-actionlabel">{saved ? "Saved" : "Save"}</span>
+              </button>
+
+              <button
+                type="button"
+                className="sasa-btn"
+                onClick={() => openMedia(getPreviousPlayableMedia())}
+                disabled={!hasAdjacentMedia}
+                aria-label="Previous item (P)"
+              >
+                <SkipBack size={18} />
+                <span className="sasa-watch-actionlabel">Previous</span>
+              </button>
+
+              <button
+                type="button"
+                className="sasa-btn"
+                onClick={() => openMedia(getNextPlayableMedia())}
+                disabled={!hasAdjacentMedia}
+                aria-label="Next item (N)"
+              >
+                <SkipForward size={18} />
+                <span className="sasa-watch-actionlabel">Next</span>
+              </button>
+
+              <button
+                type="button"
+                className="sasa-btn"
+                onClick={() => {
+                  playPopSound();
+                  setAutoplayEnabled((value) => !value);
+                }}
+                aria-pressed={autoplayEnabled}
+              >
+                <Repeat size={18} />
+                <span className="sasa-watch-actionlabel">
+                  Autoplay {autoplayEnabled ? "on" : "off"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className="sasa-btn"
+                onClick={() => {
+                  playPopSound();
+                  setTheaterMode((value) => !value);
+                }}
+                aria-pressed={theaterMode}
+                title="Theater mode (T)"
+              >
+                <Clapperboard size={18} />
+                <span className="sasa-watch-actionlabel">Theater</span>
+              </button>
+
+              {upNext.length > 0 && (
+                <button
+                  type="button"
+                  className="sasa-btn"
+                  onClick={() => {
+                    playPopSound();
+                    setRelatedHidden((value) => !value);
+                  }}
+                  aria-pressed={relatedHidden}
+                >
+                  <ListVideo size={18} />
+                  <span className="sasa-watch-actionlabel">
+                    {relatedHidden ? "Show related" : "Hide related"}
+                  </span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                className={activeWatchPartyBuddy ? "sasa-btn is-primary" : "sasa-btn"}
+                onClick={() => {
+                  playPopSound();
+                  setShowWatchPartyModal(true);
+                }}
+              >
+                <Users size={18} />
+                <span className="sasa-watch-actionlabel">
+                  {activeWatchPartyBuddy ? "Party on" : "Watch party"}
+                </span>
+              </button>
+
+              <ThemeButton theme={theme} onSelect={setTheme} />
+            </div>
+
+            <section className="sasa-watch-channel">
+              <span className="sasa-avatar is-lg" aria-hidden="true">
+                {video.sourceType === "photo" ? <ImageIcon size={20} /> : <Video size={20} />}
               </span>
-              <span className="sasa-cinema-meta-chip">🗂 {video.category || "Kids Media"}</span>
-              <span className="sasa-cinema-meta-chip is-safe">🧸 Safe for Kids</span>
-              <span className="sasa-cinema-meta-chip is-approved">🛡 Parent Approved</span>
-              <span className="sasa-cinema-meta-chip is-autoplay">
-                🔁 Autoplay {autoplayEnabled ? "On" : "Off"}
+              <span className="sasa-watch-channel-text">
+                <strong>{getMediaByline(video)}</strong>
+                <span>
+                  {getMediaKindLabel(video)} for {profileName}
+                </span>
+              </span>
+              <span
+                className="sasa-chip"
+                style={{ pointerEvents: "none", gap: 6 }}
+                aria-label="This item was approved by a parent"
+              >
+                <ShieldCheck size={16} style={{ color: "var(--sasa-ok)" }} />
+                Parent approved
               </span>
             </section>
 
-            <section className="sasa-cinema-reaction-dock" aria-label="React to this media">
-              <h3 className="sasa-cinema-reaction-label">How was it?</h3>
-
-              <div className="sasa-cinema-reaction-row">
+            <section className="sasa-watch-block" aria-label="React to this item">
+              <h2 className="sasa-watch-block-title">How was it?</h2>
+              <div className="sasa-hscroll">
                 {reactions.map((item) => {
                   const selected = reaction === item.id;
 
                   return (
-                    <motion.button
+                    <button
                       key={item.id}
-                      whileHover={{ scale: 1.06, y: -3 }}
-                      whileTap={{ scale: 0.9 }}
                       type="button"
-                      className={[
-                        "sasa-cinema-reaction-pill",
-                        item.className,
-                        selected ? "selected" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      onClick={(e) => handleReactionClick(item.id, e)}
+                      className={selected ? "sasa-reaction is-selected" : "sasa-reaction"}
+                      onClick={(event) => handleReactionClick(item.id, event)}
                       aria-pressed={selected}
-                      aria-label={item.label}
                     >
-                      <motion.span
-                        aria-hidden="true"
-                        className="sasa-cinema-reaction-emoji"
-                        animate={selected && !reduceMotion ? { scale: [1, 1.5, 1] } : undefined}
-                        transition={{ duration: 0.45, ease: "easeOut" }}
-                      >
+                      <span className="sasa-reaction-emoji" aria-hidden="true">
                         {item.emoji}
-                      </motion.span>
-                      <span>{item.label}</span>
-                    </motion.button>
+                      </span>
+                      {item.label}
+                    </button>
                   );
                 })}
               </div>
             </section>
+
+            {/* On narrow screens the related list follows the primary column;
+                from 1280px up it moves into the aside instead. */}
+            {!showAside && !relatedHidden && !theaterMode && upNext.length > 0 && (
+              <RelatedList items={upNext} current={video} onOpen={openMedia} inline />
+            )}
           </div>
 
-          {/* Up Next / More to Watch — a YouTube-style horizontal recommendation
-              row below the player, media info, and reactions. Same click-to-open
-              behavior as the old sidebar queue, just laid out as scrolling cards. */}
-          {!(queueCollapsed || theaterMode) && (
-            <section className="sasa-cinema-upnext" aria-label="Up next queue">
-              <div className="sasa-cinema-upnext-header">
-                <h3>Up Next</h3>
-              </div>
-
-              <div className="sasa-cinema-upnext-row">
-                <div className="sasa-cinema-upnext-card is-current" aria-current="true">
-                  <span className="sasa-cinema-upnext-thumb">
-                    <img
-                      src={video.image}
-                      alt=""
-                      onError={(event) => {
-                        event.currentTarget.onerror = null;
-                        event.currentTarget.src = mediaThumbnailFallback;
-                      }}
-                    />
-                    {video.duration && (
-                      <span className="sasa-cinema-upnext-duration">{video.duration}</span>
-                    )}
-                  </span>
-                  <span className="sasa-cinema-upnext-info">
-                    <span className="sasa-cinema-upnext-badge is-now-playing">
-                      <span className="sasa-cinema-upnext-now-dot" aria-hidden="true" />
-                      Now Playing
-                    </span>
-                    <strong className="sasa-cinema-upnext-title">{video.title}</strong>
-                    {video.category && (
-                      <span className="sasa-cinema-upnext-category">{video.category}</span>
-                    )}
-                  </span>
-                </div>
-
-                <AnimatePresence>
-                  {upNext.map((item, idx) => {
-                    const meta = getMediaTypeMeta(item);
-
-                    return (
-                      <motion.button
-                        key={getMediaIdentity(item)}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.04 }}
-                        whileHover={{ scale: 1.02, y: -2 }}
-                        whileTap={{ scale: 0.97 }}
-                        type="button"
-                        className="sasa-cinema-upnext-card"
-                        onClick={() => openMedia(item)}
-                      >
-                        <span className="sasa-cinema-upnext-thumb">
-                          <img
-                            src={item.image}
-                            alt=""
-                            onError={(event) => {
-                              event.currentTarget.onerror = null;
-                              event.currentTarget.src = mediaThumbnailFallback;
-                            }}
-                          />
-                          {item.duration && (
-                            <span className="sasa-cinema-upnext-duration">{item.duration}</span>
-                          )}
-                        </span>
-                        <span className="sasa-cinema-upnext-info">
-                          <span className="sasa-cinema-upnext-badge">
-                            {meta.icon} {meta.label}
-                          </span>
-                          <strong className="sasa-cinema-upnext-title">{item.title}</strong>
-                          {item.category && (
-                            <span className="sasa-cinema-upnext-category">{item.category}</span>
-                          )}
-                        </span>
-                      </motion.button>
-                    );
-                  })}
-                </AnimatePresence>
-              </div>
-            </section>
+          {showAside && (
+            <aside className="sasa-watch-aside">
+              <RelatedList items={upNext} current={video} onOpen={openMedia} />
+            </aside>
           )}
         </div>
-      </main>
+      </div>
 
-      {/* Watch Party Modal */}
+      {syncToast && (
+        <div className="sasa-toast" role="status">
+          <div>
+            <Radio size={14} aria-hidden="true" />
+            {syncToast}
+          </div>
+        </div>
+      )}
+
       <WatchPartyModal
         isOpen={showWatchPartyModal}
         onClose={() => setShowWatchPartyModal(false)}
@@ -1202,7 +1070,7 @@ export default function KidsVideoPlayer({
         activeBuddy={activeWatchPartyBuddy}
         onStartWatchParty={(buddy) => {
           setActiveWatchPartyBuddy(buddy);
-          showToast(`Watch Party started with ${buddy.name}! 🍿`);
+          showToast(`Watch Party started with ${buddy.name}!`);
         }}
         onEndWatchParty={() => {
           setActiveWatchPartyBuddy(null);
@@ -1212,57 +1080,77 @@ export default function KidsVideoPlayer({
         onTogglePlay={handleTogglePlay}
         videoTitle={video.title}
       />
+    </AppShell>
+  );
+}
 
-      <nav className="kids-player-bottom-nav">
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          type="button"
-          className="active"
-          onClick={() => {
-            playPopSound();
-            onOpenHomeTab("home");
-          }}
-        >
-          <Home size={24} />
-          <span>Home</span>
-        </motion.button>
+/** Related / up-next list. Rows keep the 16:9 ratio and never crop titles. */
+function RelatedList({
+  items,
+  current,
+  onOpen,
+  inline = false,
+}: {
+  items: KidsVideoItem[];
+  current: KidsVideoItem;
+  onOpen: (item: KidsVideoItem) => void;
+  inline?: boolean;
+}) {
+  return (
+    <section
+      className="sasa-watch-block"
+      style={inline ? undefined : { marginBlockStart: 0 }}
+      aria-label="Up next"
+    >
+      <h2 className="sasa-watch-block-title">Up next</h2>
 
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          type="button"
-          onClick={() => {
-            playPopSound();
-            onOpenHomeTab("search");
-          }}
-        >
-          <Search size={24} />
-          <span>Search</span>
-        </motion.button>
+      <div className="sasa-related">
+        <div className="sasa-related-item is-current" aria-current="true">
+          <span className="sasa-related-thumb">
+            <img
+              src={current.image}
+              alt=""
+              onError={(event) => {
+                event.currentTarget.onerror = null;
+                event.currentTarget.src = mediaThumbnailFallback;
+              }}
+            />
+          </span>
+          <span className="sasa-related-text">
+            <span className="sasa-nowplaying">
+              <span className="sasa-nowplaying-dot" aria-hidden="true" />
+              Now playing
+            </span>
+            <span className="sasa-related-title">{current.title}</span>
+            <span className="sasa-related-meta">{getMediaMetaLine(current)}</span>
+          </span>
+        </div>
 
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          type="button"
-          onClick={() => {
-            playPopSound();
-            onOpenHomeTab("library");
-          }}
-        >
-          <BookOpen size={24} />
-          <span>Library</span>
-        </motion.button>
-
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          type="button"
-          onClick={() => {
-            playPopSound();
-            onChangeProfile();
-          }}
-        >
-          <UserCircle size={24} />
-          <span>Profile</span>
-        </motion.button>
-      </nav>
-    </motion.div>
+        {items.map((item) => (
+          <button
+            key={`${item.sourceType || "built-in"}-${item.id}`}
+            type="button"
+            className="sasa-related-item"
+            onClick={() => onOpen(item)}
+          >
+            <span className="sasa-related-thumb">
+              <img
+                src={item.image}
+                alt=""
+                loading="lazy"
+                onError={(event) => {
+                  event.currentTarget.onerror = null;
+                  event.currentTarget.src = mediaThumbnailFallback;
+                }}
+              />
+            </span>
+            <span className="sasa-related-text">
+              <span className="sasa-related-title">{item.title}</span>
+              <span className="sasa-related-meta">{getMediaMetaLine(item)}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }

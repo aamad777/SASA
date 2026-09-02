@@ -1,10 +1,12 @@
 @import "tailwindcss" source(none);
 @source "../src";
-@import "tw-animate-css";
+@import "tw-animate-css"; /* SASA YOUTUBE-STYLE LAYOUT — shared shell + page system. Kept in their
+   own files so this override-heavy stylesheet stops growing. */
 
-@custom-variant dark (&:is(.dark *));
+@import "./styles/app-shell.css";
+@import "./styles/app-pages.css";
 
-/*
+@custom-variant dark (&:is(.dark *)); /*
  * Design system for Little Explorers — a toddler-friendly video, photo,
  * and learning site. Sky & Peach palette with Sora headings and
  * Manrope body text.
@@ -122,6 +124,7 @@
 }
 
 /* ===== SASA STYLES ===== */
+
 :root {
   font-family:
     Inter,
@@ -759,35 +762,6 @@ button {
   }
 }
 
-/* SARA WHO IS WATCHING MOBILE V14 — guest/local profile picker
-   (ProfileSelection.tsx). Root stays min-height (never height/max-height)
-   so the document remains the single scroll surface; only left/right inset
-   is added here since the header/bottom nav already carry their own
-   top/bottom safe-area padding (see below). */
-.kids-profile-page {
-  position: relative;
-  display: flex;
-  width: 100%;
-  min-height: calc(100dvh - 7rem);
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  overflow: hidden;
-  padding-right: env(safe-area-inset-right);
-  padding-left: env(safe-area-inset-left);
-  font-family: "Fredoka", sans-serif;
-  background-color: #a4e5ff;
-  background-image: radial-gradient(circle at center, #b9edff 0%, #a4e5ff 100%);
-}
-
-/* SARA WHO IS WATCHING MOBILE V14 — DatabaseProfileSelection.tsx's profile
-   grid (the parent-account "Who's Watching" screen). That component is
-   plain inline styles, so these two classes are the only CSS hooks added to
-   it; the 180px card width below max-width:480px is a plain override
-   (no !important needed — a later class selector already beats an earlier
-   inline style only when marked important, so it stays !important to win
-   over the inline `width: 180` reliably). Un-set at wider widths so desktop
-   keeps its original fixed 180px centered layout untouched. */
 /* SARA REAL DEVICE MOBILE POLISH V15 — real device screenshots showed this
    screen's 70px section margin + 48px heading + 115px avatars + 35px grid
    margin together pushing most/all profile cards below the fold on a
@@ -796,157 +770,6 @@ button {
    DatabaseProfileSelection.tsx, so a class rule only wins if it out-ranks
    the inline style explicitly. Desktop (>480px) keeps the original inline
    values untouched. */
-@media (max-width: 480px) {
-  .sara-who-section {
-    margin: 28px auto 0 !important;
-  }
-
-  .sara-who-heading {
-    font-size: 34px !important;
-    margin: 8px 0 !important;
-  }
-
-  .sara-who-profile-grid {
-    gap: 14px !important;
-    margin-top: 20px !important;
-  }
-
-  .sara-who-card {
-    padding: 14px !important;
-    min-height: 0 !important;
-  }
-
-  .sara-who-avatar {
-    width: 92px !important;
-    height: 92px !important;
-    font-size: 42px !important;
-  }
-}
-
-.kids-title-text {
-  paint-order: stroke fill;
-  -webkit-text-stroke: 8px #1e293b;
-  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.2));
-}
-
-.profile-name-text {
-  paint-order: stroke fill;
-  -webkit-text-stroke: 4px #1e293b;
-  letter-spacing: 0.05em;
-}
-
-.leo-halo {
-  box-shadow: 0 0 30px 10px rgba(255, 255, 255, 0.9);
-}
-
-.kids-profile-content {
-  width: min(100%, 760px);
-  margin-inline: auto;
-}
-
-.cloud {
-  position: absolute;
-  z-index: 1;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.78);
-  filter: drop-shadow(0 12px 20px rgba(47, 128, 170, 0.12));
-}
-
-.cloud::before,
-.cloud::after {
-  position: absolute;
-  content: "";
-  border-radius: 50%;
-  background: inherit;
-}
-
-.cloud::before {
-  left: 17%;
-  bottom: 18%;
-  width: 43%;
-  height: 130%;
-}
-
-.cloud::after {
-  right: 14%;
-  bottom: 25%;
-  width: 37%;
-  height: 105%;
-}
-
-.cloud-one {
-  top: 9rem;
-  left: -6rem;
-  width: 22rem;
-  height: 5.5rem;
-}
-
-.cloud-two {
-  top: 15rem;
-  right: -7rem;
-  width: 25rem;
-  height: 6rem;
-}
-
-.cloud-three {
-  bottom: 8rem;
-  left: -8rem;
-  width: 27rem;
-  height: 6.5rem;
-}
-
-@media (max-width: 900px) {
-  .cloud-one {
-    left: -13rem;
-  }
-
-  .cloud-two {
-    right: -15rem;
-  }
-
-  .cloud-three {
-    left: -16rem;
-  }
-}
-
-.kids-star {
-  position: absolute;
-  background: white;
-  opacity: 0.7;
-  clip-path: polygon(
-    50% 0%,
-    61% 35%,
-    98% 35%,
-    68% 57%,
-    79% 91%,
-    50% 70%,
-    21% 91%,
-    32% 57%,
-    2% 35%,
-    39% 35%
-  );
-}
-
-.star-one {
-  top: 10rem;
-  left: 3rem;
-  width: 1.5rem;
-  height: 1.5rem;
-}
-
-.star-two {
-  top: 3rem;
-  left: 10rem;
-  width: 1rem;
-  height: 1rem;
-}
-
-.star-three {
-  right: 2.5rem;
-  bottom: 15rem;
-  width: 1.25rem;
-  height: 1.25rem;
-}
 
 .parental-gate-page {
   position: relative;
@@ -1639,122 +1462,6 @@ button {
     gap: 24px;
   }
 
-  .parent-chart-card {
-    position: relative;
-    min-height: 600px;
-    padding: 26px;
-    overflow: hidden;
-  }
-
-  .parent-chart-card::before {
-    position: absolute;
-    inset: 0;
-    opacity: 0.5;
-    background-image: radial-gradient(circle, rgba(0, 101, 145, 0.08) 2px, transparent 2px);
-    background-size: 20px 20px;
-    content: "";
-    pointer-events: none;
-  }
-
-  .parent-chart-card > * {
-    position: relative;
-    z-index: 1;
-  }
-
-  .parent-chart {
-    display: flex;
-    min-height: 390px;
-    align-items: stretch;
-    justify-content: space-between;
-    gap: 8px;
-    margin-top: 40px;
-    padding: 20px 8px 0;
-    border-bottom: 1px solid var(--parent-border);
-    background-image: repeating-linear-gradient(
-      to bottom,
-      transparent 0,
-      transparent 94px,
-      var(--parent-border) 95px
-    );
-  }
-
-  .parent-chart-column {
-    display: flex;
-    min-width: 0;
-    flex: 1;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-end;
-  }
-
-  .parent-bars {
-    display: flex;
-    width: min(64px, 80%);
-    height: 310px;
-    flex-direction: column-reverse;
-    justify-content: flex-start;
-  }
-
-  .bar {
-    width: 100%;
-    min-height: 7px;
-    transition: filter 0.2s ease;
-  }
-
-  .parent-chart-column:hover .bar {
-    filter: brightness(1.08);
-  }
-
-  .bar.videos,
-  .legend-color.videos {
-    background: var(--parent-primary);
-  }
-
-  .bar.games,
-  .legend-color.games {
-    background: var(--parent-primary-light);
-  }
-
-  .bar.reading,
-  .legend-color.reading {
-    background: var(--parent-yellow);
-  }
-
-  .parent-bars .bar:first-child {
-    border-radius: 0 0 10px 10px;
-  }
-
-  .parent-bars .bar:last-child {
-    border-radius: 10px 10px 0 0;
-  }
-
-  .parent-chart-column > span {
-    margin-top: 12px;
-    color: #6e7882;
-    font-weight: 700;
-  }
-
-  .chart-legend {
-    display: flex;
-    justify-content: center;
-    gap: 24px;
-    margin-top: 26px;
-    padding-top: 20px;
-    border-top: 1px solid var(--parent-border);
-  }
-
-  .chart-legend > div {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .legend-color {
-    width: 16px;
-    height: 16px;
-    border-radius: 5px;
-  }
-
   .parent-stat-column {
     display: flex;
     flex-direction: column;
@@ -1938,37 +1645,6 @@ button {
   }
 }
 
-/* SARA KIDS MOBILE SAFE LAYOUT V14 — extends the V13 Parent Controls safe
-   viewport/single-scroll strategy to the kid-facing screens (Who's Watching,
-   Kids Home + its Search/Library/Profile tabs, the watch player's outer
-   padding). Same doctrine as the V13 comment above: env(safe-area-inset-*)
-   fed by viewport-fit=cover is the ONE inset strategy, applied directly on
-   the fixed/sticky chrome; page-root containers keep min-height (never
-   height/max-height) so the document stays the single scroll surface. */
-/* SARA KIDS HOME MOBILE V14 */
-.kids-video-home {
-  min-height: 100dvh;
-  /* .kids-home-bottom-nav below already grows its own padding-bottom with
-     env(safe-area-inset-bottom); this flat 105px didn't, so on a device
-     with a tall gesture-nav inset the fixed nav could grow taller than the
-     page's reserved clearance and start covering the last grid row. */
-  padding-bottom: calc(105px + env(safe-area-inset-bottom));
-  color: #1f2937;
-  background: #eef8ff;
-  font-family: "Quicksand", sans-serif;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.kids-video-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  overflow: hidden;
-  border-radius: 0 0 32px 32px;
-  background: #eef8ff;
-  box-shadow: 0 3px 12px rgba(31, 41, 55, 0.08);
-}
-
 /* SARA ANDROID SAFE VIEWPORT V13 — confirmed strategy for this app: the
    native layer (AndroidManifest.xml / styles.xml / MainActivity) has no
    WindowCompat/EdgeToEdge/fitsSystemWindows/windowTranslucentStatus calls at
@@ -1982,1005 +1658,6 @@ button {
    double up with. Do not add WindowCompat/fitsSystemWindows natively
    without removing the equivalent CSS padding below (and vice versa) — the
    two must never both apply to the same edge. */
-.kids-video-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  /* SARA_MOBILE_ANDROID_V1 — env(safe-area-inset-top) is 0px on desktop (and
-     in browsers generally), so this only adds real space on devices with an
-     edge-to-edge status bar/notch; the existing 32px design padding is
-     untouched otherwise. SARA KIDS HOME MOBILE V14 — split into longhand so
-     landscape cutout devices also get left/right inset instead of just top
-     (mobile landscape has no notch on top, but can have one on the side). */
-  padding-top: calc(32px + env(safe-area-inset-top));
-  padding-right: max(22px, env(safe-area-inset-right));
-  padding-bottom: 18px;
-  padding-left: max(22px, env(safe-area-inset-left));
-  border-radius: 0 0 32px 32px;
-  background: linear-gradient(90deg, #89b4f8, #b8b8ff);
-}
-
-.kids-video-header > div {
-  min-width: 0;
-}
-
-.kids-video-header > div > span {
-  display: block;
-  margin-bottom: 2px;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.kids-video-header h1 {
-  margin: 0;
-  color: white;
-  font-size: 25px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.kids-video-header > button {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.3);
-  color: white;
-  font-size: 13px;
-  font-weight: 700;
-  backdrop-filter: blur(10px);
-}
-
-.kids-video-header > button:hover {
-  background: rgba(255, 255, 255, 0.42);
-}
-
-.kids-category-nav {
-  display: flex;
-  gap: 24px;
-  padding: 16px 18px 18px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.kids-category-nav::-webkit-scrollbar {
-  display: none;
-}
-
-.kids-category-nav button {
-  display: flex;
-  min-width: 72px;
-  flex: 0 0 72px;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  border: 0;
-  background: transparent;
-  color: #1f2937;
-}
-
-.kids-category-nav button > span {
-  display: grid;
-  width: 64px;
-  height: 64px;
-  place-items: center;
-  overflow: hidden;
-  padding: 4px;
-  border-radius: 50%;
-  background: white;
-  box-shadow: 0 3px 9px rgba(31, 41, 55, 0.1);
-  transition: transform 0.2s ease;
-}
-
-.kids-category-nav button:hover > span {
-  transform: scale(1.06);
-}
-
-.kids-category-nav img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.kids-category-nav strong {
-  font-size: 14px;
-}
-
-.kids-category-count {
-  font-size: 11px;
-  font-weight: 700;
-  opacity: 0.65;
-}
-
-.kids-media-status-banner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin: 4px 16px 0;
-  padding: 8px 14px;
-  border-radius: 14px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.kids-media-status-banner.is-loading {
-  background: rgba(124, 58, 237, 0.1);
-  color: #6d28d9;
-}
-
-.kids-media-status-banner.is-error {
-  background: rgba(220, 38, 38, 0.1);
-  color: #b91c1c;
-}
-
-.kids-media-status-banner.is-error button {
-  border: 1px solid rgba(185, 28, 28, 0.35);
-  border-radius: 999px;
-  background: #fff;
-  color: #b91c1c;
-  font-size: 11px;
-  font-weight: 800;
-  padding: 3px 12px;
-  cursor: pointer;
-}
-
-.kids-media-status-spinner {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid rgba(124, 58, 237, 0.25);
-  border-top-color: #7c3aed;
-  animation: kids-media-status-spin 0.7s linear infinite;
-}
-
-@keyframes kids-media-status-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.kids-video-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px 16px;
-  padding: 24px 16px;
-}
-
-.kids-video-grid article {
-  min-width: 0;
-}
-
-.kids-video-thumbnail {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  padding: 0;
-  border: 0;
-  border-radius: 20px;
-  background: #dbeafe;
-  box-shadow: 0 3px 10px rgba(31, 41, 55, 0.1);
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.kids-video-thumbnail:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 9px 20px rgba(31, 41, 55, 0.15);
-}
-
-.kids-video-thumbnail > img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.kids-video-dark-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.kids-video-main-play {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  display: grid;
-  width: 50px;
-  height: 50px;
-  place-items: center;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.72);
-  color: white;
-  box-shadow: 0 5px 15px rgba(31, 41, 55, 0.18);
-  transform: translate(-50%, -50%);
-  backdrop-filter: blur(8px);
-}
-
-.kids-video-duration {
-  position: absolute;
-  bottom: 9px;
-  left: 9px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.62);
-  color: white;
-  font-size: 11px;
-  font-weight: 700;
-  backdrop-filter: blur(5px);
-}
-
-.kids-video-small-play {
-  position: absolute;
-  right: 9px;
-  bottom: 9px;
-  display: grid;
-  width: 25px;
-  height: 25px;
-  place-items: center;
-  border: 2px solid white;
-  border-radius: 50%;
-  background: white;
-  color: #1f2937;
-  box-shadow: 0 3px 8px rgba(31, 41, 55, 0.16);
-}
-
-.kids-video-grid article h2 {
-  margin: 9px 4px 0;
-  color: #111827;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.25;
-}
-
-.kids-home-bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  z-index: 50;
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  /* SARA_MOBILE_ANDROID_V1 — see .kids-video-header above; keeps the bottom
-     tab bar clear of the gesture nav bar on edge-to-edge Android.
-     SARA KIDS HOME MOBILE V14 — split into longhand to also add left/right
-     inset for landscape cutout devices (see the max-width:420px override
-     further below, which must carry the same env() term or it silently
-     wins on every phone-width screen and strips this out). */
-  padding-top: 12px;
-  padding-right: max(24px, env(safe-area-inset-right));
-  padding-bottom: calc(28px + env(safe-area-inset-bottom));
-  padding-left: max(24px, env(safe-area-inset-left));
-  border-radius: 28px 28px 0 0;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(12px);
-}
-
-.kids-home-bottom-nav button {
-  position: relative;
-  display: flex;
-  width: 64px;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  border: 0;
-  background: transparent;
-  color: rgba(75, 85, 99, 0.55);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.kids-home-bottom-nav button.active {
-  color: #3b82f6;
-  font-weight: 700;
-}
-
-.kids-home-bottom-nav button.active::before {
-  position: absolute;
-  inset: -15px;
-  z-index: -1;
-  border-radius: 50%;
-  opacity: 0.6;
-  background: linear-gradient(
-    45deg,
-    rgba(96, 165, 250, 0.85),
-    rgba(216, 180, 254, 0.75),
-    rgba(253, 230, 138, 0.75)
-  );
-  filter: blur(18px);
-  content: "";
-}
-
-.kids-nav-profile {
-  display: grid;
-  width: 29px;
-  height: 29px;
-  place-items: center;
-  border-radius: 50%;
-  background: white;
-  font-size: 19px;
-  box-shadow: 0 2px 7px rgba(31, 41, 55, 0.15);
-}
-
-@media (min-width: 700px) {
-  .kids-video-header,
-  .kids-category-nav,
-  .kids-video-grid {
-    width: min(900px, 100%);
-    margin-right: auto;
-    margin-left: auto;
-  }
-
-  .kids-video-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .kids-home-bottom-nav {
-    left: 50%;
-    width: min(700px, 100%);
-    transform: translateX(-50%);
-  }
-}
-
-@media (min-width: 1050px) {
-  .kids-video-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 420px) {
-  .kids-video-header {
-    padding-right: 16px;
-    padding-left: 16px;
-  }
-
-  .kids-video-header > button span {
-    display: none;
-  }
-
-  .kids-video-header > button {
-    width: 42px;
-    height: 42px;
-    justify-content: center;
-    padding: 0;
-  }
-
-  .kids-video-grid {
-    column-gap: 12px;
-    padding-right: 12px;
-    padding-left: 12px;
-  }
-}
-
-/* SARA REAL DEVICE MOBILE POLISH V15 pass — the task asks for 2 columns on
-   360-430px phones (kept above/untouched) but "1 or 2 columns depending on
-   actual available card width" at ~320px. auto-fit with a 140px minimum
-   does that without a second fixed breakpoint to maintain: at ~320px two
-   140px columns plus the 12px gap/padding above don't fit, so it falls
-   back to 1; at 360px+ they do, so it's still 2 — same outcome as a manual
-   breakpoint, but self-adjusting for anything in between. */
-@media (max-width: 359px) {
-  .kids-video-grid {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  }
-}
-
-/* SARA CINEMATIC PLAYER V3 */
-/* ============================================================
-   KIDS CINEMATIC MEDIA PLAYER — dark theater page chrome, ambient
-   backdrop, theater stage, metadata, reaction dock, and Up Next queue.
-   (See the second block further down for the interactive player's own
-   surface — media, fading top overlay, photo HUD, and glass control dock.)
-   ============================================================ */
-
-/* SARA PROFESSIONAL PLAYER V4 */
-
-.sasa-professional-player-v4 {
-  position: relative;
-  isolation: isolate;
-}
-
-/* ---- Theme tokens ----
-   Six built-in watching-page themes (`Space`, `Ocean`, `Jungle`, `Rainbow`,
-   `Night`, `Bright`) swap these custom properties via `data-theme` on the
-   player root. They only ever touch background/accent decoration — never
-   media, layout, or readability. `night` (the default) is a neutral,
-   professional dark theater; the rest add a gentle tint. */
-.kids-player-page {
-  --player-accent: #818cf8;
-  --player-accent-soft: rgba(129, 140, 248, 0.16);
-  --player-bg-1: #0b0c10;
-  --player-bg-2: #131519;
-  --player-bg-3: #05060a;
-
-  min-height: 100dvh;
-  /* SARA KIDS HOME MOBILE V14 — flat value, same gap as .kids-video-home
-     above; without the safe-area term the page's own bottom padding can
-     end up shorter than the fixed control dock on a large-inset device. No
-     other player layout touched here — see the V4 header comment above. */
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
-  color: #f2f3f7;
-  background: var(--player-bg-3);
-  font-family: "Plus Jakarta Sans", sans-serif;
-}
-
-.kids-player-page[data-theme="space"] {
-  --player-accent: #8b7bf7;
-  --player-accent-soft: rgba(139, 123, 247, 0.18);
-  --player-bg-1: #10102a;
-  --player-bg-2: #1c1a45;
-  --player-bg-3: #05050f;
-}
-
-.kids-player-page[data-theme="ocean"] {
-  --player-accent: #22c3e6;
-  --player-accent-soft: rgba(34, 195, 230, 0.16);
-  --player-bg-1: #06222f;
-  --player-bg-2: #0c3a4d;
-  --player-bg-3: #030d13;
-}
-
-.kids-player-page[data-theme="jungle"] {
-  --player-accent: #4ade80;
-  --player-accent-soft: rgba(74, 222, 128, 0.16);
-  --player-bg-1: #0a2116;
-  --player-bg-2: #123a26;
-  --player-bg-3: #04100a;
-}
-
-.kids-player-page[data-theme="rainbow"] {
-  --player-accent: #ef6fb6;
-  --player-accent-soft: rgba(239, 111, 182, 0.16);
-  --player-bg-1: #221033;
-  --player-bg-2: #33205a;
-  --player-bg-3: #08060f;
-}
-
-.kids-player-page[data-theme="night"] {
-  --player-accent: #818cf8;
-  --player-accent-soft: rgba(129, 140, 248, 0.14);
-  --player-bg-1: #0b0c10;
-  --player-bg-2: #131519;
-  --player-bg-3: #05060a;
-}
-
-.kids-player-page[data-theme="bright"] {
-  --player-accent: #fb923c;
-  --player-accent-soft: rgba(251, 146, 60, 0.16);
-  --player-bg-1: #241a0c;
-  --player-bg-2: #3a2a10;
-  --player-bg-3: #0c0904;
-}
-
-/* ---- Theater backdrop: neutral dark surface, a softly blurred still from
-   the active media, and one low-opacity ambient glow tinted by the current
-   theme. No starfields, no multi-color aurora, no continuous motion. ---- */
-
-.sasa-cinema-bg {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.sasa-cinema-bg-image {
-  position: absolute;
-  inset: -5%;
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  filter: blur(50px) saturate(1.1) brightness(0.4);
-  transform: scale(1.1);
-  opacity: 0.7;
-}
-
-.sasa-cinema-bg-overlay {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(
-      120% 90% at 50% 0%,
-      var(--player-bg-1) 0%,
-      var(--player-bg-2) 40%,
-      var(--player-bg-3) 78%
-    ),
-    linear-gradient(180deg, rgba(5, 6, 10, 0.6) 0%, rgba(5, 6, 10, 0.92) 100%);
-  opacity: 0.94;
-}
-
-/* SARA_CARTOON_THEMES_V7 — cute original per-theme illustration (see
-   src/assets/themes/*), set via the --player-art custom property in
-   KidsVideoPlayer. Kept confined to the edges: cover-sized so it fills the
-   viewport, then faded toward the center with a radial mask so the middle
-   (behind the player stage) always stays calm/dark/readable, and never
-   painted over the media itself — this whole layer sits at z-index 0,
-   strictly behind the stage. */
-.sasa-cinema-theme-art {
-  position: absolute;
-  inset: 0;
-  background-image: var(--player-art, none);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  opacity: 0.5;
-  mask-image: radial-gradient(60% 55% at 50% 42%, transparent 0%, transparent 20%, black 72%);
-  -webkit-mask-image: radial-gradient(
-    60% 55% at 50% 42%,
-    transparent 0%,
-    transparent 20%,
-    black 72%
-  );
-}
-
-.sasa-cinema-ambient-glow {
-  position: absolute;
-  top: -20%;
-  left: 50%;
-  width: 70vw;
-  height: 70vw;
-  max-width: 900px;
-  max-height: 900px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--player-accent) 0%, transparent 68%);
-  opacity: 0.14;
-  filter: blur(80px);
-  transform: translateX(-50%);
-  animation: sasa-ambient-breathe 16s ease-in-out infinite;
-}
-
-@keyframes sasa-ambient-breathe {
-  0%,
-  100% {
-    opacity: 0.1;
-  }
-
-  50% {
-    opacity: 0.18;
-  }
-}
-
-/* ---- Header + content ---- */
-
-.kids-player-header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  /* SARA_MOBILE_ANDROID_V1 — see .kids-video-header above. */
-  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
-  background: rgba(10, 11, 15, 0.82);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(16px);
-  isolation: isolate;
-}
-
-.sasa-player-brand {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  color: #f2f3f7;
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-
-.sasa-player-brand svg {
-  color: var(--player-accent);
-}
-
-.kids-player-header > button {
-  position: relative;
-  z-index: 10;
-  display: grid;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: #f2f3f7;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-}
-
-.kids-player-header > button * {
-  pointer-events: none;
-}
-
-.kids-player-header > button:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.kids-player-header > button:active {
-  transform: scale(0.94);
-}
-
-.kids-player-header > button:focus-visible {
-  outline: 2px solid var(--player-accent);
-  outline-offset: 2px;
-}
-
-.sasa-player-header-actions {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sasa-player-header-btn {
-  position: relative;
-  z-index: 10;
-  display: flex;
-  min-height: 36px;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #e5e7eb;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.sasa-player-header-btn:hover {
-  background: rgba(255, 255, 255, 0.11);
-}
-
-.sasa-player-header-btn:focus-visible {
-  outline: 2px solid var(--player-accent);
-  outline-offset: 2px;
-}
-
-.sasa-player-header-btn.is-active {
-  border-color: rgba(52, 211, 153, 0.4);
-  background: rgba(16, 185, 129, 0.18);
-  color: #a7f3d0;
-}
-
-@media (max-width: 480px) {
-  .sasa-player-header-btn span {
-    display: none;
-  }
-}
-
-/* ---- Theme picker popover ---- */
-
-.sasa-theme-picker-wrap {
-  position: relative;
-}
-
-.sasa-theme-picker-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 199;
-  border: 0;
-  background: transparent;
-  cursor: default;
-}
-
-.sasa-theme-picker {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  z-index: 200;
-  width: 264px;
-  /* Defensive clamp so this right-anchored popover can never exceed the
-     viewport width at the narrowest phones. */
-  max-width: calc(100vw - 24px);
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  background: #14161c;
-  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.5);
-}
-
-.sasa-theme-picker-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 0 10px;
-}
-
-.sasa-theme-picker-header h4 {
-  margin: 0;
-  color: #f2f3f7;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.sasa-theme-picker-header button {
-  display: grid;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  color: #cbd2e1;
-  cursor: pointer;
-}
-
-.sasa-theme-picker-header button:hover {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-.sasa-theme-picker-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-}
-
-.sasa-theme-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  cursor: pointer;
-  touch-action: manipulation;
-  transition: border-color 0.15s ease;
-}
-
-.sasa-theme-card:hover {
-  border-color: rgba(255, 255, 255, 0.25);
-}
-
-.sasa-theme-card:focus-visible {
-  outline: 2px solid var(--player-accent);
-  outline-offset: 2px;
-}
-
-.sasa-theme-card.selected {
-  border-color: var(--player-accent);
-  background: var(--player-accent-soft);
-}
-
-.sasa-theme-card-swatch {
-  display: grid;
-  height: 56px;
-  place-items: center;
-  border-radius: 8px;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  color: #fff;
-  transition: transform 0.15s ease;
-}
-
-.sasa-theme-card:hover .sasa-theme-card-swatch {
-  transform: scale(1.03);
-}
-
-.sasa-theme-card-label {
-  color: #e5e7eb;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.kids-player-content {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  min-width: 0;
-  min-height: calc(100dvh - 64px);
-}
-
-.kids-player-play-button {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 20;
-  display: grid;
-  width: 76px;
-  height: 76px;
-  place-items: center;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  border-radius: 50%;
-  background: rgba(20, 22, 28, 0.6);
-  color: #fff;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-  transform: translate(-50%, -50%);
-  backdrop-filter: blur(8px);
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-  transition: transform 0.2s ease;
-}
-
-.kids-player-play-button * {
-  pointer-events: none;
-}
-
-.kids-player-play-button:active {
-  transform: translate(-50%, -50%) scale(0.94);
-}
-
-.kids-player-play-button:focus-visible {
-  outline: 2px solid var(--player-accent);
-  outline-offset: 4px;
-}
-
-/* ---- Player toolbar: position pill + Theater/Queue toggles, sits directly
-   above the stage so it never competes with the controls inside it. ---- */
-
-.sasa-player-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 0 0 10px;
-}
-
-.sasa-player-toolbar-left,
-.sasa-player-toolbar-right {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.sasa-player-position-pill {
-  padding: 5px 11px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #9aa3b5;
-  font-size: 11px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.sasa-player-toolbar-btn {
-  display: flex;
-  min-height: 34px;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #cbd2e1;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.sasa-player-toolbar-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #f2f3f7;
-}
-
-.sasa-player-toolbar-btn:focus-visible {
-  outline: 2px solid var(--player-accent);
-  outline-offset: 2px;
-}
-
-.sasa-player-toolbar-btn.is-active {
-  border-color: var(--player-accent);
-  background: var(--player-accent-soft);
-  color: #f2f3f7;
-}
-
-.sasa-player-toolbar-btn.is-accent {
-  border-color: var(--player-accent);
-  background: var(--player-accent-soft);
-  color: #f2f3f7;
-}
-
-.sasa-desktop-only {
-  display: none;
-}
-
-@media (min-width: 1024px) {
-  .sasa-desktop-only {
-    display: flex;
-  }
-}
-
-@media (max-width: 640px) {
-  .sasa-player-toolbar-btn span {
-    display: none;
-  }
-}
-
-/* ---- Theater layout: stage column (~73%) + Up Next queue (~27%) ---- */
-
-.sasa-cinema-layout {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  gap: 20px;
-}
-
-.sasa-cinema-stage-col {
-  min-width: 0;
-}
-
-/* ---- Stage: a plain black 16:9 box with a subtle shadow and — only while
-   something is actively playing — a very soft single-color glow. No rainbow
-   gradients, no infinite animation. ---- */
-
-.sasa-cinema-stage-shell {
-  position: relative;
-  padding: 0;
-}
-
-.sasa-cinema-stage-glow {
-  position: absolute;
-  inset: -10px;
-  z-index: 0;
-  border-radius: 24px;
-  background: var(--player-accent);
-  filter: blur(36px);
-  opacity: 0.16;
-}
-
-.sasa-cinema-stage {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border-radius: 16px;
-  background: #000;
-  box-shadow:
-    0 20px 50px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
-}
-
-.sasa-cinema-stage.is-fluid {
-  aspect-ratio: auto;
-  min-height: 420px;
-}
-
-.sasa-cinema-stage-media {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
 
 .sasa-cinema-frame {
   position: relative;
@@ -3091,414 +1768,6 @@ button {
   color: #bbf7d0;
 }
 
-/* ---- Compact metadata row ----
-   media type • category • Safe for Kids • Parent Approved • Autoplay
-   status — no view counts, likes, or comment totals. */
-
-.sasa-cinema-meta-strip {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin: 14px 0 0;
-}
-
-.sasa-cinema-meta-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #b6bccb;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.sasa-cinema-meta-chip.is-safe {
-  border-color: rgba(52, 211, 153, 0.3);
-  background: rgba(16, 185, 129, 0.1);
-  color: #86efac;
-}
-
-.sasa-cinema-meta-chip.is-approved {
-  border-color: rgba(74, 222, 128, 0.3);
-  background: rgba(34, 197, 94, 0.1);
-  color: #bbf7d0;
-}
-
-.sasa-cinema-meta-chip.is-autoplay {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
-  color: #cbd2e1;
-}
-
-.sasa-cinema-meta-chip.is-type {
-  border-color: var(--player-accent);
-  background: var(--player-accent-soft);
-  color: #f2f3f7;
-}
-
-/* ---- Reaction dock ---- */
-
-.sasa-cinema-reaction-dock {
-  margin: 18px 0 0;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(16px);
-}
-
-.sasa-cinema-reaction-label {
-  margin: 0 0 10px;
-  color: #94a3b8;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.sasa-cinema-reaction-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.sasa-cinema-reaction-pill {
-  position: relative;
-  display: inline-flex;
-  min-height: 40px;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 15px;
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #e5e7eb;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    transform 0.15s ease;
-}
-
-.sasa-cinema-reaction-pill * {
-  pointer-events: none;
-}
-
-.sasa-cinema-reaction-emoji {
-  display: inline-block;
-  font-size: 15px;
-}
-
-.sasa-cinema-reaction-pill:hover {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(255, 255, 255, 0.24);
-}
-
-.sasa-cinema-reaction-pill:active {
-  transform: scale(0.96);
-}
-
-.sasa-cinema-reaction-pill:focus-visible {
-  outline: 2px solid var(--player-accent);
-  outline-offset: 2px;
-}
-
-.sasa-cinema-reaction-pill.selected {
-  border-color: var(--player-accent);
-  background: var(--player-accent-soft);
-  color: #fff;
-}
-
-/* SARA UP NEXT BELOW PLAYER V6 */
-
-/* ---- Up Next: a YouTube-style horizontal recommendation row below the
-   player/media info/reactions on every breakpoint — never a side column. ---- */
-
-.sasa-cinema-upnext {
-  min-width: 0;
-}
-
-.sasa-cinema-upnext-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 0 12px;
-}
-
-.sasa-cinema-upnext-header h3 {
-  margin: 0;
-  color: #f2f3f7;
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.sasa-cinema-upnext-row {
-  display: flex;
-  gap: 10px;
-  padding-bottom: 6px;
-  overflow-x: auto;
-  overflow-y: visible;
-  scroll-snap-type: x proximity;
-  scrollbar-width: thin;
-  -webkit-overflow-scrolling: touch;
-}
-
-.sasa-cinema-upnext-card {
-  position: relative;
-  display: flex;
-  width: 168px;
-  flex: 0 0 auto;
-  flex-direction: column;
-  gap: 6px;
-  padding: 6px;
-  border: 1.5px solid transparent;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  color: #f2f3f7;
-  text-align: left;
-  cursor: pointer;
-  pointer-events: auto;
-  scroll-snap-align: start;
-  touch-action: manipulation;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.sasa-cinema-upnext-card * {
-  pointer-events: none;
-}
-
-.sasa-cinema-upnext-card:hover {
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.sasa-cinema-upnext-card:hover .sasa-cinema-upnext-thumb img {
-  transform: scale(1.06);
-}
-
-.sasa-cinema-upnext-card:focus-visible {
-  outline: 2px solid var(--player-accent);
-  outline-offset: 2px;
-}
-
-/* Current media: a subtle border + tinted wash only — no glow/blur. */
-.sasa-cinema-upnext-card.is-current {
-  cursor: default;
-  border-color: var(--player-accent);
-  background: var(--player-accent-soft);
-}
-
-.sasa-cinema-upnext-thumb {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border-radius: 10px;
-  background: #0b0c10;
-}
-
-.sasa-cinema-upnext-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.25s ease;
-}
-
-.sasa-cinema-upnext-duration {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  padding: 2px 6px;
-  border-radius: 5px;
-  background: rgba(0, 0, 0, 0.75);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.sasa-cinema-upnext-info {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.sasa-cinema-upnext-badge {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  margin: 0 0 2px;
-  color: #9aa3b5;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
-.sasa-cinema-upnext-badge.is-now-playing {
-  color: var(--player-accent);
-}
-
-.sasa-cinema-upnext-now-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #4ade80;
-}
-
-.sasa-cinema-upnext-title {
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.3;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.sasa-cinema-upnext-category {
-  display: block;
-  overflow: hidden;
-  margin-top: 2px;
-  color: #8890a0;
-  font-size: 11px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Desktop: bigger cards, roughly 4-5 visible across the player's width. */
-@media (min-width: 1024px) {
-  .sasa-cinema-upnext-card {
-    width: 216px;
-    gap: 8px;
-    padding: 8px;
-  }
-
-  .sasa-cinema-upnext-row {
-    gap: 14px;
-  }
-}
-
-/* Bottom navigation */
-.kids-player-bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  z-index: 120;
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-around;
-  padding: 9px 16px calc(16px + env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px 20px 0 0;
-  background: rgba(10, 11, 15, 0.85);
-  backdrop-filter: blur(20px);
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
-  isolation: isolate;
-}
-
-.kids-player-bottom-nav button {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  min-width: 66px;
-  min-height: 54px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 7px 13px;
-  border: 0;
-  border-radius: 14px;
-  background: transparent;
-  color: #8890a0;
-  font-size: 10px;
-  font-weight: 700;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-}
-
-.kids-player-bottom-nav button * {
-  pointer-events: none;
-}
-
-.kids-player-bottom-nav button.active {
-  background: var(--player-accent-soft);
-  color: #f2f3f7;
-}
-
-.kids-player-bottom-nav button:hover {
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.kids-player-bottom-nav button:active {
-  transform: scale(0.94);
-}
-
-.kids-player-bottom-nav button:focus-visible {
-  outline: 2px solid var(--player-accent);
-  outline-offset: -2px;
-}
-
-/* Desktop */
-@media (min-width: 760px) {
-  .kids-player-page {
-    width: min(1180px, 100%);
-    margin: 0 auto;
-  }
-
-  .kids-player-bottom-nav {
-    left: 50%;
-    width: min(1180px, 100%);
-    transform: translateX(-50%);
-  }
-
-  /* Theater mode: give the enlarged player extra breathing room. */
-  .kids-player-page.is-theater-mode {
-    width: min(1440px, 100%);
-  }
-
-  .kids-player-page.is-theater-mode .kids-player-bottom-nav {
-    width: min(1440px, 100%);
-  }
-}
-
-/* Mobile portrait */
-@media (max-width: 420px) {
-  .sasa-cinema-upnext-card {
-    width: 148px;
-  }
-
-  .sasa-cinema-reaction-pill {
-    padding: 7px 11px;
-    font-size: 12px;
-  }
-}
-
-/* Mobile landscape — prioritize the media stage, compact everything else */
-@media (orientation: landscape) and (max-height: 600px) {
-  .sasa-cinema-stage {
-    aspect-ratio: auto;
-    height: calc(100dvh - 120px);
-  }
-
-  .sasa-cinema-stage-shell {
-    padding: 8px;
-  }
-}
-
 .device-locked-page {
   display: grid;
   min-height: 100dvh;
@@ -3657,206 +1926,6 @@ button {
 .device-locked-actions button:active {
   transform: translateY(3px);
   box-shadow: none;
-}
-
-.kids-search-panel {
-  display: flex;
-  width: min(680px, calc(100% - 32px));
-  align-items: center;
-  gap: 10px;
-  margin: 14px auto;
-  padding: 12px 16px;
-  border: 2px solid rgba(0, 180, 255, 0.25);
-  border-radius: 18px;
-  background: white;
-}
-
-.kids-search-panel input {
-  min-width: 0;
-  flex: 1;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  font: inherit;
-  font-weight: 700;
-}
-
-.kids-search-panel button {
-  display: grid;
-  place-items: center;
-  padding: 4px;
-  border: 0;
-  background: transparent;
-}
-
-.kids-category-nav button.selected {
-  transform: translateY(-3px);
-}
-
-.kids-category-nav button.selected > span {
-  outline: 4px solid #00b4ff;
-  outline-offset: 3px;
-}
-
-.kids-all-category {
-  display: grid;
-  place-items: center;
-  background: #ffe16d;
-  font-size: 34px;
-}
-
-.kids-video-title-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.kids-library-button {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  padding: 9px;
-  border: 0;
-  border-radius: 50%;
-  background: #eaeef2;
-  color: #60707c;
-}
-
-.kids-library-button.saved {
-  background: #ffdad7;
-  color: #ba1724;
-}
-
-.kids-empty-view {
-  grid-column: 1 / -1;
-  padding: 70px 20px;
-  text-align: center;
-}
-
-.kids-empty-view > span {
-  font-size: 58px;
-}
-
-.kids-empty-view h2 {
-  margin: 14px 0 7px;
-}
-
-.kids-empty-view p {
-  margin: 0;
-  color: #60707c;
-}
-
-/* Fix clickable layers for header and navigation */
-.kids-video-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  isolation: isolate;
-}
-
-.kids-video-header {
-  position: relative;
-  z-index: 3;
-  overflow: visible;
-}
-
-.kids-video-header > button {
-  position: relative;
-  z-index: 10;
-  min-width: 48px;
-  min-height: 48px;
-  pointer-events: auto;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.kids-category-nav {
-  position: relative;
-  z-index: 1;
-}
-
-.kids-category-nav button {
-  position: relative;
-  z-index: 2;
-  min-height: 88px;
-  pointer-events: auto;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.kids-video-grid {
-  position: relative;
-  z-index: 1;
-}
-
-.kids-home-bottom-nav {
-  z-index: 100;
-  isolation: isolate;
-  pointer-events: auto;
-}
-
-.kids-home-bottom-nav button {
-  position: relative;
-  z-index: 2;
-  min-width: 44px;
-  flex: 1;
-  min-height: 52px;
-  padding: 4px 2px;
-  pointer-events: auto;
-  cursor: pointer;
-  touch-action: manipulation;
-  font-size: 11px;
-}
-
-.kids-home-bottom-nav button.active::before {
-  z-index: -1;
-  pointer-events: none;
-}
-
-.kids-search-panel {
-  position: relative;
-  z-index: 4;
-  display: flex;
-  width: min(680px, calc(100% - 32px));
-  align-items: center;
-  gap: 10px;
-  margin: 14px auto;
-  padding: 12px 16px;
-  border: 2px solid rgba(0, 180, 255, 0.3);
-  border-radius: 18px;
-  background: white;
-  box-shadow: 0 5px 18px rgba(31, 41, 55, 0.09);
-  pointer-events: auto;
-}
-
-.kids-search-panel input {
-  min-width: 0;
-  flex: 1;
-  height: 40px;
-  padding: 0 5px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: #1f2937;
-  font: inherit;
-  font-weight: 700;
-  pointer-events: auto;
-}
-
-.kids-search-panel button {
-  position: relative;
-  z-index: 5;
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border: 0;
-  border-radius: 50%;
-  background: #eaf5ff;
-  color: #3b82f6;
-  pointer-events: auto;
-  cursor: pointer;
 }
 
 /* SARA REAL DEVICE MOBILE POLISH V15 pass — the 7-item bottom nav's 12px top
@@ -3868,171 +1937,8 @@ button {
    Placed before the 420px block below so 420px's own overrides still win
    at even smaller widths (matches the source-order convention already
    used by every other max-width block in this file). */
-@media (max-width: 480px) {
-  .kids-home-bottom-nav {
-    padding-top: 8px;
-    padding-bottom: calc(14px + env(safe-area-inset-bottom));
-  }
-
-  .kids-home-bottom-nav button {
-    min-height: 48px;
-  }
-}
 
 @media (max-width: 420px) {
-  .kids-video-header {
-    gap: 10px;
-  }
-
-  .kids-video-header > button {
-    width: 48px;
-    height: 48px;
-    flex-basis: 48px;
-  }
-
-  /* SARA KIDS HOME MOBILE V14 — this used to hardcode 10px, which matches
-     every phone at <=420px and so always won over the base rule's
-     env(safe-area-inset-right/left) term above (same source-order pitfall
-     the V13 comments elsewhere in this file describe): the compact 10px
-     was correct for the design, but it silently dropped landscape-cutout
-     safety exactly where it mattered most. max() keeps the compact value
-     everywhere the inset is 0 and only grows it where the inset is real. */
-  .kids-home-bottom-nav {
-    padding-right: max(10px, env(safe-area-inset-right));
-    padding-left: max(10px, env(safe-area-inset-left));
-  }
-
-  .kids-home-bottom-nav button {
-    width: auto;
-    flex: 1;
-    font-size: 10px;
-  }
-}
-
-.kids-video-header > button {
-  position: relative;
-  z-index: 50;
-  min-width: 170px;
-  min-height: 50px;
-  justify-content: center;
-  cursor: pointer;
-  pointer-events: auto;
-}
-
-.kids-video-header > button::after {
-  position: absolute;
-  inset: -6px;
-  content: "";
-}
-
-/* Make Parental Settings behave like a normal button */
-.kids-video-header > button {
-  position: relative;
-  z-index: 50;
-  display: inline-flex;
-  min-width: 170px;
-  min-height: 50px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 18px;
-  border: 2px solid rgba(255, 255, 255, 0.45);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.32);
-  color: white;
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-  user-select: none;
-}
-
-.kids-video-header > button::after {
-  display: none;
-  content: none;
-}
-
-.kids-video-header > button * {
-  pointer-events: none;
-}
-
-.kids-video-header > button:hover {
-  background: rgba(255, 255, 255, 0.48);
-  transform: translateY(-1px);
-}
-
-.kids-video-header > button:active {
-  background: rgba(255, 255, 255, 0.6);
-  transform: translateY(1px) scale(0.98);
-}
-
-.kids-video-header > button:focus-visible {
-  outline: 4px solid rgba(255, 255, 255, 0.75);
-  outline-offset: 3px;
-}
-
-@media (max-width: 420px) {
-  .kids-video-header > button {
-    min-width: 50px;
-    width: 50px;
-    height: 50px;
-    padding: 0;
-  }
-}
-
-/* Removed a byte-for-byte duplicate of the ".kids-video-header > button" rule
-   block above (comment, base rule, pseudo-elements, hover/active/focus
-   states, and the 420px media query), confirmed unused/no-op since it
-   repeated the exact same selectors and values immediately after the
-   original. */
-
-.kids-video-title-row {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.kids-video-title-row h2 {
-  min-width: 0;
-  flex: 1;
-}
-
-.kids-library-button {
-  position: relative;
-  z-index: 10;
-  display: grid;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
-  place-items: center;
-  padding: 0;
-  border: 2px solid #dbeafe;
-  border-radius: 50%;
-  background: white;
-  color: #64748b;
-  box-shadow: 0 3px 9px rgba(31, 41, 55, 0.12);
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-}
-
-.kids-library-button * {
-  pointer-events: none;
-}
-
-.kids-library-button:hover {
-  transform: scale(1.06);
-}
-
-.kids-library-button:active {
-  transform: scale(0.94);
-}
-
-.kids-library-button.saved {
-  border-color: #ffb4ab;
-  background: #ffdad6;
-  color: #ba1a1a;
 }
 
 .screen-time-quick-control {
@@ -4254,6 +2160,7 @@ button {
 }
 
 /* Show blocked channel list inside the desktop Content Filters page */
+
 .parent-content-filter-page .mobile-blocked-channels {
   display: block !important;
   width: 100%;
@@ -4303,7 +2210,6 @@ button {
   background: #fecaca;
 }
 
-/* Desktop Content Filters channel list */
 .parent-content-filter-page .mobile-dashboard-section.blocked-section {
   display: block !important;
   width: 100%;
@@ -5057,6 +2963,7 @@ button {
 }
 
 /* Ensure Parent Settings button is clickable */
+
 .parent-sidebar,
 .parent-sidebar-footer {
   position: relative;
@@ -5224,6 +3131,7 @@ button {
 }
 
 /* Fix parent sidebar navigation overflow */
+
 .parent-dashboard-sidebar {
   display: flex;
   flex-direction: column;
@@ -6432,139 +4340,6 @@ button {
    Centered kids header and quick navigation
    ========================================================= */
 
-.kids-video-header.kids-centered-header {
-  display: flex;
-  width: min(1000px, calc(100% - 24px));
-  margin-right: auto;
-  margin-left: auto;
-  /* SARA REAL DEVICE MOBILE POLISH V15 pass — this two-class selector has higher
-     specificity than the plain `.kids-video-header` rule above (which is
-     the one carrying the env(safe-area-inset-*) terms per the SARA ANDROID
-     SAFE VIEWPORT V13 doctrine), so it always wins — a `padding: 22px 18px`
-     shorthand here was silently resetting every side back to a flat value
-     and dropping the status-bar/notch/landscape-cutout insets on the one
-     header this kids-facing component actually renders (`kids-video-header
-     kids-centered-header` together, always). Longhand sides restore the
-     safe-area terms while keeping the same design values everywhere the
-     inset is 0. */
-  padding-top: calc(22px + env(safe-area-inset-top));
-  padding-right: max(18px, env(safe-area-inset-right));
-  padding-bottom: 22px;
-  padding-left: max(18px, env(safe-area-inset-left));
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
-  border-radius: 0 0 32px 32px;
-  text-align: center;
-}
-
-.kids-header-main {
-  display: flex;
-  width: 100%;
-  min-width: 0;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.kids-header-title {
-  width: 100%;
-  text-align: center;
-}
-
-.kids-header-title > span {
-  justify-content: center;
-}
-
-.kids-video-header .kids-header-title h1 {
-  text-align: center;
-}
-
-.topbar-actions.kids-centered-actions {
-  display: flex;
-  width: 100%;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.kids-centered-actions .icon-button {
-  flex: 0 0 44px;
-}
-
-.kids-centered-actions .kids-parent-btn {
-  flex: 0 0 auto;
-}
-
-.kids-quick-tabs {
-  display: flex;
-  width: min(1000px, calc(100% - 24px));
-  margin: 5px auto 0;
-  padding: 10px 12px;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  overflow-x: auto;
-  border-top: 1px solid rgba(221, 214, 254, 0.75);
-  border-bottom: 1px solid rgba(221, 214, 254, 0.75);
-  background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(12px);
-  scrollbar-width: none;
-}
-
-.kids-quick-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.kids-quick-tabs > button {
-  flex: 0 0 auto;
-}
-
-@media (min-width: 700px) {
-  .kids-video-header.kids-centered-header {
-    padding-top: 25px;
-    padding-bottom: 18px;
-  }
-
-  .kids-header-title h1 {
-    font-size: 28px;
-  }
-}
-
-@media (max-width: 699px) {
-  .kids-video-header.kids-centered-header {
-    width: 100%;
-    padding-bottom: 17px;
-    /* SARA REAL DEVICE MOBILE POLISH V15 pass — same shorthand-resets-safe-area
-       issue as the base rule above, repeated here since this breakpoint's
-       own shorthand would otherwise re-strip it. Longhand sides keep the
-       17px/12px design values while restoring the env() terms. */
-    padding-top: calc(17px + env(safe-area-inset-top));
-    padding-right: max(12px, env(safe-area-inset-right));
-    padding-left: max(12px, env(safe-area-inset-left));
-    border-radius: 0 0 25px 25px;
-  }
-
-  .topbar-actions.kids-centered-actions {
-    gap: 8px;
-  }
-
-  .kids-centered-actions .kids-parent-btn {
-    min-height: 44px;
-    padding: 9px 13px;
-    font-size: 12px;
-  }
-
-  .kids-quick-tabs {
-    width: 100%;
-    padding: 9px 10px;
-    justify-content: flex-start;
-  }
-}
-
 /* SARA REAL DEVICE MOBILE POLISH V15 pass — real-device screenshots showed the
    Kids Home header (greeting + title + theme/sound/account/parental row)
    still using near-desktop padding/gap on a normal phone, squeezing the
@@ -6574,44 +4349,9 @@ button {
    smaller phone still gets that block's tighter values (source order, not
    just specificity, decides ties between two max-width blocks that are
    both true at once). */
-@media (max-width: 480px) {
-  .kids-video-header.kids-centered-header {
-    gap: 8px;
-    padding-top: calc(12px + env(safe-area-inset-top));
-    padding-right: max(12px, env(safe-area-inset-right));
-    padding-bottom: 10px;
-    padding-left: max(12px, env(safe-area-inset-left));
-  }
-
-  .kids-header-main {
-    gap: 6px;
-  }
-
-  .topbar-actions.kids-centered-actions {
-    gap: 6px;
-  }
-}
-
-@media (max-width: 420px) {
-  .kids-centered-actions .icon-button {
-    width: 42px;
-    height: 42px;
-    flex-basis: 42px;
-  }
-
-  .kids-centered-actions .kids-parent-btn {
-    width: auto;
-    min-width: 0;
-    height: 42px;
-    padding: 8px 12px;
-  }
-
-  .kids-centered-actions .kids-parent-btn span {
-    display: inline;
-  }
-}
 
 /* ===== Parent dashboard mobile viewport fix ===== */
+
 @media (max-width: 767px) {
   .parent-dashboard {
     position: relative;
@@ -6647,6 +4387,7 @@ button {
      Parent Controls is the document itself; .flex leftover (this element
      is no longer a flex child now that .parent-dashboard is display:block)
      removed too. */
+
   .parent-dashboard-main {
     display: block;
     width: 100%;
@@ -7092,6 +4833,7 @@ button {
 }
 
 /* ===== Parent settings mobile fixes ===== */
+
 @media (max-width: 767px) {
   .parent-settings-page {
     display: grid;
@@ -7170,9 +4912,12 @@ button {
 }
 
 /* Final mobile parent-dashboard layout correction */
+
 /* SARA PARENT MOBILE RECOVERY V12 */
+
 @media (max-width: 767px) {
   /* Hide the legacy desktop navigation completely */
+
   .parent-dashboard .parent-sidebar,
   .parent-dashboard .parent-desktop-header,
   .parent-dashboard .parent-mobile-header {
@@ -7180,6 +4925,7 @@ button {
   }
 
   /* Keep only the newer mobile header */
+
   .parent-dashboard-mobile-header {
     display: block !important;
     position: sticky;
@@ -7229,6 +4975,7 @@ button {
   }
 
   /* Ensure dashboard sections stack vertically */
+
   .parent-dashboard-content > div,
   .parent-dashboard-content > section,
   .parent-dashboard-content > article {
@@ -7242,6 +4989,7 @@ button {
   }
 
   /* Keep the new bottom navigation visible */
+
   .parent-dashboard-bottom-nav {
     display: flex !important;
     position: fixed !important;
@@ -7262,6 +5010,7 @@ button {
    small screens never actually applied. Re-asserting it here (after V12,
    also !important) restores the intended small-phone padding without
    touching the V12 block's own safe-area-critical padding values. */
+
 @media (max-width: 390px) {
   .parent-dashboard-content {
     padding-right: 9px !important;
@@ -7269,53 +5018,12 @@ button {
   }
 }
 
-/* PROFILE PAGE WIDTH ALIGNMENT */
-.kids-profile-page > header,
-.kids-profile-page > nav {
-  width: min(calc(100% - 2rem), 760px);
-  margin-inline: auto;
-  box-sizing: border-box;
-}
-
-/* FULL WIDTH DYNAMIC CATEGORY ROW */
-.kids-category-nav {
-  width: min(1180px, calc(100% - 24px));
-  justify-content: space-between;
-  gap: clamp(14px, 2.2vw, 32px);
-  margin-inline: auto;
-  padding-inline: 12px;
-}
-
-.kids-category-nav button {
-  min-width: 84px;
-  flex: 0 0 84px;
-}
-
-@media (max-width: 699px) {
-  .kids-category-nav {
-    width: 100%;
-    justify-content: flex-start;
-    gap: 18px;
-    padding-inline: 16px;
-  }
-
-  .kids-category-nav button {
-    min-width: 72px;
-    flex-basis: 72px;
-  }
-}
-
-/* PREVENT OLD MEDIA FLASH DURING TAB CHANGE */
-.kids-video-home main:not(.kids-video-grid) > article,
-.kids-video-home main:not(.kids-video-grid) > div > article {
-  display: none !important;
-}
-
 /* PROFESSIONAL VIDEO STAGE — photos + uploaded videos (YouTubeStyleMediaPlayer):
    the media surface, a fading title overlay, and ONE bottom control dock
    (seek bar + transport controls) shared by both photos and videos. Photos
    reuse the same seek bar and time readout for their 8-second slideshow
    timer instead of getting a second bar of their own. */
+
 .sasa-cinema-player {
   position: relative;
   display: flex;
@@ -7388,6 +5096,7 @@ button {
 }
 
 /* Bottom control dock */
+
 .sasa-cinema-controlbar {
   position: absolute;
   right: 10px;
@@ -7572,6 +5281,7 @@ button {
 
 /* "3 / 12" media-position readout, right next to the time — tasteful, not a
    second badge competing with Now Playing. */
+
 .sasa-cinema-position {
   flex: 0 0 auto;
   margin-left: 8px;
@@ -7588,6 +5298,7 @@ button {
 /* Reused for the photo slideshow's "Next in Xs" hint — sits inline right
    after the time readout inside the single control dock, never a bar of
    its own. */
+
 .sasa-cinema-photo-caption {
   flex: 0 0 auto;
   margin-left: 8px;
@@ -7690,10 +5401,12 @@ button {
 }
 
 /* SARA MOBILE FULLSCREEN FINAL V9 */
+
 /* Landscape fullscreen on notched phones previously pinned the controlbar/
    lock pill/top overlay at flat 14-20px offsets, ignoring the device
    safe-area cutout on the left/right edges (only bottom was inset-aware).
    Adding the missing insets here instead of a new override block. */
+
 .sasa-cinema-player:fullscreen .sasa-cinema-controlbar {
   right: calc(20px + env(safe-area-inset-right));
   bottom: calc(16px + env(safe-area-inset-bottom));
@@ -7709,11 +5422,6 @@ button {
   padding-left: calc(18px + env(safe-area-inset-left));
   padding-right: calc(18px + env(safe-area-inset-right));
   padding-top: calc(14px + env(safe-area-inset-top));
-}
-
-.sasa-cinema-player:fullscreen .sasa-cinema-frame-nav {
-  right: calc(14px + env(safe-area-inset-right));
-  left: calc(14px + env(safe-area-inset-left));
 }
 
 @media (max-width: 699px) {
@@ -7738,6 +5446,7 @@ button {
      instead of just looking cramped. Wrapping keeps every control tappable;
      margin-left:auto right-aligns the second group instead of leaving it
      stuck at the left edge. */
+
   .sasa-cinema-control-row {
     flex-wrap: wrap;
     row-gap: 4px;
@@ -7773,83 +5482,13 @@ button {
   }
 }
 
-/* COMPLETE ASSIGNED MEDIA NAVIGATION — YouTube embed prev/next arrows */
-
-.sasa-cinema-frame-nav {
-  position: absolute;
-  top: 50%;
-  right: 14px;
-  left: 14px;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  pointer-events: none;
-  transform: translateY(-50%);
-}
-
-.sasa-cinema-frame-nav button {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 50%;
-  background: rgba(10, 11, 15, 0.7);
-  color: white;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(7px);
-  cursor: pointer;
-  pointer-events: auto;
-  touch-action: manipulation;
-  transition:
-    background 0.15s ease,
-    transform 0.15s ease;
-}
-
-.sasa-cinema-frame-nav button:hover {
-  background: rgba(10, 11, 15, 0.92);
-  transform: scale(1.06);
-}
-
-.sasa-cinema-frame-nav button:active {
-  transform: scale(0.92);
-}
-
-.sasa-cinema-frame-nav button:focus-visible {
-  outline: 2px solid var(--player-accent, #818cf8);
-  outline-offset: 2px;
-}
-
-@media (max-width: 600px) {
-  .sasa-cinema-frame-nav {
-    right: 8px;
-    left: 8px;
-  }
-
-  .sasa-cinema-frame-nav button {
-    width: 40px;
-    height: 40px;
-  }
-}
-
 /* Reduced-motion fallback: keep every state change (fades, focus, selection)
-   but drop the continuous decorative motion — the ambient glow breathe. */
+   instant rather than animated for the interactive player surface. */
 @media (prefers-reduced-motion: reduce) {
-  .sasa-cinema-ambient-glow {
-    animation: none !important;
-  }
-
-  .sasa-cinema-bg-image,
-  .sasa-cinema-stage-media,
   .sasa-cinema-media,
   .sasa-cinema-center-play,
   .sasa-cinema-top-overlay,
-  .sasa-cinema-controlbar,
-  .sasa-cinema-upnext-card,
-  .sasa-cinema-upnext-thumb img,
-  .sasa-cinema-reaction-pill {
+  .sasa-cinema-controlbar {
     transition-duration: 0.01ms !important;
   }
 }

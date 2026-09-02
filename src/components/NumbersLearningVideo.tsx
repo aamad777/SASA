@@ -153,14 +153,14 @@ export default function NumbersLearningVideo({
   return (
     <div className="w-full relative rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-900 border-4 border-sky-300 text-white min-h-[360px] flex flex-col justify-between p-4 sm:p-6">
       {/* Top Banner / Progress Indicator */}
-      <div className="flex items-center justify-between z-10 gap-2">
+      <div className="flex flex-wrap items-center justify-between z-10 gap-2">
         {/* Pippin Mascot */}
-        <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
+        <div className="flex min-w-0 items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
           <div className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-sky-200 shrink-0">
             <img src={penguinImg} alt="Pippin" className="w-full h-full object-cover" />
           </div>
-          <div>
-            <span className="text-xs font-black tracking-tight block text-amber-300">
+          <div className="min-w-0">
+            <span className="text-xs font-black tracking-tight block truncate text-amber-300">
               Pippin's Number School 🐧
             </span>
             <span className="text-[10px] text-sky-200 font-bold">
@@ -170,13 +170,13 @@ export default function NumbersLearningVideo({
         </div>
 
         {/* Quick Number Selector Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto max-w-[200px] sm:max-w-xs scrollbar-none py-1">
+        <div className="flex items-center gap-1 overflow-x-auto max-w-full sm:max-w-xs scrollbar-none py-1">
           {numberItems.map((item, idx) => (
             <button
               key={item.num}
               type="button"
               onClick={() => handleSelectNumber(idx)}
-              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full font-black text-xs sm:text-sm flex items-center justify-center transition cursor-pointer shrink-0 ${
+              className={`w-11 h-11 sm:w-9 sm:h-9 rounded-full font-black text-xs sm:text-sm flex items-center justify-center transition cursor-pointer shrink-0 ${
                 currentNumIndex === idx
                   ? "bg-amber-400 text-amber-950 scale-110 shadow-lg shadow-amber-400/40 ring-2 ring-white"
                   : "bg-white/15 text-white hover:bg-white/30"
@@ -226,7 +226,7 @@ export default function NumbersLearningVideo({
           ) : (
             <>
               {/* Number Card Display */}
-              <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 mb-4">
+              <div className="flex min-w-0 flex-col sm:flex-row items-center gap-4 sm:gap-8 mb-4">
                 <motion.div
                   whileHover={{ scale: 1.08 }}
                   className={`w-28 h-28 sm:w-36 sm:h-36 rounded-3xl bg-gradient-to-tr ${activeItem.bg} border-4 border-white/80 shadow-2xl flex flex-col items-center justify-center text-white relative`}

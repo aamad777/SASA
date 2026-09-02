@@ -1,56 +1,71 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Play, ArrowLeft, Star } from "lucide-react";
+import { ArrowLeft, Play } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
+import { kidsVideos } from "@/components/KidsVideoHome";
+import { mediaThumbnailFallback } from "@/components/KidsVideoHome";
 
 export const Route = createFileRoute("/videos")({
   component: VideosPage,
 });
 
-const videos = [
-  { id: 1, title: "Sunny Morning Song", duration: "2:30", color: "bg-sky-soft" },
-  { id: 2, title: "Animal Friends", duration: "3:15", color: "bg-peach-soft" },
-  { id: 3, title: "Counting Clouds", duration: "2:45", color: "bg-mint" },
-  { id: 4, title: "Color Parade", duration: "4:00", color: "bg-sun" },
-  { id: 5, title: "Bedtime Lullaby", duration: "3:30", color: "bg-sky-soft" },
-  { id: 6, title: "Shapes Everywhere", duration: "2:10", color: "bg-peach-soft" },
-];
-
+/**
+ * Standalone catalogue of the built-in video library. The cards are real
+ * entries from the same `kidsVideos` list the app itself plays, and each one
+ * opens the app on the Home section rather than pretending to play here.
+ */
 function VideosPage() {
   return (
-    <div className="min-h-screen bg-background pb-28">
-      <main className="mx-auto max-w-3xl px-4 pt-6 sm:pt-10">
-        <header className="mb-6 flex items-center gap-4">
-          <Link
-            to="/"
-            className="grid h-12 w-12 place-items-center rounded-2xl bg-muted text-foreground transition-colors hover:bg-muted/80"
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </Link>
-          <div>
-            <h1 className="font-heading text-3xl font-extrabold text-foreground">Watch Videos</h1>
-            <p className="text-sm font-medium text-muted-foreground">
-              Fun, safe videos for little ones
-            </p>
-          </div>
-        </header>
+    <div className="sasa-standalone">
+      <header className="sasa-auth-topbar">
+        <Link to="/" className="sasa-iconbtn" aria-label="Back to SARA">
+          <ArrowLeft size={22} />
+        </Link>
+        <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+          <h1 className="sasa-standalone-title">Videos</h1>
+          <p className="sasa-standalone-sub">The built-in video library</p>
+        </div>
+        <Link to="/" className="sasa-btn is-primary">
+          Open the app
+        </Link>
+      </header>
 
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {videos.map((video) => (
-            <button
-              key={video.id}
-              className={`kid-card toddler-shadow flex items-center gap-5 text-left ${video.color}`}
-            >
-              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/60">
-                <Play className="h-8 w-8 fill-current text-foreground" />
+      <main className="sasa-container">
+        <div className="sasa-grid">
+          {kidsVideos.map((video) => (
+            <article className="sasa-card" key={video.id}>
+              <Link
+                to="/"
+                search={{ section: "home" }}
+                className="sasa-card-link"
+                aria-label={`Open ${video.title} in SARA`}
+              >
+                <span className="sasa-card-thumb">
+                  <img
+                    src={video.image}
+                    alt=""
+                    loading="lazy"
+                    onError={(event) => {
+                      event.currentTarget.onerror = null;
+                      event.currentTarget.src = mediaThumbnailFallback;
+                    }}
+                  />
+                  <span className="sasa-card-play" aria-hidden="true">
+                    <Play size={30} fill="currentColor" />
+                  </span>
+                  <span className="sasa-card-badge">{video.duration}</span>
+                </span>
+              </Link>
+
+              <div className="sasa-card-body">
+                <div className="sasa-card-text">
+                  <h2 className="sasa-card-title">{video.title}</h2>
+                  <p className="sasa-card-channel">SARA Kids</p>
+                  <p className="sasa-card-meta">Video · {video.category}</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h3 className="font-heading text-lg font-bold text-foreground">{video.title}</h3>
-                <p className="text-sm font-medium text-muted-foreground">{video.duration}</p>
-              </div>
-              <Star className="ml-auto h-6 w-6 shrink-0 text-sun" />
-            </button>
+            </article>
           ))}
-        </section>
+        </div>
       </main>
 
       <BottomNav />

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Eye, EyeOff, LockKeyhole, Plus, X, Settings } from "lucide-react";
+import BrandMark from "./layout/BrandMark";
+import ProfileAvatar from "./layout/ProfileAvatar";
 
 // SARA_PIN_RESET_V5 — aliased on import: this file also declares a local
 // `setChildPin` state setter (useState below) for the *verify* PIN input.
@@ -275,66 +277,28 @@ export default function DatabaseProfileSelection({
   };
 
   return (
-    <main
-      style={{
-        // SARA WHO IS WATCHING MOBILE V14 — 100vh includes the mobile
-        // browser's collapsible address-bar height, and a flat 24px padding
-        // ignored the status bar / notch and Android gesture-nav area
-        // entirely (this screen has no bottom nav of its own, so the
-        // bottom inset only matters when the page is short enough that the
-        // last content sits at the true device edge).
-        minHeight: "100dvh",
-        paddingTop: "max(24px, env(safe-area-inset-top))",
-        paddingRight: "max(24px, env(safe-area-inset-right))",
-        paddingBottom: "max(24px, env(safe-area-inset-bottom))",
-        paddingLeft: "max(24px, env(safe-area-inset-left))",
-        background: "linear-gradient(135deg, #eff6ff, #fdf2f8)",
-      }}
-    >
-      <header
-        style={{
-          maxWidth: 1050,
-          margin: "0 auto",
-          display: "flex",
-          // Mobile fit fix: this row of 4 labeled buttons plus the
-          // parent-name block had no wrap, so it overflowed the viewport
-          // horizontally at 320-390px widths. flexWrap lets both groups
-          // reflow onto their own row(s) instead of clipping/scrolling.
-          flexWrap: "wrap",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 16,
-        }}
-      >
-        <div>
-          <small style={{ color: "#64748b" }}>Connected parent</small>
+    <main className="sasa-auth-page">
+      {/* SARA WHO IS WATCHING MOBILE V14 — the safe-area insets that used to
+          live on this screen's inline padding now come from .sasa-auth-page
+          / .sasa-auth-topbar in src/styles/app-pages.css, so every entry
+          screen handles the notch and gesture bar the same way. */}
+      <header className="sasa-auth-topbar">
+        <span className="sasa-brand" aria-hidden="true">
+          <BrandMark />
+          <span className="sasa-brand-word">
+            SARA<sup>kids</sup>
+          </span>
+        </span>
 
-          <h2 style={{ margin: "4px 0 0" }}>{displayParentName}</h2>
-        </div>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 7,
-              padding: "11px 16px",
-              border: 0,
-              borderRadius: 14,
-              background: "#2563eb",
-              color: "white",
-              fontWeight: 800,
-              cursor: "pointer",
-            }}
-          >
+        <div className="sasa-auth-topbar-actions">
+          <button type="button" className="sasa-btn is-primary" onClick={() => setShowForm(true)}>
             <Plus size={18} />
-            Add Child
+            Add child
           </button>
 
           <button
             type="button"
+            className="sasa-btn"
             onClick={() => {
               setShowManagePin(true);
               setManagedChildId(children.length === 1 ? String(children[0].id) : null);
@@ -342,219 +306,101 @@ export default function DatabaseProfileSelection({
               setManagePinSuccess("");
             }}
             disabled={children.length === 0}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 7,
-              padding: "11px 16px",
-              border: 0,
-              borderRadius: 14,
-              background: children.length === 0 ? "#e2e8f0" : "#fef3c7",
-              color: children.length === 0 ? "#94a3b8" : "#92400e",
-              fontWeight: 800,
-              cursor: children.length === 0 ? "not-allowed" : "pointer",
-            }}
           >
             <LockKeyhole size={18} />
             Manage PIN
           </button>
 
-          <button
-            type="button"
-            onClick={onOpenParentControls}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 7,
-              padding: "11px 16px",
-              border: 0,
-              borderRadius: 14,
-              background: "linear-gradient(135deg, #8b5cf6, #ec4899)",
-              color: "white",
-              fontWeight: 800,
-              cursor: "pointer",
-              boxShadow: "0 8px 20px rgba(139, 92, 246, 0.25)",
-            }}
-          >
+          <button type="button" className="sasa-btn" onClick={onOpenParentControls}>
             <Settings size={18} />
-            Parent Controls
+            Parent controls
           </button>
 
-          <button
-            type="button"
-            onClick={onLogout}
-            style={{
-              padding: "11px 16px",
-              border: 0,
-              borderRadius: 14,
-              background: "#fee2e2",
-              color: "#b91c1c",
-              fontWeight: 800,
-              cursor: "pointer",
-            }}
-          >
-            Sign Out
+          <button type="button" className="sasa-btn is-danger" onClick={onLogout}>
+            Sign out
           </button>
         </div>
       </header>
 
-      {/* SARA REAL DEVICE MOBILE POLISH V15 pass — sara-who-section/-heading are
-          new CSS hooks so the @media (max-width: 480px) rule in styles.css
-          can shrink the 70px top margin and 48px heading (real-device
-          screenshots showed this consuming most of the screen before any
-          profile card was visible) without touching the desktop layout,
-          which keeps its original inline values. */}
-      <section
-        className="sara-who-section"
-        style={{
-          maxWidth: 1050,
-          margin: "70px auto 0",
-          textAlign: "center",
-        }}
-      >
-        <div style={{ fontSize: 30 }}>☁️ ⭐ 🌈</div>
+      <section className="sasa-auth-body">
+        <p className="sasa-auth-eyebrow">Signed in as {displayParentName}</p>
 
-        <h1 className="sara-who-heading" style={{ fontSize: 48, margin: "10px 0" }}>
-          Who&apos;s Watching?
-        </h1>
+        <h1 className="sasa-auth-title">Who&apos;s watching?</h1>
 
-        <p style={{ color: "#64748b" }}>Select an existing child or create a new profile.</p>
+        <p className="sasa-auth-sub">Choose a child profile, or add a new one.</p>
 
-        {loading && <p>Loading child profiles...</p>}
+        {loading && (
+          <div className="sasa-notice" role="status">
+            <span className="sasa-spinner" aria-hidden="true" />
+            Loading child profiles…
+          </div>
+        )}
 
         {error && !loading && (
-          <div>
-            <p style={{ color: "#b91c1c" }}>{error}</p>
+          <div className="sasa-notice is-error" role="alert">
+            <span>{error}</span>
             <button type="button" onClick={onRetry}>
-              Try Again
+              Try again
             </button>
           </div>
         )}
 
         {!loading && !error && children.length === 0 && (
-          <div
-            style={{
-              maxWidth: 470,
-              margin: "35px auto",
-              padding: 35,
-              borderRadius: 26,
-              background: "white",
-              boxShadow: "0 18px 45px rgba(15,23,42,.12)",
-            }}
-          >
-            <Plus size={48} color="#2563eb" />
-
+          <section className="sasa-state">
+            <span className="sasa-state-icon" aria-hidden="true">
+              <Plus size={22} />
+            </span>
             <h2>Create your first child profile</h2>
-
-            <p style={{ color: "#64748b" }}>
-              Add the child&apos;s name, age, login name, and optional PIN.
-            </p>
-
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              style={{
-                padding: "13px 20px",
-                border: 0,
-                borderRadius: 14,
-                background: "#2563eb",
-                color: "white",
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
-            >
-              Add Child
+            <p>Add the child&apos;s name, age, login name, and an optional PIN.</p>
+            <button type="button" className="sasa-btn is-primary" onClick={() => setShowForm(true)}>
+              <Plus size={18} />
+              Add child
             </button>
-          </div>
+          </section>
         )}
 
         {!loading && !error && children.length > 0 && (
-          // SARA WHO IS WATCHING MOBILE V14 — sara-who-profile-grid/-card
-          // classes let a @media (max-width: 480px) rule in styles.css
-          // shrink the fixed 180px card to a compact size that fits two per
-          // row on 360-430px phones, falling back to one per row at 320px
-          // via the existing flexWrap (no card is ever forced narrower than
-          // 132px, so it stays readable rather than tiny).
-          <div
-            className="sara-who-profile-grid"
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              flexWrap: "wrap",
-              gap: 24,
-              marginTop: 35,
-            }}
-          >
-            {children.map((child) => (
-              <button
-                type="button"
-                key={child.id}
-                className="sara-who-card"
-                onClick={() => openChildProfile(child)}
-                style={{
-                  width: 180,
-                  padding: 20,
-                  border: 0,
-                  borderRadius: 26,
-                  background: "white",
-                  boxShadow: "0 14px 35px rgba(15,23,42,.12)",
-                  cursor: "pointer",
-                }}
-              >
-                <div
-                  className="sara-who-avatar"
-                  style={{
-                    width: 115,
-                    height: 115,
-                    margin: "0 auto",
-                    display: "grid",
-                    placeItems: "center",
-                    borderRadius: "50%",
-                    background: getDatabaseProfileColor(child.id),
-                    fontSize: 58,
-                  }}
+          <div className="sasa-profile-grid">
+            {children.map((child) => {
+              const savedImage = getSavedChildImage(child);
+
+              return (
+                <button
+                  type="button"
+                  key={child.id}
+                  className="sasa-profile-card"
+                  onClick={() => openChildProfile(child)}
                 >
-                  {getSavedChildImage(child) ? (
-                    <img
-                      src={getSavedChildImage(child)}
-                      alt={child.display_name}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        borderRadius: "50%",
-                        objectFit: "cover",
-                      }}
-                    />
-                  ) : (
-                    getDatabaseProfileEmoji(child.id)
-                  )}
-                </div>
+                  <ProfileAvatar
+                    className="sasa-profile-avatar"
+                    style={{ background: getDatabaseProfileColor(child.id) }}
+                    image={savedImage}
+                    fallback={getDatabaseProfileEmoji(child.id)}
+                  />
 
-                <h2>{child.display_name}</h2>
+                  <span className="sasa-profile-name">{child.display_name}</span>
 
-                <p style={{ color: "#64748b" }}>{child.age ? `Age ${child.age}` : "Child"}</p>
+                  <span className="sasa-profile-meta">
+                    {child.age ? `Age ${child.age}` : "Child"}
+                  </span>
 
-                <small>{child.has_pin ? "🔒 PIN protected" : "No PIN"}</small>
-              </button>
-            ))}
+                  <span
+                    className={child.has_pin ? "sasa-profile-pin is-locked" : "sasa-profile-pin"}
+                  >
+                    {child.has_pin ? <LockKeyhole size={11} /> : null}
+                    {child.has_pin ? "PIN protected" : "No PIN"}
+                  </span>
+                </button>
+              );
+            })}
 
             <button
               type="button"
-              className="sara-who-card"
+              className="sasa-profile-card is-add"
               onClick={() => setShowForm(true)}
-              style={{
-                width: 180,
-                minHeight: 245,
-                border: "2px dashed #93c5fd",
-                borderRadius: 26,
-                background: "#eff6ff",
-                color: "#2563eb",
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
             >
-              <Plus size={42} />
-              <div style={{ marginTop: 10 }}>Add Child</div>
+              <Plus size={30} />
+              <span className="sasa-profile-name">Add child</span>
             </button>
           </div>
         )}

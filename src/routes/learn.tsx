@@ -1,54 +1,74 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpen, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ChevronRight, Gamepad2, Music, Paintbrush } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 
 export const Route = createFileRoute("/learn")({
   component: LearnPage,
 });
 
-const activities = [
-  { id: 1, title: "ABC Match", subtitle: "Find the letters", color: "bg-sky-soft" },
-  { id: 2, title: "Counting Bears", subtitle: "1, 2, 3", color: "bg-peach-soft" },
-  { id: 3, title: "Shape Sorting", subtitle: "Circles & squares", color: "bg-mint" },
-  { id: 4, title: "Color Mixing", subtitle: "What color is this?", color: "bg-sun" },
-  { id: 5, title: "Animal Sounds", subtitle: "Moo, woof, meow", color: "bg-sky-soft" },
-  { id: 6, title: "Story Time", subtitle: "Read together", color: "bg-peach-soft" },
-];
+/**
+ * Directory of the app's real play-and-learn sections. Each entry deep-links
+ * into that section of the app (see the `section` search param handling in
+ * src/routes/index.tsx) instead of duplicating the activity here.
+ */
+const sections = [
+  {
+    id: "songs",
+    title: "Songs",
+    description: "Sing-along songs with words on screen",
+    icon: Music,
+  },
+  {
+    id: "games",
+    title: "Games",
+    description: "Small games that practise counting and matching",
+    icon: Gamepad2,
+  },
+  {
+    id: "studio",
+    title: "Drawing studio",
+    description: "Draw, colour and save your own artwork",
+    icon: Paintbrush,
+  },
+] as const;
 
 function LearnPage() {
   return (
-    <div className="min-h-screen bg-background pb-28">
-      <main className="mx-auto max-w-3xl px-4 pt-6 sm:pt-10">
-        <header className="mb-6 flex items-center gap-4">
-          <Link
-            to="/"
-            className="grid h-12 w-12 place-items-center rounded-2xl bg-muted text-foreground transition-colors hover:bg-muted/80"
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </Link>
-          <div>
-            <h1 className="font-heading text-3xl font-extrabold text-foreground">Play & Learn</h1>
-            <p className="text-sm font-medium text-muted-foreground">Tiny games and lessons</p>
-          </div>
-        </header>
+    <div className="sasa-standalone">
+      <header className="sasa-auth-topbar">
+        <Link to="/" className="sasa-iconbtn" aria-label="Back to SARA">
+          <ArrowLeft size={22} />
+        </Link>
+        <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+          <h1 className="sasa-standalone-title">Play &amp; learn</h1>
+          <p className="sasa-standalone-sub">Open a section in the app</p>
+        </div>
+      </header>
 
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {activities.map((activity) => (
-            <button
-              key={activity.id}
-              className={`kid-card toddler-shadow flex items-center gap-5 text-left ${activity.color}`}
-            >
-              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/60">
-                <BookOpen className="h-8 w-8 text-foreground" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="font-heading text-xl font-bold text-foreground">{activity.title}</h3>
-                <p className="text-sm font-medium text-muted-foreground">{activity.subtitle}</p>
-              </div>
-              <CheckCircle2 className="ml-auto h-7 w-7 shrink-0 text-mint" />
-            </button>
-          ))}
-        </section>
+      <main className="sasa-container">
+        <div className="sasa-linklist">
+          {sections.map((section) => {
+            const Icon = section.icon;
+
+            return (
+              <Link
+                key={section.id}
+                to="/"
+                search={{ section: section.id }}
+                className="sasa-panel sasa-linkrow"
+              >
+                <span className="sasa-avatar is-lg" aria-hidden="true">
+                  <Icon size={20} />
+                </span>
+                <span className="sasa-panel-text">
+                  <strong>{section.title}</strong>
+                  <span>{section.description}</span>
+                </span>
+                <ChevronRight size={20} aria-hidden="true" />
+              </Link>
+            );
+          })}
+        </div>
       </main>
 
       <BottomNav />
