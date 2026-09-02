@@ -34,6 +34,14 @@ FROM node:22-alpine AS runner
 
 WORKDIR /app
 
+# The image-scan gate (Trivy, HIGH/CRITICAL, --ignore-unfixed) blocks both CI
+# and CD while node:22-alpine still ships openssl 3.5.7-r0, which carries
+# CVE-2026-14456. Alpine v3.24/main already publishes the fixed 3.5.8-r0, so
+# the OS packages are upgraded here instead of the finding being suppressed.
+# Keep this in the runner stage: it is the only stage that ships, and it is
+# what the scanner inspects.
+RUN apk --no-cache upgrade libssl3 libcrypto3
+
 RUN rm -rf \
     /usr/local/lib/node_modules/npm \
     /usr/local/lib/node_modules/corepack \
