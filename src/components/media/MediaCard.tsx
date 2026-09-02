@@ -1,8 +1,10 @@
-import { Film, Heart, Image as ImageIcon, Play, Sparkles } from "lucide-react";
-import type { MouseEvent } from "react";
+import { Check, Heart, Image as ImageIcon, Link2, MoreVertical, Share2, Video } from "lucide-react";
+import { useRef, useState, type MouseEvent } from "react";
+import { useDismiss } from "@/hooks/use-dismiss";
+import { shareMedia } from "@/lib/share";
 import type { KidsVideoItem } from "../KidsVideoHome";
 import { mediaThumbnailFallback } from "../KidsVideoHome";
-import { getMediaByline, getMediaKindLabel, getMediaMetaLine, isClockDuration } from "./media-meta";
+import { getMediaByline, getMediaMetaLine, isClockDuration } from "./media-meta";
 
 type Props = {
   item: KidsVideoItem;
@@ -12,16 +14,42 @@ type Props = {
 };
 
 function SourceIcon({ item }: { item: KidsVideoItem }) {
-  if (item.sourceType === "photo") return <ImageIcon size={16} />;
-  if (item.sourceType === "upload" || item.sourceType === "youtube") return <Film size={16} />;
-
-  return <Sparkles size={16} />;
+  return item.sourceType === "photo" ? <ImageIcon size={16} /> : <Video size={16} />;
 }
 
-/** One feed cell: 16:9 thumbnail, then title, byline and real metadata. */
+/**
+ * SASA_FEED_MOBILE_V19 — one feed cell in the proportions a phone video feed
+ * uses: a full-bleed 16:9 thumbnail, then a compact row of avatar / two-line
+ * title / byline / metadata with an overflow menu on the end.
+ *
+ * The duration badge appears only when the item genuinely has a clock
+ * duration — assigned media carries a media-type word ("Video", "Photo")
+ * in that field, and printing that in the corner would read as a fake
+ * runtime. Nothing here invents a view count, a date or a channel name;
+ * every line comes from media-meta.ts, which omits whatever the backend
+ * did not send.
+ */
 export function MediaCard({ item, saved, onOpen, onToggleSave }: Props) {
   const isPhoto = item.sourceType === "photo";
-  const badge = isClockDuration(item.duration) ? item.duration : getMediaKindLabel(item);
+  const duration = isClockDuration(item.duration) ? item.duration : null;
+  const meta = getMediaMetaLine(item);
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [shareNote, setShareNote] = useState("");
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useDismiss(menuOpen, menuRef, () => setMenuOpen(false));
+
+  const handleShare = async () => {
+    const outcome = await shareMedia({ title: item.title, text: getMediaByline(item) });
+
+    setMenuOpen(false);
+
+    if (outcome === "shared" || outcome === "cancelled") return;
+
+    setShareNote(outcome === "copied" ? "Link copied" : "Sharing isn’t available here");
+    window.setTimeout(() => setShareNote(""), 2400);
+  };
 
   return (
     <article className="sasa-card">
@@ -41,10 +69,7 @@ export function MediaCard({ item, saved, onOpen, onToggleSave }: Props) {
               event.currentTarget.src = mediaThumbnailFallback;
             }}
           />
-          <span className="sasa-card-play" aria-hidden="true">
-            <Play size={30} fill="currentColor" />
-          </span>
-          {badge && <span className="sasa-card-badge">{badge}</span>}
+          {duration && <span className="sasa-card-badge">{duration}</span>}
         </span>
       </button>
 
@@ -53,22 +78,56 @@ export function MediaCard({ item, saved, onOpen, onToggleSave }: Props) {
           <SourceIcon item={item} />
         </span>
 
-        <div className="sasa-card-text">
+        <button type="button" className="sasa-card-text" onClick={() => onOpen(item)}>
           <h3 className="sasa-card-title">{item.title}</h3>
           <p className="sasa-card-channel">{getMediaByline(item)}</p>
-          <p className="sasa-card-meta">{getMediaMetaLine(item)}</p>
-        </div>
-
-        <button
-          type="button"
-          className={saved ? "sasa-card-save is-saved" : "sasa-card-save"}
-          onClick={(event) => onToggleSave(item.id, event)}
-          aria-pressed={saved}
-          aria-label={saved ? `Remove ${item.title} from library` : `Save ${item.title} to library`}
-        >
-          <Heart size={18} fill={saved ? "currentColor" : "none"} />
+          {meta && <p className="sasa-card-meta">{meta}</p>}
         </button>
+
+        <div className="sasa-card-menuwrap" ref={menuRef}>
+          <button
+            type="button"
+            className="sasa-card-more"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label={`More options for ${item.title}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              setMenuOpen((value) => !value);
+            }}
+          >
+            <MoreVertical size={18} />
+          </button>
+
+          {menuOpen && (
+            <div className="sasa-card-menu" role="menu">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(event) => {
+                  onToggleSave(item.id, event);
+                  setMenuOpen(false);
+                }}
+              >
+                <Heart size={17} fill={saved ? "currentColor" : "none"} />
+                {saved ? "Remove from library" : "Save to library"}
+              </button>
+
+              <button type="button" role="menuitem" onClick={handleShare}>
+                <Share2 size={17} />
+                Share
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {shareNote && (
+        <p className="sasa-card-note" role="status">
+          {shareNote === "Link copied" ? <Check size={14} /> : <Link2 size={14} />}
+          {shareNote}
+        </p>
+      )}
     </article>
   );
 }

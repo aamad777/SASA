@@ -657,6 +657,24 @@
   color: #c3b5ff;
 }
 
+/* SASA_NAV_PARENT_ACTION_V19 — the central create action. Rendered only for a
+   signed-in parent (see MobileTabBar), and still gated by the parental gate
+   behind it. Styled as the raised centre item a video app uses so it reads as
+   the primary action without crowding the four real destinations. */
+.sasa-tabbar-create .sasa-tabbar-create-icon {
+  display: grid;
+  width: 38px;
+  height: 26px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--sasa-brand);
+  color: var(--sasa-brand-ink);
+}
+
+.sasa-tabbar-create:hover .sasa-tabbar-create-icon {
+  background: var(--sasa-brand-strong);
+}
+
 .sasa-tabbar-avatar {
   display: grid;
   width: 22px;

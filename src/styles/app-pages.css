@@ -34,6 +34,25 @@
   }
 }
 
+/* SASA_FEED_MOBILE_V19 — on phones the heading block cost ~90px above the
+   first thumbnail, which is the opposite of the dense feed this screen is
+   meant to be. The title stays (it names the section the bottom bar is
+   highlighting) but shrinks, and the descriptive subtitle drops: the same
+   information is already carried by the section the user just tapped. */
+@media (max-width: 479px) {
+  .sasa-page-head {
+    padding-block: 10px 2px;
+  }
+
+  .sasa-page-head h1 {
+    font-size: 17px;
+  }
+
+  .sasa-page-head p {
+    display: none;
+  }
+}
+
 .sasa-section-title {
   margin: 0 0 12px;
   font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
@@ -57,11 +76,44 @@
 
 /* ── Media grid ───────────────────────────────────────────────────── */
 
+/* SASA_FEED_MOBILE_V19 — phone feed is edge-to-edge and compact, the way a
+   modern mobile video feed reads: the thumbnail spans the full screen width
+   with no side gutter, no rounding and no card border, and the gap between
+   items is just enough to separate them (a 22px gap plus card chrome made
+   barely two items fit on a 800px-tall phone). The gutter is cancelled with
+   a negative inline margin rather than by unsetting .sasa-main's padding,
+   so every other section on the page keeps its normal alignment. */
 .sasa-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 22px 16px;
   padding-block: 18px;
+}
+
+@media (max-width: 479px) {
+  .sasa-grid {
+    margin-inline: calc(-1 * max(var(--sasa-gutter), var(--sasa-sal)))
+      calc(-1 * max(var(--sasa-gutter), var(--sasa-sar)));
+    gap: 0;
+    padding-block: 0 8px;
+  }
+
+  .sasa-grid > .sasa-card {
+    gap: 0;
+    padding-bottom: 14px;
+  }
+
+  .sasa-grid > .sasa-card .sasa-card-thumb {
+    border-radius: 0;
+  }
+
+  .sasa-grid > .sasa-card .sasa-card-body {
+    padding: 10px 12px 0;
+  }
+
+  .sasa-grid > .sasa-card .sasa-card-note {
+    padding-inline: 12px;
+  }
 }
 
 @media (min-width: 480px) {
@@ -215,11 +267,30 @@
   color: var(--sasa-ink-3);
 }
 
-.sasa-card-save {
-  display: grid;
-  width: 36px;
-  height: 36px;
+/* Title block is tappable in its own right, like the title area of a phone
+   video feed — the thumbnail above is a separate target for the same route. */
+.sasa-card-text {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+}
+
+/* Overflow menu (the row-end "⋮"). Both of its entries do real work: the
+   library toggle the heart used to own, and a share that uses the platform
+   share sheet or the clipboard — never a decorative entry. */
+.sasa-card-menuwrap {
+  position: relative;
   flex: 0 0 auto;
+}
+
+.sasa-card-more {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin-block-start: -6px;
+  margin-inline-end: -10px;
   place-items: center;
   border: 0;
   border-radius: 999px;
@@ -227,13 +298,50 @@
   color: var(--sasa-ink-3);
 }
 
-.sasa-card-save:hover {
+.sasa-card-more:hover {
   background: var(--sasa-surface-2);
   color: var(--sasa-ink);
 }
 
-.sasa-card-save.is-saved {
-  color: var(--sasa-pink);
+.sasa-card-menu {
+  position: absolute;
+  z-index: 40;
+  inset-inline-end: 0;
+  top: 40px;
+  display: grid;
+  min-width: 208px;
+  overflow: hidden;
+  border: 1px solid var(--sasa-line);
+  border-radius: var(--sasa-radius);
+  background: var(--sasa-surface);
+}
+
+.sasa-card-menu button {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  padding-inline: 14px;
+  border: 0;
+  background: transparent;
+  color: var(--sasa-ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: start;
+}
+
+.sasa-card-menu button:hover {
+  background: var(--sasa-surface-2);
+}
+
+.sasa-card-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  color: var(--sasa-ink-2);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 /* ── Skeleton / states ────────────────────────────────────────────── */
@@ -410,6 +518,28 @@
   }
 }
 
+/* SASA_WATCH_LANDSCAPE_V19 — phone landscape. A strict 16:9 box on an
+   844x390 screen is 475px tall, so the player ran past the bottom of the
+   viewport and had to be scrolled to see. Landscape should prioritise the
+   player, so the stage is capped to the visible height (minus the header)
+   and the 16:9 frame is preserved by letterboxing inside that cap rather
+   than by cropping — `object-fit: contain` on the media already does that.
+   Portrait is untouched: this only applies to short, wide viewports. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .sasa-watch-stage {
+    max-height: calc(var(--app-visible-height, 100dvh) - var(--sasa-header-h) - var(--sasa-sat));
+    margin-inline: auto;
+    aspect-ratio: 16 / 9;
+    max-width: calc(
+      (var(--app-visible-height, 100dvh) - var(--sasa-header-h) - var(--sasa-sat)) * 16 / 9
+    );
+  }
+
+  .sasa-watch-stagewrap {
+    background: #000;
+  }
+}
+
 .sasa-watch-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -474,6 +604,80 @@
    an unlabelled row of round icons is far harder for a parent to scan. */
 .sasa-watch-actionlabel {
   display: inline;
+}
+
+/* SASA_WATCH_INFO_V19 — collapsed-by-default details panel under the title,
+   the phone watch-page pattern. It prints only fields the backend really
+   sent; there is no view counter on these endpoints so none is displayed. */
+.sasa-watch-info-toggle {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 6px;
+  margin-block-start: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--sasa-ink-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sasa-watch-info {
+  margin-block-start: 10px;
+  padding: 12px 14px;
+  border-radius: var(--sasa-radius);
+  background: var(--sasa-surface-2);
+}
+
+.sasa-watch-info-desc {
+  margin: 0 0 10px;
+  color: var(--sasa-ink);
+  font-size: 13.5px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.sasa-watch-info-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.sasa-watch-info-list > div {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.sasa-watch-info-list dt {
+  min-width: 84px;
+  color: var(--sasa-ink-3);
+  font-weight: 700;
+}
+
+.sasa-watch-info-list dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--sasa-ink);
+  overflow-wrap: anywhere;
+}
+
+.sasa-watch-info-empty {
+  margin: 10px 0 0;
+  color: var(--sasa-ink-3);
+  font-size: 12.5px;
+}
+
+.sasa-watch-sharenote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  color: var(--sasa-ok);
+  font-size: 12.5px;
+  font-weight: 700;
 }
 
 /* Channel / source card */
@@ -1572,7 +1776,7 @@
     min-height: 44px;
   }
 
-  .sasa-card-save,
+  .sasa-card-more,
   .sasa-search-clear,
   .sasa-field-toggle,
   .sasa-party-emoji {
