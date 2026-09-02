@@ -62,6 +62,10 @@ export type KidsVideoItem = {
   createdAt?: string;
   /** Byline shown under a card title. Never invented — see media-meta.ts. */
   sourceLabel?: string;
+  /** Parent-written description straight from the backend, when there is one. */
+  description?: string;
+  /** The backend's own media key (a uuid for assigned media). See SASA_FEED_ID_V19. */
+  mediaId?: string;
 };
 
 export type KidsHomeTab = KidsSectionId;
@@ -1086,6 +1090,7 @@ export default function KidsVideoHome({
         }
       }}
       searchPlaceholder="Search videos and photos"
+      parentSignedIn={accountActionLabel === "Sign Out"}
       profileLabel="You"
       profileEmoji={activeEmoji}
       profileImage={activeImage}

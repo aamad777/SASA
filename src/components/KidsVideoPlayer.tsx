@@ -2,8 +2,10 @@ import YouTubeStyleMediaPlayer from "./YouTubeStyleMediaPlayer";
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Clapperboard,
   Heart,
   Image as ImageIcon,
@@ -13,6 +15,7 @@ import {
   Play,
   Radio,
   Repeat,
+  Share2,
   ShieldCheck,
   SkipBack,
   SkipForward,
@@ -24,12 +27,18 @@ import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import confetti from "canvas-confetti";
 import { playHeartSound, playPopSound } from "../lib/sound";
 import { recordActivity } from "../lib/activity";
+import { shareMedia } from "../lib/share";
 import { useDismiss } from "../hooks/use-dismiss";
 import type { KidsVideoItem, KidsHomeTab } from "./KidsVideoHome";
 import { kidsVideos, mediaThumbnailFallback } from "./KidsVideoHome";
 import AppShell from "./layout/AppShell";
 import AccountMenu, { type AccountMenuItem } from "./layout/AccountMenu";
-import { getMediaByline, getMediaKindLabel, getMediaMetaLine } from "./media/media-meta";
+import {
+  getMediaByline,
+  getMediaDate,
+  getMediaKindLabel,
+  getMediaMetaLine,
+} from "./media/media-meta";
 import WatchPartyModal, { type WatchPartyBuddy } from "./WatchPartyModal";
 import NumbersLearningVideo from "./NumbersLearningVideo";
 
@@ -327,6 +336,10 @@ export default function KidsVideoPlayer({
     return stored === null ? true : stored === "true";
   });
   const [theaterMode, setTheaterMode] = useState(false);
+  // SASA_WATCH_INFO_V19 — the description/metadata panel under the title is
+  // collapsed by default and expands on tap, the way a phone watch page works.
+  const [infoExpanded, setInfoExpanded] = useState(false);
+  const [shareNote, setShareNote] = useState("");
   const [relatedHidden, setRelatedHidden] = useState(false);
   // SARA_LOCKED_AUTOPLAY_V9 — mirrors YouTubeStyleMediaPlayer's in-player
   // lock state so the app-level Theater/Next/Previous keyboard shortcuts
@@ -408,6 +421,8 @@ export default function KidsVideoPlayer({
   // stale reaction never leaks from the previous item.
   useEffect(() => {
     setReaction(localStorage.getItem(`sasa-video-reaction-${video.id}`) ?? "");
+    setInfoExpanded(false);
+    setShareNote("");
 
     // Photos/uploads report their own play state via onPlayingChange once the
     // YouTubeStyleMediaPlayer mounts for the new item — resetting it here too
@@ -544,6 +559,20 @@ export default function KidsVideoPlayer({
     if (activeWatchPartyBuddy) {
       showToast(`${activeWatchPartyBuddy.name} sent ${emoji}`);
     }
+  };
+
+  const handleShare = async () => {
+    playPopSound();
+
+    const outcome = await shareMedia({
+      title: video.title,
+      text: getMediaByline(video),
+    });
+
+    if (outcome === "shared" || outcome === "cancelled") return;
+
+    setShareNote(outcome === "copied" ? "Link copied" : "Sharing isn’t available here");
+    window.setTimeout(() => setShareNote(""), 2600);
   };
 
   const handleReactionClick = (id: string, e: MouseEvent) => {
@@ -892,6 +921,65 @@ export default function KidsVideoPlayer({
               )}
             </p>
 
+            <button
+              type="button"
+              className="sasa-watch-info-toggle"
+              aria-expanded={infoExpanded}
+              onClick={() => {
+                playPopSound();
+                setInfoExpanded((value) => !value);
+              }}
+            >
+              <span>{infoExpanded ? "Hide details" : "More details"}</span>
+              {infoExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+
+            {infoExpanded && (
+              <div className="sasa-watch-info">
+                {/* Only fields the backend actually sent are rendered — there is
+                    no view counter on these endpoints, so none is shown. */}
+                {video.description && <p className="sasa-watch-info-desc">{video.description}</p>}
+
+                <dl className="sasa-watch-info-list">
+                  <div>
+                    <dt>Type</dt>
+                    <dd>{getMediaKindLabel(video)}</dd>
+                  </div>
+
+                  {video.category?.trim() && (
+                    <div>
+                      <dt>Category</dt>
+                      <dd>{video.category}</dd>
+                    </div>
+                  )}
+
+                  {getMediaDate(video) && (
+                    <div>
+                      <dt>Added</dt>
+                      <dd>{getMediaDate(video)}</dd>
+                    </div>
+                  )}
+
+                  <div>
+                    <dt>Shared by</dt>
+                    <dd>{getMediaByline(video)}</dd>
+                  </div>
+                </dl>
+
+                {!video.description && (
+                  <p className="sasa-watch-info-empty">
+                    No description was added for this {getMediaKindLabel(video).toLowerCase()}.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {shareNote && (
+              <p className="sasa-watch-sharenote" role="status">
+                <Check size={14} /> {shareNote}
+              </p>
+            )}
+
             <div className="sasa-watch-actions sasa-hscroll">
               <button
                 type="button"
@@ -906,6 +994,16 @@ export default function KidsVideoPlayer({
                   style={saved ? { color: "var(--sasa-pink)" } : undefined}
                 />
                 <span className="sasa-watch-actionlabel">{saved ? "Saved" : "Save"}</span>
+              </button>
+
+              <button
+                type="button"
+                className="sasa-btn"
+                onClick={handleShare}
+                aria-label={`Share ${video.title}`}
+              >
+                <Share2 size={18} />
+                <span className="sasa-watch-actionlabel">Share</span>
               </button>
 
               <button

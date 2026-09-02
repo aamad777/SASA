@@ -36,6 +36,9 @@ type Props = {
   profileEmoji?: string;
   profileImage?: string;
 
+  /** True only when a parent account is signed in — gates the create action. */
+  parentSignedIn?: boolean;
+
   /** Set false to let a page manage its own horizontal padding. */
   contained?: boolean;
   children: ReactNode;
@@ -59,6 +62,7 @@ export function AppShell({
   profileLabel,
   profileEmoji,
   profileImage,
+  parentSignedIn = false,
   contained = true,
   children,
 }: Props) {
@@ -230,6 +234,8 @@ export function AppShell({
         profileLabel={profileLabel}
         profileEmoji={profileEmoji}
         profileImage={profileImage}
+        parentSignedIn={parentSignedIn}
+        onOpenParentControls={onOpenParentControls}
       />
     </div>
   );

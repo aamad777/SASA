@@ -1,4 +1,4 @@
-import { Sparkles, X } from "lucide-react";
+import { Plus, Sparkles, X } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { useDismiss } from "@/hooks/use-dismiss";
 import ProfileAvatar from "./ProfileAvatar";
@@ -10,6 +10,16 @@ type Props = {
   profileLabel: string;
   profileEmoji?: string;
   profileImage?: string;
+  /**
+   * SASA_NAV_PARENT_ACTION_V19 — true only when a parent account is actually
+   * signed in on this device. It gates the central create action, which is
+   * the entry point to uploading media. A child profile never renders it, and
+   * even when it is shown the destination is still behind the parental gate,
+   * so this is a visibility rule layered on top of the existing check rather
+   * than a replacement for it.
+   */
+  parentSignedIn?: boolean;
+  onOpenParentControls?: () => void;
 };
 
 /**
@@ -23,6 +33,8 @@ export function MobileTabBar({
   profileLabel,
   profileEmoji,
   profileImage,
+  parentSignedIn = false,
+  onOpenParentControls,
 }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const sheetRef = useRef<HTMLDivElement | null>(null);
@@ -53,6 +65,20 @@ export function MobileTabBar({
             </button>
           );
         })}
+
+        {parentSignedIn && onOpenParentControls && (
+          <button
+            type="button"
+            className="sasa-tabbar-create"
+            onClick={onOpenParentControls}
+            aria-label="Parent controls — add or manage media"
+          >
+            <span className="sasa-tabbar-create-icon" aria-hidden="true">
+              <Plus size={22} />
+            </span>
+            <span>Add</span>
+          </button>
+        )}
 
         <button
           type="button"
