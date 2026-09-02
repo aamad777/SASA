@@ -6,6 +6,37 @@ if (!API_BASE_URL) {
   throw new Error("VITE_API_BASE_URL is not configured.");
 }
 
+/**
+ * SARA_AUTH_ERROR_SURFACE_V16 — when the API is unreachable the ingress
+ * answers with an HTML error page (a 502 while the backend is down, for
+ * example). `response.json()` then throws a raw `SyntaxError: Unexpected
+ * token '<'`, which is what parents actually saw on the login and register
+ * screens instead of a usable message. This reads the body once and reports
+ * the real condition. It changes no URL, method, header or payload — only
+ * how a response that is not JSON is described.
+ */
+async function parseJsonOrExplain(response: Response, action: string) {
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  const body = await response.text().catch(() => "");
+
+  if (response.status >= 502 && response.status <= 504) {
+    throw new Error(
+      `The SARA API is not responding right now (HTTP ${response.status}). ` +
+        `${action} is unavailable until the API is back.`,
+    );
+  }
+
+  throw new Error(
+    `The SARA API returned an unexpected response (HTTP ${response.status}) ` +
+      `while ${action.toLowerCase()}. ${body.slice(0, 120)}`.trim(),
+  );
+}
+
 export type ApiHealth = {
   status: string;
   service: string;
@@ -30,7 +61,7 @@ export async function getApiHealth(): Promise<ApiHealth> {
     throw new Error(`API health check failed: ${response.status}`);
   }
 
-  return response.json();
+  return parseJsonOrExplain(response, "Checking the API");
 }
 
 export async function registerParent(
@@ -50,17 +81,7 @@ export async function registerParent(
     }),
   });
 
-  const contentType = response.headers.get("content-type") || "";
-
-  if (!contentType.includes("application/json")) {
-    const body = await response.text();
-
-    throw new Error(
-      `Registration API returned invalid content ` + `(${response.status}): ${body.slice(0, 100)}`,
-    );
-  }
-
-  const data = await response.json();
+  const data = await parseJsonOrExplain(response, "Creating your account");
 
   if (!response.ok) {
     throw new Error(data.error || "Parent registration failed.");
@@ -81,7 +102,7 @@ export async function loginParent(email: string, password: string): Promise<Pare
     }),
   });
 
-  const data = await response.json();
+  const data = await parseJsonOrExplain(response, "Signing in");
 
   if (!response.ok) {
     throw new Error(data.error || "Parent login failed.");
@@ -102,10 +123,20 @@ export async function getCurrentUser(token: string): Promise<{
   });
 
   if (!response.ok) {
+    // A 5xx means the API is down, not that the saved login expired —
+    // telling a parent to sign in again would be wrong and would throw away
+    // a perfectly valid token.
+    if (response.status >= 500) {
+      throw new Error(
+        `The SARA API is not responding right now (HTTP ${response.status}). ` +
+          `Your saved login was kept.`,
+      );
+    }
+
     throw new Error("Saved login is no longer valid.");
   }
 
-  return response.json();
+  return parseJsonOrExplain(response, "Checking your login");
 }
 
 export type DatabaseChild = {
@@ -133,13 +164,7 @@ export async function getChildren(token: string): Promise<DatabaseChild[]> {
     },
   });
 
-  const contentType = response.headers.get("content-type") || "";
-
-  if (!contentType.includes("application/json")) {
-    throw new Error(`Children API returned invalid content: ${response.status}`);
-  }
-
-  const data = await response.json();
+  const data = await parseJsonOrExplain(response, "Loading child profiles");
 
   if (!response.ok) {
     throw new Error(data.error || "Unable to load child profiles.");
@@ -205,17 +230,7 @@ export async function createChild(token: string, input: CreateChildInput): Promi
     }),
   });
 
-  const contentType = response.headers.get("content-type") || "";
-
-  if (!contentType.includes("application/json")) {
-    const body = await response.text();
-
-    throw new Error(
-      `Child API returned invalid content ` + `(${response.status}): ${body.slice(0, 100)}`,
-    );
-  }
-
-  const data = await response.json();
+  const data = await parseJsonOrExplain(response, "Creating the child profile");
 
   if (!response.ok) {
     throw new Error(data.error || "Unable to create child profile.");
@@ -262,17 +277,7 @@ export async function loginChild(loginName: string, pin: string): Promise<ChildL
     }),
   });
 
-  const contentType = response.headers.get("content-type") || "";
-
-  if (!contentType.includes("application/json")) {
-    const body = await response.text();
-
-    throw new Error(
-      `Child login returned invalid content ` + `(${response.status}): ${body.slice(0, 100)}`,
-    );
-  }
-
-  const data = await response.json();
+  const data = await parseJsonOrExplain(response, "Checking the child PIN");
 
   if (!response.ok) {
     throw new Error(data.error || "Child PIN verification failed.");
@@ -360,15 +365,7 @@ export type AdminChild = {
 };
 
 async function readJsonResponse(response: Response) {
-  const contentType = response.headers.get("content-type") || "";
-
-  if (!contentType.includes("application/json")) {
-    const body = await response.text();
-
-    throw new Error(`API returned invalid content (${response.status}): ` + body.slice(0, 100));
-  }
-
-  const data = await response.json();
+  const data = await parseJsonOrExplain(response, "Talking to the SARA API");
 
   if (!response.ok) {
     throw new Error(data.error || `API request failed (${response.status}).`);
@@ -542,15 +539,7 @@ export type ParentMediaInput = {
 };
 
 async function readApiResponse(response: Response) {
-  const contentType = response.headers.get("content-type") || "";
-
-  if (contentType.includes("application/json")) {
-    return response.json();
-  }
-
-  const body = await response.text();
-
-  throw new Error(`API returned invalid content (${response.status}): ` + body.slice(0, 120));
+  return parseJsonOrExplain(response, "Talking to the SARA API");
 }
 
 export async function uploadParentVideo(token: string, file: File, input: ParentMediaInput) {
@@ -640,17 +629,7 @@ export async function getChildAssignedMedia(
     },
   });
 
-  const contentType = response.headers.get("content-type") || "";
-
-  if (!contentType.includes("application/json")) {
-    const body = await response.text();
-
-    throw new Error(
-      `Child media API returned invalid content ` + `(${response.status}): ${body.slice(0, 120)}`,
-    );
-  }
-
-  const data = await response.json();
+  const data = await parseJsonOrExplain(response, "Loading the child's media");
 
   if (!response.ok) {
     throw new Error(data.error || "Unable to load child media.");

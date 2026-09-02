@@ -89,8 +89,25 @@ export function getStoredTheme(): AppThemeId {
 export function setStoredTheme(themeId: AppThemeId): void {
   try {
     localStorage.setItem("sasa-app-theme", themeId);
-    document.documentElement.setAttribute("data-theme", themeId);
+    applyThemeAttribute(themeId);
   } catch {
     // Ignore error
   }
+}
+
+/**
+ * Kid themes are styled off `data-app-theme` on <html> (see the theme block
+ * in src/styles/app-shell.css). The older `data-theme` attribute is kept in
+ * place because it is what the picker has always written.
+ */
+export function applyThemeAttribute(themeId: AppThemeId): void {
+  const root = document.documentElement;
+
+  root.setAttribute("data-theme", themeId);
+  root.setAttribute("data-app-theme", themeId);
+}
+
+/** Themes whose surface reads as night-time and drive the dark shell. */
+export function isNightTheme(themeId: AppThemeId): boolean {
+  return themeId === "space" || themeId === "night";
 }

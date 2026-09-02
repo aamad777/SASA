@@ -1,0 +1,1679 @@
+/* =====================================================================
+   SASA PAGES — feed, media cards, watch screen, shared states
+   Built on the tokens defined in app-shell.css.
+   ===================================================================== */
+
+/* ── Page headings ─────────────────────────────────────────────────── */
+
+.sasa-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 18px 4px;
+}
+
+.sasa-page-head h1 {
+  margin: 0;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.sasa-page-head p {
+  margin: 4px 0 0;
+  color: var(--sasa-ink-2);
+  font-size: 13px;
+}
+
+@media (min-width: 768px) {
+  .sasa-page-head h1 {
+    font-size: 24px;
+  }
+}
+
+.sasa-section-title {
+  margin: 0 0 12px;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* ── Filter chip row ──────────────────────────────────────────────── */
+
+.sasa-chiprow {
+  position: sticky;
+  top: calc(var(--sasa-header-h) + var(--sasa-sat));
+  z-index: 30;
+  margin-inline: calc(-1 * max(var(--sasa-gutter), var(--sasa-sal)))
+    calc(-1 * max(var(--sasa-gutter), var(--sasa-sar)));
+  padding-block: 10px;
+  padding-inline: max(var(--sasa-gutter), var(--sasa-sal)) max(var(--sasa-gutter), var(--sasa-sar));
+  background: var(--sasa-page);
+  border-bottom: 1px solid var(--sasa-line-soft);
+}
+
+/* ── Media grid ───────────────────────────────────────────────────── */
+
+.sasa-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px 16px;
+  padding-block: 18px;
+}
+
+@media (min-width: 480px) {
+  .sasa-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .sasa-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 26px 18px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .sasa-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* ── Media card ───────────────────────────────────────────────────── */
+
+.sasa-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sasa-card-link {
+  display: block;
+  position: relative;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--sasa-radius);
+  background: transparent;
+  text-align: start;
+}
+
+.sasa-card-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--sasa-radius);
+  background: var(--sasa-surface-3);
+}
+
+.sasa-card-thumb > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Photos are shown uncropped — letterboxed on a neutral field. */
+.sasa-card-thumb.is-photo {
+  background: #12131a;
+}
+
+.sasa-card-thumb.is-photo > img {
+  object-fit: contain;
+}
+
+.sasa-card-badge {
+  position: absolute;
+  inset-inline-end: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(10, 11, 15, 0.82);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+}
+
+.sasa-card-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  opacity: 0;
+  background: rgba(10, 11, 15, 0.28);
+  transition: opacity 140ms ease;
+}
+
+.sasa-card-link:hover .sasa-card-play,
+.sasa-card-link:focus-visible .sasa-card-play {
+  opacity: 1;
+}
+
+.sasa-card-body {
+  display: flex;
+  min-width: 0;
+  gap: 10px;
+}
+
+.sasa-card-source {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--sasa-brand-soft);
+  color: var(--sasa-brand);
+}
+
+.sasa-shell.is-dark .sasa-card-source {
+  color: #c3b5ff;
+}
+
+.sasa-card-text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sasa-card-title {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  color: var(--sasa-ink);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.sasa-card-channel,
+.sasa-card-meta {
+  margin: 3px 0 0;
+  color: var(--sasa-ink-2);
+  font-size: 12.5px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sasa-card-meta {
+  color: var(--sasa-ink-3);
+}
+
+.sasa-card-save {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sasa-ink-3);
+}
+
+.sasa-card-save:hover {
+  background: var(--sasa-surface-2);
+  color: var(--sasa-ink);
+}
+
+.sasa-card-save.is-saved {
+  color: var(--sasa-pink);
+}
+
+/* ── Skeleton / states ────────────────────────────────────────────── */
+
+.sasa-skel {
+  border-radius: var(--sasa-radius);
+  background: var(--sasa-surface-3);
+  animation: sasa-pulse 1.4s ease-in-out infinite;
+}
+
+.sasa-skel.is-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.sasa-skel.is-line {
+  height: 12px;
+  border-radius: 4px;
+}
+
+@keyframes sasa-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.sasa-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-block: 12px;
+  padding: 40px 20px;
+  border: 1px solid var(--sasa-line);
+  border-radius: var(--sasa-radius);
+  background: var(--sasa-surface);
+  text-align: center;
+}
+
+.sasa-state-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--sasa-surface-2);
+  color: var(--sasa-ink-2);
+}
+
+.sasa-state h2 {
+  margin: 0;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.sasa-state p {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--sasa-ink-2);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.sasa-state.is-error .sasa-state-icon {
+  background: var(--sasa-danger-soft);
+  color: var(--sasa-danger);
+}
+
+/* Inline notice strip (loading / error above the grid) */
+.sasa-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-block: 12px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--sasa-line);
+  border-radius: var(--sasa-radius-sm);
+  background: var(--sasa-surface);
+  color: var(--sasa-ink-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sasa-notice.is-error {
+  border-color: #f2c9c9;
+  background: var(--sasa-danger-soft);
+  color: var(--sasa-danger);
+}
+
+.sasa-notice button {
+  margin-inline-start: auto;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sasa-spinner {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 2px solid var(--sasa-surface-3);
+  border-top-color: var(--sasa-brand);
+  border-radius: 999px;
+  animation: sasa-spin 0.7s linear infinite;
+}
+
+@keyframes sasa-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Watch screen ─────────────────────────────────────────────────── */
+
+.sasa-watch {
+  padding-block: 0 0;
+}
+
+/* The player is edge-to-edge on phones and boxed from 768px up. */
+.sasa-watch-stagewrap {
+  margin-inline: calc(-1 * max(var(--sasa-gutter), var(--sasa-sal)))
+    calc(-1 * max(var(--sasa-gutter), var(--sasa-sar)));
+  background: #000;
+}
+
+.sasa-watch-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #000;
+}
+
+/* The Numbers activity has its own non-video layout: it must grow with its
+   content rather than be cropped into a 16:9 box or scrolled inside one. */
+.sasa-watch-stage.is-fluid {
+  aspect-ratio: auto;
+  min-height: 0;
+}
+
+.sasa-watch-stage.is-fluid .sasa-watch-stage-media {
+  position: relative;
+  inset: auto;
+}
+
+.sasa-watch-activity {
+  position: relative;
+  width: 100%;
+  background: #000;
+}
+
+.sasa-watch-stage-media {
+  position: absolute;
+  inset: 0;
+}
+
+@media (min-width: 768px) {
+  .sasa-watch-stagewrap {
+    margin-inline: 0;
+    margin-block-start: 16px;
+    border-radius: var(--sasa-radius);
+    overflow: hidden;
+  }
+}
+
+.sasa-watch-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  padding-block: 0;
+}
+
+@media (min-width: 1280px) {
+  .sasa-watch-grid.has-aside {
+    grid-template-columns: minmax(0, 1fr) 380px;
+  }
+}
+
+.sasa-watch-primary {
+  min-width: 0;
+}
+
+.sasa-watch-aside {
+  min-width: 0;
+}
+
+.sasa-watch-title {
+  margin: 16px 0 0;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 768px) {
+  .sasa-watch-title {
+    font-size: 20px;
+  }
+}
+
+.sasa-watch-meta {
+  margin: 6px 0 0;
+  color: var(--sasa-ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sasa-watch-meta-dot {
+  margin-inline: 6px;
+  opacity: 0.6;
+}
+
+/* Action row — scrolls sideways on narrow screens instead of wrapping
+   into a tall block or overflowing the page. */
+.sasa-watch-actions {
+  margin-block: 14px;
+  padding-block: 2px;
+}
+
+.sasa-watch-actions .sasa-btn {
+  min-height: 40px;
+}
+
+/* The action row scrolls sideways, so labels stay visible at every width —
+   an unlabelled row of round icons is far harder for a parent to scan. */
+.sasa-watch-actionlabel {
+  display: inline;
+}
+
+/* Channel / source card */
+.sasa-watch-channel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--sasa-line);
+  border-radius: var(--sasa-radius);
+  background: var(--sasa-surface);
+}
+
+.sasa-watch-channel-text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sasa-watch-channel-text strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.sasa-watch-channel-text span {
+  display: block;
+  color: var(--sasa-ink-2);
+  font-size: 12.5px;
+}
+
+/* Reactions */
+.sasa-watch-block {
+  margin-block: 16px;
+}
+
+.sasa-watch-block-title {
+  margin: 0 0 8px;
+  color: var(--sasa-ink-2);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sasa-reaction {
+  display: inline-flex;
+  min-height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--sasa-line);
+  border-radius: 999px;
+  background: var(--sasa-surface);
+  color: var(--sasa-ink);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.sasa-reaction:hover {
+  background: var(--sasa-surface-2);
+}
+
+.sasa-reaction.is-selected {
+  border-color: var(--sasa-brand);
+  background: var(--sasa-brand-soft);
+  color: var(--sasa-brand);
+  font-weight: 700;
+}
+
+.sasa-shell.is-dark .sasa-reaction.is-selected {
+  color: #d6cbff;
+}
+
+.sasa-reaction-emoji {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Related list — vertical rows on mobile/aside, becomes a row of cards
+   nowhere: a list reads better and never crops titles. */
+.sasa-related {
+  display: grid;
+  gap: 12px;
+}
+
+.sasa-related-item {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--sasa-radius-sm);
+  background: transparent;
+  text-align: start;
+}
+
+.sasa-related-item:hover {
+  background: var(--sasa-surface-2);
+}
+
+.sasa-related-item.is-current {
+  background: var(--sasa-brand-soft);
+}
+
+.sasa-related-thumb {
+  position: relative;
+  width: 148px;
+  flex: 0 0 auto;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--sasa-radius-sm);
+  background: var(--sasa-surface-3);
+}
+
+@media (min-width: 400px) {
+  .sasa-related-thumb {
+    width: 168px;
+  }
+}
+
+.sasa-related-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sasa-related-text {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-block: 2px;
+}
+
+.sasa-related-title {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  color: var(--sasa-ink);
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.sasa-related-meta {
+  margin: 4px 0 0;
+  color: var(--sasa-ink-2);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sasa-nowplaying {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 3px;
+  color: var(--sasa-brand);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sasa-shell.is-dark .sasa-nowplaying {
+  color: #c3b5ff;
+}
+
+.sasa-nowplaying-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+/* Watch-party strip (existing feature, restyled) */
+.sasa-party {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-block: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--sasa-line);
+  border-radius: var(--sasa-radius);
+  background: var(--sasa-surface);
+}
+
+.sasa-party-stack {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.sasa-party-stack > * + * {
+  margin-inline-start: -8px;
+}
+
+.sasa-party-text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sasa-party-text strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sasa-party-text span {
+  display: block;
+  color: var(--sasa-ink-2);
+  font-size: 11.5px;
+}
+
+.sasa-party-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+}
+
+.sasa-party-emoji {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 16px;
+}
+
+.sasa-party-emoji:hover {
+  background: var(--sasa-surface-2);
+}
+
+/* Toast */
+.sasa-toast {
+  position: fixed;
+  top: calc(var(--sasa-header-h) + var(--sasa-sat) + 10px);
+  inset-inline: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.sasa-toast > div {
+  display: flex;
+  max-width: calc(100% - 32px);
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(16, 18, 24, 0.92);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* Theme picker popover on the watch screen */
+.sasa-themepop {
+  position: absolute;
+  top: calc(100% + 6px);
+  inset-inline-end: 0;
+  z-index: 70;
+  width: 264px;
+  max-width: calc(100vw - 24px);
+  padding: 10px;
+  border: 1px solid var(--sasa-line);
+  border-radius: var(--sasa-radius);
+  background: var(--sasa-surface);
+  box-shadow: 0 10px 30px rgba(6, 8, 12, 0.35);
+}
+
+.sasa-themepop-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sasa-themecard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  border: 1px solid var(--sasa-line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--sasa-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sasa-themecard:hover {
+  background: var(--sasa-surface-2);
+}
+
+.sasa-themecard.is-selected {
+  border-color: var(--sasa-brand);
+  background: var(--sasa-brand-soft);
+}
+
+.sasa-themecard-swatch {
+  display: grid;
+  width: 100%;
+  height: 34px;
+  place-items: center;
+  border-radius: 6px;
+  background-position: center;
+  background-size: cover;
+  color: #fff;
+}
+
+/* Floating watch-party reactions over the stage (existing feature) */
+.sasa-floatlayer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sasa-floatlayer > div {
+  position: absolute;
+  bottom: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 32px;
+}
+
+.sasa-floatlayer > div > span:last-child {
+  margin-top: 2px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(16, 18, 24, 0.8);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Center play button for the non-video stage branches */
+.sasa-stage-play {
+  position: absolute;
+  top: 50%;
+  inset-inline-start: 50%;
+  z-index: 30;
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(10, 11, 15, 0.6);
+  color: #fff;
+  transform: translate(-50%, -50%);
+}
+
+.sasa-stage-play:hover {
+  background: rgba(10, 11, 15, 0.75);
+}
+
+/* Prev/next arrows over the embed stage */
+.sasa-stage-nav {
+  position: absolute;
+  top: 50%;
+  inset-inline: 8px;
+  z-index: 25;
+  display: flex;
+  justify-content: space-between;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.sasa-stage-nav button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(10, 11, 15, 0.55);
+  color: #fff;
+  pointer-events: auto;
+}
+
+.sasa-stage-nav button:hover {
+  background: rgba(10, 11, 15, 0.75);
+}
+
+/* Static overlay for the branches without their own fading controls */
+.sasa-stage-overlay {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  z-index: 22;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 26px;
+  background: linear-gradient(to bottom, rgba(6, 7, 10, 0.72), transparent);
+  color: #fff;
+  pointer-events: none;
+}
+
+.sasa-stage-overlay strong {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.sasa-stage-overlay-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sasa-stage-overlay-chips span {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ── Legacy static pages (videos / photos / learn) ─────────────────── */
+
+.sasa-tilegrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+  padding-block: 18px;
+}
+
+.sasa-tile {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  border: 1px solid var(--sasa-line);
+  border-radius: var(--sasa-radius);
+  background: var(--sasa-surface);
+  overflow: hidden;
+  text-align: start;
+}
+
+.sasa-tile:hover {
+  background: var(--sasa-surface-2);
+}
+
+.sasa-tile-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--sasa-surface-3);
+}
+
+.sasa-tile-media.is-square {
+  aspect-ratio: 1 / 1;
+}
+
+.sasa-tile-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sasa-tile-media .sasa-tile-icon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--sasa-ink-2);
+}
+
+.sasa-tile-body {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.sasa-tile-body strong {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.sasa-tile-body span {
+  flex: 0 0 auto;
+  color: var(--sasa-ink-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sasa-skel,
+  .sasa-spinner {
+    animation: none;
+  }
+}
+
+/* ── Watch themes ─────────────────────────────────────────────────────
+   The watch screen's theme picker retints the shell's surface and line
+   tokens; the media itself is never touched. Each theme stays inside the
+   dark token family so the black 16:9 stage always sits in context.
+   ------------------------------------------------------------------- */
+
+.sasa-shell.is-dark[data-watch-theme="space"] {
+  --sasa-page: #0a0e22;
+  --sasa-surface: #141a33;
+  --sasa-surface-2: #1c2444;
+  --sasa-surface-3: #242d51;
+  --sasa-line: #283256;
+  --sasa-line-soft: #1f2848;
+}
+
+.sasa-shell.is-dark[data-watch-theme="ocean"] {
+  --sasa-page: #05202c;
+  --sasa-surface: #0c2c3b;
+  --sasa-surface-2: #123748;
+  --sasa-surface-3: #194354;
+  --sasa-line: #1d4657;
+  --sasa-line-soft: #143a49;
+}
+
+.sasa-shell.is-dark[data-watch-theme="jungle"] {
+  --sasa-page: #0a1d12;
+  --sasa-surface: #12291c;
+  --sasa-surface-2: #193425;
+  --sasa-surface-3: #1f3f2d;
+  --sasa-line: #23422f;
+  --sasa-line-soft: #1b3626;
+}
+
+.sasa-shell.is-dark[data-watch-theme="rainbow"] {
+  --sasa-page: #14092a;
+  --sasa-surface: #1f1140;
+  --sasa-surface-2: #29184f;
+  --sasa-surface-3: #331f5d;
+  --sasa-line: #372262;
+  --sasa-line-soft: #2b1a4f;
+}
+
+.sasa-shell.is-dark[data-watch-theme="bright"] {
+  --sasa-page: #1b1408;
+  --sasa-surface: #271d0d;
+  --sasa-surface-2: #322512;
+  --sasa-surface-3: #3d2e17;
+  --sasa-line: #40311a;
+  --sasa-line-soft: #332714;
+}
+
+/* Theater mode: the stage spans the full main column at every width. */
+.sasa-watch.is-theater .sasa-watch-stagewrap {
+  margin-inline: calc(-1 * max(var(--sasa-gutter), var(--sasa-sal)))
+    calc(-1 * max(var(--sasa-gutter), var(--sasa-sar)));
+  margin-block-start: 0;
+  border-radius: 0;
+}
+
+/* ── Entry screens (profile picker, parent login, gates) ───────────────
+   Shared chrome for the screens that sit outside the app shell: they have
+   no navigation yet, so they carry their own header and centred column.
+   ------------------------------------------------------------------- */
+
+.sasa-auth-page {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  background: var(--sasa-page);
+  color: var(--sasa-ink);
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+}
+
+.sasa-auth-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-block: calc(12px + var(--sasa-sat)) 12px;
+  padding-inline: max(16px, var(--sasa-sal)) max(16px, var(--sasa-sar));
+  border-bottom: 1px solid var(--sasa-line);
+  background: var(--sasa-surface);
+}
+
+.sasa-auth-topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sasa-auth-body {
+  width: 100%;
+  max-width: 900px;
+  margin-inline: auto;
+  padding-block: 28px calc(32px + var(--sasa-sab));
+  padding-inline: max(16px, var(--sasa-sal)) max(16px, var(--sasa-sar));
+}
+
+.sasa-auth-eyebrow {
+  margin: 0;
+  color: var(--sasa-ink-3);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sasa-auth-title {
+  margin: 6px 0 0;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+@media (min-width: 768px) {
+  .sasa-auth-title {
+    font-size: 32px;
+  }
+}
+
+.sasa-auth-sub {
+  margin: 6px 0 0;
+  color: var(--sasa-ink-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.sasa-btn.is-danger {
+  border-color: transparent;
+  background: var(--sasa-danger-soft);
+  color: var(--sasa-danger);
+}
+
+.sasa-btn.is-danger:hover {
+  background: #f9dede;
+}
+
+/* Profile picker grid */
+.sasa-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 14px;
+  margin-block-start: 22px;
+}
+
+@media (min-width: 768px) {
+  .sasa-profile-grid {
+    grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+    gap: 18px;
+  }
+}
+
+.sasa-profile-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 18px 12px 16px;
+  border: 1px solid var(--sasa-line);
+  border-radius: var(--sasa-radius);
+  background: var(--sasa-surface);
+  color: var(--sasa-ink);
+  text-align: center;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.sasa-profile-card:hover {
+  border-color: var(--sasa-brand);
+  background: var(--sasa-surface-2);
+}
+
+.sasa-profile-card.is-selecting {
+  border-color: var(--sasa-brand);
+  background: var(--sasa-brand-soft);
+}
+
+.sasa-profile-card.is-add {
+  border-style: dashed;
+  color: var(--sasa-brand);
+  justify-content: center;
+  gap: 8px;
+}
+
+.sasa-profile-avatar {
+  display: grid;
+  width: 84px;
+  height: 84px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--sasa-surface-2);
+  font-size: 40px;
+  line-height: 1;
+}
+
+@media (min-width: 768px) {
+  .sasa-profile-avatar {
+    width: 96px;
+    height: 96px;
+    font-size: 46px;
+  }
+}
+
+.sasa-profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sasa-profile-name {
+  margin-block-start: 10px;
+  max-width: 100%;
+  overflow: hidden;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sasa-profile-meta {
+  color: var(--sasa-ink-2);
+  font-size: 12.5px;
+}
+
+.sasa-profile-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-block-start: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--sasa-surface-2);
+  color: var(--sasa-ink-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sasa-profile-pin.is-locked {
+  background: var(--sasa-brand-soft);
+  color: var(--sasa-brand);
+}
+
+.sasa-guest-links {
+  margin-block-start: 28px;
+  padding-block-start: 18px;
+  border-top: 1px solid var(--sasa-line);
+}
+
+/* ── Standalone pages (/videos, /photos, /learn) ──────────────────── */
+
+.sasa-standalone {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  background: var(--sasa-page);
+  color: var(--sasa-ink);
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  padding-bottom: calc(var(--sasa-tabbar-h) + var(--sasa-sab) + 24px);
+}
+
+.sasa-standalone-title {
+  margin: 0;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.sasa-standalone-sub {
+  margin: 2px 0 0;
+  color: var(--sasa-ink-2);
+  font-size: 12.5px;
+}
+
+.sasa-linklist {
+  display: grid;
+  gap: 10px;
+  padding-block: 18px;
+  max-width: 640px;
+}
+
+.sasa-linkrow {
+  text-decoration: none;
+}
+
+.sasa-linkrow:hover {
+  background: var(--sasa-surface-2);
+}
+
+.sasa-linkrow svg:last-child {
+  flex: 0 0 auto;
+  color: var(--sasa-ink-3);
+}
+
+/* Photo viewer */
+.sasa-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding-block: var(--sasa-sat) calc(12px + var(--sasa-sab));
+  padding-inline: max(12px, var(--sasa-sal)) max(12px, var(--sasa-sar));
+  background: #0c0d11;
+  color: #fff;
+}
+
+.sasa-lightbox-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 8px;
+}
+
+.sasa-lightbox-bar strong {
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+}
+
+.sasa-lightbox .sasa-iconbtn {
+  color: #fff;
+}
+
+.sasa-lightbox .sasa-iconbtn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.sasa-lightbox-img {
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.sasa-lightbox-nav {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding-block-start: 12px;
+}
+
+/* ── Forms (parent login / register) ─────────────────────────────────── */
+
+.sasa-form-page {
+  display: flex;
+  min-height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding-inline: max(16px, var(--sasa-sal)) max(16px, var(--sasa-sar));
+  background: var(--sasa-page);
+  color: var(--sasa-ink);
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+}
+
+.sasa-form-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  margin-block: auto;
+  padding: 22px 20px;
+  border: 1px solid var(--sasa-line);
+  border-radius: 16px;
+  background: var(--sasa-surface);
+}
+
+@media (min-width: 480px) {
+  .sasa-form-card {
+    padding: 28px;
+  }
+}
+
+.sasa-form-back {
+  position: absolute;
+  inset-inline-start: 8px;
+  top: 8px;
+}
+
+.sasa-segmented {
+  display: flex;
+  gap: 4px;
+  margin-block: 18px;
+  padding: 4px;
+  border: 1px solid var(--sasa-line);
+  border-radius: 999px;
+  background: var(--sasa-surface-2);
+}
+
+.sasa-segmented button {
+  display: inline-flex;
+  min-height: 40px;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sasa-ink-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sasa-segmented button.is-selected {
+  background: var(--sasa-surface);
+  color: var(--sasa-brand);
+}
+
+.sasa-segmented button:focus-visible {
+  outline: 2px solid var(--sasa-brand);
+  outline-offset: 2px;
+}
+
+.sasa-form-fields {
+  display: grid;
+  gap: 16px;
+}
+
+.sasa-field {
+  display: block;
+}
+
+.sasa-field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sasa-field-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding-inline: 12px;
+  border: 1px solid var(--sasa-line);
+  border-radius: 10px;
+  background: var(--sasa-surface);
+  color: var(--sasa-ink-3);
+}
+
+.sasa-field-control:focus-within {
+  border-color: var(--sasa-brand);
+  outline: 2px solid var(--sasa-brand);
+  outline-offset: -1px;
+}
+
+.sasa-field-input {
+  width: 100%;
+  min-width: 0;
+  padding-block: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--sasa-ink);
+  font-size: 15px;
+  outline: none;
+}
+
+.sasa-field-toggle {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sasa-ink-2);
+}
+
+.sasa-field-toggle:hover {
+  background: var(--sasa-surface-2);
+}
+
+/* Guest-mode strip above the profile picker */
+.sasa-guestbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-block: calc(10px + var(--sasa-sat)) 10px;
+  padding-inline: max(14px, var(--sasa-sal)) max(14px, var(--sasa-sar));
+  border-bottom: 1px solid var(--sasa-line);
+  background: var(--sasa-surface);
+  color: var(--sasa-ink);
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+}
+
+.sasa-guestbar-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--sasa-brand-soft);
+  color: var(--sasa-brand);
+}
+
+.sasa-guestbar-text {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.sasa-guestbar-text strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.sasa-guestbar-text span {
+  display: block;
+  color: var(--sasa-ink-2);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+/* ── Touch targets ────────────────────────────────────────────────────
+   Below the desktop breakpoint every interactive control grows to the
+   44px minimum the mobile spec asks for. Desktop keeps the tighter
+   sizing, where a pointer is precise and 44px chips look oversized.
+   ------------------------------------------------------------------- */
+
+@media (max-width: 1023px) {
+  .sasa-chip,
+  .sasa-btn,
+  .sasa-reaction {
+    min-height: 44px;
+  }
+
+  .sasa-card-save,
+  .sasa-search-clear,
+  .sasa-field-toggle,
+  .sasa-party-emoji {
+    width: 44px;
+    height: 44px;
+  }
+
+  .sasa-tabbar button,
+  .sasa-tabbar.is-standalone a {
+    min-height: 52px;
+  }
+}
+
+/* ── Activity chart (parent dashboard) ────────────────────────────────
+   Replaces the old desktop-only bar chart: this one is styled at every
+   width and is fed by the real activity log.
+   ------------------------------------------------------------------- */
+
+.sasa-chart {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  height: 200px;
+  padding-block-start: 8px;
+}
+
+.sasa-chart-col {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sasa-chart-bars {
+  display: flex;
+  width: min(40px, 90%);
+  height: 100%;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+  gap: 2px;
+}
+
+.sasa-chart-bar {
+  display: block;
+  width: 100%;
+  min-height: 4px;
+  border-radius: 3px;
+}
+
+.sasa-chart-bar.is-videos {
+  background: var(--sasa-brand);
+}
+
+.sasa-chart-bar.is-photos {
+  background: #3a9ad9;
+}
+
+.sasa-chart-bar.is-reactions {
+  background: var(--sasa-pink);
+}
+
+.sasa-chart-label {
+  color: var(--sasa-ink-3);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sasa-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  margin-block-start: 14px;
+  padding-block-start: 12px;
+  border-top: 1px solid var(--sasa-line);
+}
+
+.sasa-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--sasa-ink-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sasa-chart-legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.sasa-chart-legend i.is-videos {
+  background: var(--sasa-brand);
+}
+
+.sasa-chart-legend i.is-photos {
+  background: #3a9ad9;
+}
+
+.sasa-chart-legend i.is-reactions {
+  background: var(--sasa-pink);
+}
+
+/* ── Parent dashboard touch targets ───────────────────────────────────
+   The dashboard keeps its own blue/slate admin palette; only the tap
+   sizes are raised on phones and tablets, where several of its inputs
+   and pills sat well under the 44px minimum.
+   ------------------------------------------------------------------- */
+
+@media (max-width: 1023px) {
+  .parent-dashboard input[type="text"],
+  .parent-dashboard input[type="time"],
+  .parent-dashboard input[type="number"],
+  .parent-dashboard input[type="password"],
+  .parent-dashboard input[type="search"],
+  .parent-dashboard select,
+  .parent-dashboard textarea {
+    min-height: 44px;
+  }
+
+  .parent-dashboard input[type="range"] {
+    height: 24px;
+  }
+
+  .parent-dashboard input[type="range"]::-webkit-slider-thumb {
+    width: 24px;
+    height: 24px;
+  }
+
+  .parent-dashboard button[role="switch"],
+  .parent-dashboard .parent-dashboard-bottom-nav button {
+    min-height: 44px;
+  }
+}
+
+/* Full-width form submit: squared to match the fields above it. */
+.sasa-btn.is-block {
+  width: 100%;
+  min-height: 46px;
+  border-radius: 10px;
+}

@@ -666,39 +666,41 @@ export default function ParentLogin({ onSuccess, onGuest }: ParentLoginProps) {
     // Safe-area padding added so the card never sits under a notch/home
     // indicator, matching every other screen in the app.
     <main
-      className="min-h-dvh bg-gradient-to-br from-sky-100 via-purple-100 to-pink-100 flex items-center justify-center px-4 overflow-y-auto"
+      className="sasa-form-page"
       style={{
         paddingTop: "max(2rem, calc(2rem + env(safe-area-inset-top)))",
         paddingBottom: "max(2rem, calc(2rem + env(safe-area-inset-bottom)))",
       }}
     >
-      <section className="relative bg-white rounded-[2rem] shadow-2xl border border-white/80 p-5 sm:p-7 max-w-md w-full my-auto">
+      <section className="sasa-form-card">
         <button
           type="button"
           onClick={() => {
             window.location.assign("/");
           }}
-          className="absolute left-4 top-4 w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700"
+          className="sasa-iconbtn sasa-form-back"
           aria-label="Back to welcome screen"
         >
           <ArrowLeft size={21} />
         </button>
 
         <div className="text-center pt-5">
-          <div className="mx-auto bg-purple-100 text-purple-700 p-3 rounded-full inline-flex">
+          <div className="sasa-avatar is-lg" style={{ margin: "0 auto" }}>
             {mode === "register" ? <UserPlus size={34} /> : <ShieldCheck size={34} />}
           </div>
 
-          <div className="flex bg-slate-100 p-1.5 rounded-2xl my-5 w-full border border-slate-200">
+          <div className="sasa-segmented">
             <button
               type="button"
               onClick={() => {
                 setMode("login");
                 setError("");
               }}
-              className={`flex-1 py-2.5 text-xs font-black rounded-xl transition ${
-                mode === "login" ? "bg-white text-purple-700 shadow-sm" : "text-slate-500"
-              }`}
+              className={mode === "login" ? "is-selected" : undefined}
+              aria-pressed={mode === "login"}
+              // The submit button below is also called "Sign In", so the two
+              // controls were indistinguishable to a screen reader.
+              aria-label="Show the sign in form"
             >
               Sign In
             </button>
@@ -709,33 +711,33 @@ export default function ParentLogin({ onSuccess, onGuest }: ParentLoginProps) {
                 setMode("register");
                 setError("");
               }}
-              className={`flex-1 py-2.5 text-xs font-black rounded-xl transition flex items-center justify-center gap-1 ${
-                mode === "register" ? "bg-purple-600 text-white shadow-sm" : "text-slate-500"
-              }`}
+              className={mode === "register" ? "is-selected" : undefined}
+              aria-pressed={mode === "register"}
+              aria-label="Show the register form"
             >
               <UserPlus size={14} />
               Register
             </button>
           </div>
 
-          <h1 className="text-2xl font-black text-slate-800">
+          <h1 className="sasa-auth-title" style={{ fontSize: 22 }}>
             {mode === "register" ? "Register Parent Account" : "Parent Login"}
           </h1>
 
-          <p className="text-sm text-slate-500 mt-1 mb-5">
+          <p className="sasa-auth-sub" style={{ marginBottom: 20 }}>
             {mode === "register"
               ? "Create an account to manage child profiles and media."
               : "Sign in using your parent account."}
           </p>
         </div>
 
-        <div className="space-y-4">
+        <div className="sasa-form-fields">
           {mode === "register" && (
-            <label className="block">
-              <span className="text-sm font-black text-slate-700">Parent Name</span>
+            <label className="sasa-field">
+              <span className="sasa-field-label">Parent name</span>
 
-              <div className="mt-1.5 flex items-center gap-2 rounded-2xl border border-slate-300 px-3 focus-within:ring-2 focus-within:ring-purple-400">
-                <User size={19} className="text-slate-400" />
+              <div className="sasa-field-control">
+                <User size={18} aria-hidden="true" />
 
                 <input
                   type="text"
@@ -746,17 +748,17 @@ export default function ParentLogin({ onSuccess, onGuest }: ParentLoginProps) {
                     setName(event.target.value);
                     setError("");
                   }}
-                  className="w-full py-3 outline-none border-0 focus:ring-0"
+                  className="sasa-field-input"
                 />
               </div>
             </label>
           )}
 
-          <label className="block">
-            <span className="text-sm font-black text-slate-700">Email address</span>
+          <label className="sasa-field">
+            <span className="sasa-field-label">Email address</span>
 
-            <div className="mt-1.5 flex items-center gap-2 rounded-2xl border border-slate-300 px-3 focus-within:ring-2 focus-within:ring-purple-400">
-              <Mail size={19} className="text-slate-400" />
+            <div className="sasa-field-control">
+              <Mail size={18} aria-hidden="true" />
 
               <input
                 type="email"
@@ -767,16 +769,16 @@ export default function ParentLogin({ onSuccess, onGuest }: ParentLoginProps) {
                   setEmail(event.target.value);
                   setError("");
                 }}
-                className="w-full py-3 outline-none border-0 focus:ring-0"
+                className="sasa-field-input"
               />
             </div>
           </label>
 
-          <label className="block">
-            <span className="text-sm font-black text-slate-700">Password</span>
+          <label className="sasa-field">
+            <span className="sasa-field-label">Password</span>
 
-            <div className="mt-1.5 flex items-center gap-2 rounded-2xl border border-slate-300 px-3 focus-within:ring-2 focus-within:ring-purple-400">
-              <LockKeyhole size={19} className="text-slate-400" />
+            <div className="sasa-field-control">
+              <LockKeyhole size={18} aria-hidden="true" />
 
               <input
                 type={showPassword ? "text" : "password"}
@@ -792,13 +794,13 @@ export default function ParentLogin({ onSuccess, onGuest }: ParentLoginProps) {
                     handleSubmit();
                   }
                 }}
-                className="w-full py-3 outline-none border-0 focus:ring-0"
+                className="sasa-field-input"
               />
 
               <button
                 type="button"
                 onClick={() => setShowPassword((current) => !current)}
-                className="text-slate-500"
+                className="sasa-field-toggle"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
@@ -807,7 +809,7 @@ export default function ParentLogin({ onSuccess, onGuest }: ParentLoginProps) {
           </label>
 
           {error && (
-            <div className="rounded-2xl bg-red-50 border border-red-200 p-3 text-sm font-bold text-red-700">
+            <div className="sasa-notice is-error" role="alert">
               {error}
             </div>
           )}
@@ -816,7 +818,7 @@ export default function ParentLogin({ onSuccess, onGuest }: ParentLoginProps) {
             type="button"
             disabled={loading}
             onClick={handleSubmit}
-            className="w-full rounded-2xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-black py-3.5 shadow-lg"
+            className="sasa-btn is-primary is-block"
           >
             {loading
               ? mode === "register"

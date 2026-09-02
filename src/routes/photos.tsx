@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Camera, ArrowLeft, Heart } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import puppyImg from "@/assets/photo-puppy.jpg";
 import flowerImg from "@/assets/photo-flower.jpg";
@@ -14,56 +15,113 @@ export const Route = createFileRoute("/photos")({
   component: PhotosPage,
 });
 
+/** The picture set bundled with the app (src/assets/photo-*.jpg). */
 const photos = [
-  { id: 1, label: "Puppy", image: puppyImg, color: "bg-peach-soft" },
-  { id: 2, label: "Flower", image: flowerImg, color: "bg-sky-soft" },
-  { id: 3, label: "Car", image: carImg, color: "bg-mint" },
-  { id: 4, label: "Star", image: starImg, color: "bg-sun" },
-  { id: 5, label: "Apple", image: appleImg, color: "bg-peach-soft" },
-  { id: 6, label: "Fish", image: fishImg, color: "bg-sky-soft" },
-  { id: 7, label: "Ball", image: ballImg, color: "bg-mint" },
-  { id: 8, label: "Moon", image: moonImg, color: "bg-sun" },
+  { id: 1, label: "Puppy", image: puppyImg },
+  { id: 2, label: "Flower", image: flowerImg },
+  { id: 3, label: "Car", image: carImg },
+  { id: 4, label: "Star", image: starImg },
+  { id: 5, label: "Apple", image: appleImg },
+  { id: 6, label: "Fish", image: fishImg },
+  { id: 7, label: "Ball", image: ballImg },
+  { id: 8, label: "Moon", image: moonImg },
 ];
 
+/**
+ * Standalone picture book. Tapping a picture opens it full size in a viewer
+ * with previous/next — the cards used to be inert buttons that did nothing.
+ */
 function PhotosPage() {
-  return (
-    <div className="min-h-screen bg-background pb-28">
-      <main className="mx-auto max-w-3xl px-4 pt-6 sm:pt-10">
-        <header className="mb-6 flex items-center gap-4">
-          <Link
-            to="/"
-            className="grid h-12 w-12 place-items-center rounded-2xl bg-muted text-foreground transition-colors hover:bg-muted/80"
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </Link>
-          <div>
-            <h1 className="font-heading text-3xl font-extrabold text-foreground">See Photos</h1>
-            <p className="text-sm font-medium text-muted-foreground">
-              Tap a picture to say its name
-            </p>
-          </div>
-        </header>
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
-        <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {photos.map((photo) => (
+  useEffect(() => {
+    if (openIndex === null) return;
+
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenIndex(null);
+      if (event.key === "ArrowRight") setOpenIndex((index) => ((index ?? 0) + 1) % photos.length);
+      if (event.key === "ArrowLeft")
+        setOpenIndex((index) => ((index ?? 0) - 1 + photos.length) % photos.length);
+    };
+
+    window.addEventListener("keydown", handleKey);
+
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [openIndex]);
+
+  const active = openIndex === null ? null : photos[openIndex];
+
+  return (
+    <div className="sasa-standalone">
+      <header className="sasa-auth-topbar">
+        <Link to="/" className="sasa-iconbtn" aria-label="Back to SARA">
+          <ArrowLeft size={22} />
+        </Link>
+        <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+          <h1 className="sasa-standalone-title">Photos</h1>
+          <p className="sasa-standalone-sub">Tap a picture to see it big</p>
+        </div>
+      </header>
+
+      <main className="sasa-container">
+        <div className="sasa-tilegrid">
+          {photos.map((photo, index) => (
             <button
               key={photo.id}
-              className={`kid-card toddler-shadow flex flex-col items-center gap-3 p-4 ${photo.color}`}
+              type="button"
+              className="sasa-tile"
+              onClick={() => setOpenIndex(index)}
+              aria-label={`Open ${photo.label}`}
             >
-              <div className="aspect-square w-full overflow-hidden rounded-2xl bg-white/60">
-                <img
-                  src={photo.image}
-                  alt={photo.label}
-                  loading="lazy"
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <span className="font-heading text-lg font-bold text-foreground">{photo.label}</span>
-              <Heart className="h-5 w-5 text-peach" />
+              <span className="sasa-tile-media is-square">
+                <img src={photo.image} alt="" loading="lazy" />
+              </span>
+              <span className="sasa-tile-body">
+                <strong>{photo.label}</strong>
+              </span>
             </button>
           ))}
-        </section>
+        </div>
       </main>
+
+      {active && (
+        <div className="sasa-lightbox" role="dialog" aria-label={active.label}>
+          <div className="sasa-lightbox-bar">
+            <strong>{active.label}</strong>
+            <button
+              type="button"
+              className="sasa-iconbtn"
+              onClick={() => setOpenIndex(null)}
+              aria-label="Close"
+            >
+              <X size={22} />
+            </button>
+          </div>
+
+          <img className="sasa-lightbox-img" src={active.image} alt={active.label} />
+
+          <div className="sasa-lightbox-nav">
+            <button
+              type="button"
+              className="sasa-btn"
+              onClick={() =>
+                setOpenIndex((index) => ((index ?? 0) - 1 + photos.length) % photos.length)
+              }
+            >
+              <ChevronLeft size={18} />
+              Previous
+            </button>
+            <button
+              type="button"
+              className="sasa-btn"
+              onClick={() => setOpenIndex((index) => ((index ?? 0) + 1) % photos.length)}
+            >
+              Next
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </div>

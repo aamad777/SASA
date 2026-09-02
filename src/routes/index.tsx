@@ -67,6 +67,28 @@ function getStorageItem(key: string): string | null {
   return null;
 }
 
+const KID_SECTIONS: KidsHomeTab[] = [
+  "home",
+  "search",
+  "library",
+  "songs",
+  "games",
+  "studio",
+  "profile",
+];
+
+/**
+ * `/?section=games` opens the app straight on that kid section — used by the
+ * standalone /learn and /videos pages so their links go somewhere real.
+ */
+function getSectionFromUrl(): KidsHomeTab {
+  if (typeof window === "undefined") return "home";
+
+  const requested = new URLSearchParams(window.location.search).get("section");
+
+  return KID_SECTIONS.find((section) => section === requested) ?? "home";
+}
+
 function normalizeParentName(value: unknown): string {
   if (typeof value !== "string") return "Parent";
 
@@ -137,7 +159,7 @@ function SasaApp() {
   const [assignedMediaLoading, setAssignedMediaLoading] = useState(false);
   const [assignedMediaRetryToken, setAssignedMediaRetryToken] = useState(0);
 
-  const [homeTab, setHomeTab] = useState<KidsHomeTab>("home");
+  const [homeTab, setHomeTab] = useState<KidsHomeTab>(getSectionFromUrl);
 
   useEffect(() => {
     if (!parentToken || !profile) {
@@ -180,18 +202,12 @@ function SasaApp() {
 
           const placeholderImage = `data:image/svg+xml,${encodeURIComponent(`
                 <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">
-                  <defs>
-                    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stop-color="#7c3aed"/>
-                      <stop offset="100%" stop-color="#ec4899"/>
-                    </linearGradient>
-                  </defs>
-                  <rect width="640" height="360" fill="url(#g)"/>
-                  <circle cx="320" cy="170" r="65" fill="white" fill-opacity="0.95"/>
-                  <polygon points="300,130 300,210 365,170" fill="#7c3aed"/>
-                  <text x="320" y="295" text-anchor="middle"
-                    font-family="Arial" font-size="30" font-weight="700"
-                    fill="white">Family Media</text>
+                  <rect width="640" height="360" fill="#e6e8ec"/>
+                  <circle cx="320" cy="164" r="42" fill="#ffffff"/>
+                  <polygon points="306,142 306,186 342,164" fill="#5b3ce0"/>
+                  <text x="320" y="252" text-anchor="middle"
+                    font-family="Manrope, Arial" font-size="22" font-weight="700"
+                    fill="#545a63">Family media</text>
                 </svg>
               `)}`;
 
@@ -218,6 +234,11 @@ function SasaApp() {
             sourceType: isYoutube ? "youtube" : isPhoto ? "photo" : "upload",
             sourceUrl: assetUrl,
             youtubeVideoId,
+            // Real values straight off the backend record — a card shows a
+            // date only when the API actually sent one, and the byline names
+            // where the item came from rather than inventing a channel.
+            createdAt: item.created_at || undefined,
+            sourceLabel: "Family library",
           };
         });
 
@@ -413,7 +434,7 @@ function SasaApp() {
   if (showParentDashboard) {
     return (
       <ParentDashboard
-        parentToken={parentToken!}
+        parentToken={parentToken}
         databaseChildren={databaseChildren}
         onDatabaseChildDeleted={(childId) => {
           setDatabaseChildren((current) => current.filter((child) => String(child.id) !== childId));
@@ -657,57 +678,54 @@ function SasaApp() {
   }
 
   return (
-    // Mobile fit fix: min-h-screen (100vh) sat on top of the body's own
-    // min-height:100vh, and on mobile browsers 100vh includes the
-    // collapsible address-bar height, leaving stray scrollable whitespace
-    // below the fold. min-h-dvh matches the dvh convention already used
-    // elsewhere (styles.css, ParentLogin, AddProfile).
-    <div className="min-h-dvh flex flex-col">
-      <KidsVideoHome
-        assignedVideos={assignedVideos}
-        assignedVideosLoading={assignedMediaLoading}
-        assignedMediaError={assignedMediaError}
-        onRetryAssignedMedia={() => setAssignedMediaRetryToken((value) => value + 1)}
-        profileName={profile.name}
-        profileEmoji={profile.emoji}
-        profileId={profile.id}
-        profileImage={profile.image}
-        activeTab={homeTab}
-        onTabChange={setHomeTab}
-        onOpenVideo={openKidsVideo}
-        onOpenParentalControls={openParentGate}
-        onChangeProfile={changeProfile}
-        onOpenFreeAccount={
-          guestMode && !parentToken
-            ? () => {
-                localStorage.removeItem("sasa-account-mode");
-                setGuestMode(false);
-                setProfile(null);
-                setSelectedKidsVideo(null);
-              }
-            : undefined
-        }
-        accountActionLabel={parentToken ? "Sign Out" : "Login"}
-        onAccountAction={() => {
-          if (parentToken) {
-            localStorage.removeItem("sasa-parent-token");
-            localStorage.removeItem("sasa-parent-name");
-            localStorage.removeItem("sasa-parent-role");
-            localStorage.removeItem("sasa-account-mode");
-            setParentToken(null);
-            setParentName("Parent");
-            setDatabaseChildren([]);
-            setProfile(null);
-            setSelectedKidsVideo(null);
-            return;
-          }
-
+    // AppShell (rendered by KidsVideoHome) owns the page min-height, the
+    // safe-area insets and the bottom-navigation clearance. A second
+    // min-height wrapper here used to leave stray scrollable whitespace
+    // below the fold on mobile browsers.
+    <KidsVideoHome
+      assignedVideos={assignedVideos}
+      assignedVideosLoading={assignedMediaLoading}
+      assignedMediaError={assignedMediaError}
+      onRetryAssignedMedia={() => setAssignedMediaRetryToken((value) => value + 1)}
+      profileName={profile.name}
+      profileEmoji={profile.emoji}
+      profileId={profile.id}
+      profileImage={profile.image}
+      activeTab={homeTab}
+      onTabChange={setHomeTab}
+      onOpenVideo={openKidsVideo}
+      onOpenParentalControls={openParentGate}
+      onChangeProfile={changeProfile}
+      onOpenFreeAccount={
+        guestMode && !parentToken
+          ? () => {
+              localStorage.removeItem("sasa-account-mode");
+              setGuestMode(false);
+              setProfile(null);
+              setSelectedKidsVideo(null);
+            }
+          : undefined
+      }
+      accountActionLabel={parentToken ? "Sign Out" : "Login"}
+      onAccountAction={() => {
+        if (parentToken) {
+          localStorage.removeItem("sasa-parent-token");
+          localStorage.removeItem("sasa-parent-name");
+          localStorage.removeItem("sasa-parent-role");
           localStorage.removeItem("sasa-account-mode");
-          setGuestMode(false);
+          setParentToken(null);
+          setParentName("Parent");
+          setDatabaseChildren([]);
           setProfile(null);
           setSelectedKidsVideo(null);
-        }}
-      />
-    </div>
+          return;
+        }
+
+        localStorage.removeItem("sasa-account-mode");
+        setGuestMode(false);
+        setProfile(null);
+        setSelectedKidsVideo(null);
+      }}
+    />
   );
 }

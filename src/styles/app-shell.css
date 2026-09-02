@@ -1,0 +1,1015 @@
+/* =====================================================================
+   SASA APP SHELL — responsive video-platform layout system
+   ---------------------------------------------------------------------
+   One shared chrome for every kid-facing screen (feed, search, library,
+   songs, games, studio, profile, watch) and the standalone legacy
+   pages. Structure:
+
+     .sasa-shell
+       .sasa-topbar        sticky header (brand, search, actions)
+       .sasa-shell-body
+         .sasa-rail        desktop navigation (inline) / drawer (overlay)
+         .sasa-main        page content
+       .sasa-tabbar        fixed bottom navigation (< 1024px)
+
+   Rules this file follows on purpose:
+   - one token block, no per-component color literals;
+   - borders instead of shadows, flat surfaces, no glassmorphism;
+   - logical properties (padding-inline / inset-inline) so the layout
+     mirrors correctly if an RTL locale is ever added;
+   - every fixed edge carries its own env(safe-area-inset-*) term, and
+     .sasa-main reserves matching clearance so nothing is ever covered.
+   ===================================================================== */
+
+:root {
+  /* Surfaces */
+  --sasa-page: #f6f7f9;
+  --sasa-surface: #ffffff;
+  --sasa-surface-2: #f0f1f4;
+  --sasa-surface-3: #e6e8ec;
+  --sasa-line: #dfe1e6;
+  --sasa-line-soft: #ebedf0;
+
+  /* Text */
+  --sasa-ink: #16181d;
+  --sasa-ink-2: #545a63;
+  --sasa-ink-3: #79808a;
+
+  /* Brand */
+  --sasa-brand: #5b3ce0;
+  --sasa-brand-strong: #4a2ecb;
+  --sasa-brand-soft: #efeaff;
+  --sasa-brand-ink: #ffffff;
+  --sasa-pink: #f0417d;
+  --sasa-danger: #c02626;
+  --sasa-danger-soft: #fdecec;
+  --sasa-ok: #15803d;
+  --sasa-ok-soft: #e8f6ec;
+
+  /* Metrics */
+  --sasa-header-h: 56px;
+  --sasa-rail-w: 240px;
+  --sasa-rail-w-mini: 76px;
+  --sasa-tabbar-h: 58px;
+  --sasa-radius: 12px;
+  --sasa-radius-sm: 8px;
+  --sasa-gutter: 16px;
+
+  /* Safe areas, resolved once */
+  --sasa-sat: env(safe-area-inset-top, 0px);
+  --sasa-sab: env(safe-area-inset-bottom, 0px);
+  --sasa-sal: env(safe-area-inset-left, 0px);
+  --sasa-sar: env(safe-area-inset-right, 0px);
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --sasa-header-h: 60px;
+    --sasa-gutter: 24px;
+  }
+}
+
+/* ── Shell ─────────────────────────────────────────────────────────── */
+
+.sasa-shell {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  background: var(--sasa-page);
+  color: var(--sasa-ink);
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sasa-shell-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: flex-start;
+}
+
+.sasa-main {
+  min-width: 0;
+  flex: 1 1 auto;
+  /* Bottom navigation clearance — the tab bar is fixed, so the scroll
+     surface has to reserve its full height plus the device inset. */
+  padding-bottom: calc(var(--sasa-tabbar-h) + var(--sasa-sab) + 24px);
+}
+
+@media (min-width: 1024px) {
+  .sasa-main {
+    padding-bottom: 40px;
+  }
+}
+
+.sasa-container {
+  width: 100%;
+  max-width: 1600px;
+  margin-inline: auto;
+  padding-inline: max(var(--sasa-gutter), var(--sasa-sal)) max(var(--sasa-gutter), var(--sasa-sar));
+}
+
+/* Dark variant, used by the watch screen. */
+.sasa-shell.is-dark {
+  --sasa-page: #101014;
+  --sasa-surface: #1a1b21;
+  --sasa-surface-2: #23242b;
+  --sasa-surface-3: #2c2e37;
+  --sasa-line: #2f313a;
+  --sasa-line-soft: #26272e;
+  --sasa-ink: #f2f3f5;
+  --sasa-ink-2: #b0b5be;
+  --sasa-ink-3: #878d97;
+  --sasa-brand-soft: #2a2350;
+  color: var(--sasa-ink);
+}
+
+/* ── Top bar ───────────────────────────────────────────────────────── */
+
+.sasa-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: calc(var(--sasa-header-h) + var(--sasa-sat));
+  padding-block: var(--sasa-sat) 0;
+  padding-inline: max(12px, var(--sasa-sal)) max(12px, var(--sasa-sar));
+  border-bottom: 1px solid var(--sasa-line);
+  background: var(--sasa-surface);
+}
+
+@media (min-width: 1024px) {
+  .sasa-topbar {
+    gap: 12px;
+    padding-inline: max(16px, var(--sasa-sal)) max(16px, var(--sasa-sar));
+  }
+}
+
+.sasa-topbar-start,
+.sasa-topbar-end {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.sasa-topbar-start {
+  flex: 0 0 auto;
+}
+
+.sasa-topbar-mid {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.sasa-topbar-end {
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+/* Icon button — 44px hit area everywhere, per the mobile spec. */
+.sasa-iconbtn {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sasa-ink-2);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.sasa-iconbtn:hover {
+  background: var(--sasa-surface-2);
+  color: var(--sasa-ink);
+}
+
+.sasa-iconbtn[aria-pressed="true"],
+.sasa-iconbtn.is-active {
+  background: var(--sasa-brand-soft);
+  color: var(--sasa-brand);
+}
+
+.sasa-shell.is-dark .sasa-iconbtn[aria-pressed="true"],
+.sasa-shell.is-dark .sasa-iconbtn.is-active {
+  color: #c3b5ff;
+}
+
+.sasa-iconbtn:focus-visible,
+.sasa-brand:focus-visible,
+.sasa-btn:focus-visible,
+.sasa-chip:focus-visible,
+.sasa-rail-link:focus-visible,
+.sasa-tabbar button:focus-visible,
+.sasa-card-link:focus-visible,
+.sasa-menu-item:focus-visible {
+  outline: 2px solid var(--sasa-brand);
+  outline-offset: 2px;
+}
+
+.sasa-shell.is-dark .sasa-iconbtn:focus-visible,
+.sasa-shell.is-dark .sasa-btn:focus-visible,
+.sasa-shell.is-dark .sasa-chip:focus-visible,
+.sasa-shell.is-dark .sasa-card-link:focus-visible {
+  outline-color: #a48bff;
+}
+
+/* Brand */
+.sasa-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 4px;
+  border: 0;
+  border-radius: var(--sasa-radius-sm);
+  background: transparent;
+  color: var(--sasa-ink);
+  text-decoration: none;
+}
+
+.sasa-brand-mark {
+  display: block;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+}
+
+.sasa-brand-word {
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.sasa-brand-word sup {
+  margin-inline-start: 2px;
+  color: var(--sasa-ink-3);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: super;
+}
+
+/* Search */
+.sasa-search {
+  display: flex;
+  width: 100%;
+  max-width: 620px;
+  align-items: center;
+  height: 40px;
+  padding-inline: 14px 4px;
+  border: 1px solid var(--sasa-line);
+  border-radius: 999px;
+  background: var(--sasa-surface);
+}
+
+.sasa-search:focus-within {
+  border-color: var(--sasa-brand);
+}
+
+.sasa-search input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--sasa-ink);
+  font-size: 15px;
+  outline: none;
+}
+
+.sasa-search input::placeholder {
+  color: var(--sasa-ink-3);
+}
+
+.sasa-search-icon {
+  flex: 0 0 auto;
+  margin-inline-end: 10px;
+  color: var(--sasa-ink-3);
+}
+
+.sasa-search-clear {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sasa-ink-2);
+}
+
+.sasa-search-clear:hover {
+  background: var(--sasa-surface-2);
+}
+
+/* Mobile: the search row replaces the whole bar while it is open. */
+.sasa-topbar.is-searching .sasa-topbar-start,
+.sasa-topbar.is-searching .sasa-topbar-end {
+  display: none;
+}
+
+.sasa-topbar.is-searching .sasa-topbar-mid {
+  gap: 4px;
+}
+
+.sasa-topbar-searchrow {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 4px;
+}
+
+.sasa-desktop-search {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .sasa-desktop-search {
+    display: flex;
+  }
+
+  .sasa-search-trigger {
+    display: none;
+  }
+}
+
+/* Account button + menu */
+.sasa-avatar {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--sasa-brand-soft);
+  color: var(--sasa-brand);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sasa-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sasa-avatar.is-lg {
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
+}
+
+.sasa-menu-wrap {
+  position: relative;
+}
+
+.sasa-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  inset-inline-end: 0;
+  z-index: 70;
+  width: 268px;
+  max-width: calc(100vw - 24px);
+  overflow: hidden;
+  padding: 6px;
+  border: 1px solid var(--sasa-line);
+  border-radius: var(--sasa-radius);
+  background: var(--sasa-surface);
+  box-shadow: 0 10px 30px rgba(15, 18, 25, 0.14);
+}
+
+.sasa-menu-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-bottom: 1px solid var(--sasa-line-soft);
+  margin-bottom: 4px;
+}
+
+.sasa-menu-head strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sasa-menu-head span {
+  display: block;
+  color: var(--sasa-ink-3);
+  font-size: 12px;
+}
+
+.sasa-menu-item {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--sasa-radius-sm);
+  background: transparent;
+  color: var(--sasa-ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: start;
+}
+
+.sasa-menu-item:hover {
+  background: var(--sasa-surface-2);
+}
+
+.sasa-menu-item svg {
+  flex: 0 0 auto;
+  color: var(--sasa-ink-2);
+}
+
+.sasa-menu-item.is-danger {
+  color: var(--sasa-danger);
+}
+
+.sasa-menu-item.is-danger svg {
+  color: var(--sasa-danger);
+}
+
+.sasa-menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--sasa-line-soft);
+}
+
+/* ── Side rail ─────────────────────────────────────────────────────── */
+
+.sasa-rail {
+  display: none;
+  position: sticky;
+  top: calc(var(--sasa-header-h) + var(--sasa-sat));
+  z-index: 40;
+  width: var(--sasa-rail-w);
+  max-height: calc(100dvh - var(--sasa-header-h) - var(--sasa-sat));
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  padding: 12px 8px 24px;
+  padding-inline-start: max(8px, var(--sasa-sal));
+  border-inline-end: 1px solid var(--sasa-line);
+  background: var(--sasa-page);
+  overscroll-behavior: contain;
+}
+
+@media (min-width: 1024px) {
+  .sasa-rail.is-inline {
+    display: flex;
+  }
+
+  .sasa-rail.is-inline.is-mini {
+    width: var(--sasa-rail-w-mini);
+    align-items: stretch;
+  }
+}
+
+.sasa-rail-link {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--sasa-ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: start;
+  text-decoration: none;
+}
+
+.sasa-rail-link:hover {
+  background: var(--sasa-surface-2);
+}
+
+.sasa-rail-link svg {
+  flex: 0 0 auto;
+  color: var(--sasa-ink-2);
+}
+
+.sasa-rail-link.is-current {
+  background: var(--sasa-brand-soft);
+  color: var(--sasa-brand);
+  font-weight: 700;
+}
+
+.sasa-rail-link.is-current svg {
+  color: var(--sasa-brand);
+}
+
+.sasa-shell.is-dark .sasa-rail-link.is-current,
+.sasa-shell.is-dark .sasa-rail-link.is-current svg {
+  color: #c3b5ff;
+}
+
+.sasa-rail-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sasa-rail.is-mini .sasa-rail-link {
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 4px;
+}
+
+.sasa-rail.is-mini .sasa-rail-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.sasa-rail-group-title {
+  padding: 14px 12px 6px;
+  color: var(--sasa-ink-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sasa-rail-sep {
+  height: 1px;
+  margin: 8px 4px;
+  background: var(--sasa-line);
+}
+
+.sasa-rail-note {
+  padding: 10px 12px;
+  color: var(--sasa-ink-3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* Overlay drawer (watch screen on desktop, and any narrow viewport) */
+.sasa-rail-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  border: 0;
+  background: rgba(12, 14, 20, 0.5);
+}
+
+.sasa-rail.is-overlay {
+  position: fixed;
+  top: 0;
+  inset-inline-start: 0;
+  z-index: 81;
+  display: flex;
+  width: min(var(--sasa-rail-w), 82vw);
+  max-height: none;
+  height: 100dvh;
+  padding-top: calc(12px + var(--sasa-sat));
+  border-inline-end: 1px solid var(--sasa-line);
+  background: var(--sasa-surface);
+}
+
+.sasa-rail-overlay-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+/* ── Bottom tab bar ────────────────────────────────────────────────── */
+
+.sasa-tabbar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  gap: 2px;
+  padding-block: 4px calc(4px + var(--sasa-sab));
+  padding-inline: max(4px, var(--sasa-sal)) max(4px, var(--sasa-sar));
+  border-top: 1px solid var(--sasa-line);
+  background: var(--sasa-surface);
+}
+
+@media (min-width: 1024px) {
+  .sasa-tabbar {
+    display: none;
+  }
+}
+
+.sasa-tabbar button {
+  display: flex;
+  min-width: 0;
+  min-height: 50px;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--sasa-ink-2);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.sasa-tabbar button > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sasa-tabbar button.is-current {
+  color: var(--sasa-brand);
+  font-weight: 700;
+}
+
+.sasa-shell.is-dark .sasa-tabbar button.is-current {
+  color: #c3b5ff;
+}
+
+.sasa-tabbar-avatar {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--sasa-surface-2);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.sasa-tabbar-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Bottom sheet used by the tab bar's "Play" entry. */
+.sasa-sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  border: 0;
+  background: rgba(12, 14, 20, 0.5);
+}
+
+.sasa-sheet {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 91;
+  padding: 8px 12px calc(16px + var(--sasa-sab));
+  border-top: 1px solid var(--sasa-line);
+  border-radius: 16px 16px 0 0;
+  background: var(--sasa-surface);
+}
+
+.sasa-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px 10px;
+}
+
+.sasa-sheet-head h2 {
+  margin: 0;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sasa-sheet-list {
+  display: grid;
+  gap: 4px;
+}
+
+/* ── Buttons, chips, generic bits ─────────────────────────────────── */
+
+.sasa-btn {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--sasa-line);
+  border-radius: 999px;
+  background: var(--sasa-surface);
+  color: var(--sasa-ink);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sasa-btn:hover {
+  background: var(--sasa-surface-2);
+}
+
+.sasa-btn.is-primary {
+  border-color: transparent;
+  background: var(--sasa-brand);
+  color: var(--sasa-brand-ink);
+}
+
+.sasa-btn.is-primary:hover {
+  background: var(--sasa-brand-strong);
+}
+
+.sasa-btn.is-quiet {
+  border-color: transparent;
+  background: var(--sasa-surface-2);
+}
+
+.sasa-btn.is-quiet:hover {
+  background: var(--sasa-surface-3);
+}
+
+.sasa-btn[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--sasa-brand-soft);
+  color: var(--sasa-brand);
+}
+
+.sasa-shell.is-dark .sasa-btn[aria-pressed="true"] {
+  color: #c3b5ff;
+}
+
+.sasa-btn:disabled {
+  opacity: 0.5;
+}
+
+.sasa-chip {
+  display: inline-flex;
+  min-height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--sasa-line);
+  border-radius: 999px;
+  background: var(--sasa-surface);
+  color: var(--sasa-ink);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sasa-chip:hover {
+  background: var(--sasa-surface-2);
+}
+
+.sasa-chip.is-selected {
+  border-color: transparent;
+  background: var(--sasa-ink);
+  color: var(--sasa-page);
+}
+
+.sasa-shell.is-dark .sasa-chip.is-selected {
+  background: var(--sasa-ink);
+  color: #101014;
+}
+
+.sasa-chip-count {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.65;
+}
+
+.sasa-chip-thumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+/* Horizontal scrollers */
+.sasa-hscroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sasa-hscroll::-webkit-scrollbar {
+  display: none;
+}
+
+.sasa-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The hamburger only makes sense where a rail exists (desktop) or where the
+   drawer is the only nav (watch screen on desktop). Phones use the tab bar. */
+.sasa-menu-trigger {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .sasa-menu-trigger {
+    display: inline-grid;
+  }
+}
+
+.sasa-menu-item.is-current {
+  background: var(--sasa-brand-soft);
+  color: var(--sasa-brand);
+  font-weight: 700;
+}
+
+.sasa-menu-item.is-current svg {
+  color: var(--sasa-brand);
+}
+
+.sasa-shell.is-dark .sasa-menu-item.is-current,
+.sasa-shell.is-dark .sasa-menu-item.is-current svg {
+  color: #c3b5ff;
+}
+
+/* ── Kid app themes ────────────────────────────────────────────────────
+   The Home theme picker (src/lib/theme.ts) writes `data-app-theme` on
+   <html>. Before this pass the picker set an attribute nothing styled, so
+   choosing a theme did nothing visible. Each theme now retints the shell's
+   surface and accent tokens only — never the media itself — and the two
+   night-time themes switch the shell to its dark token set through
+   AppShell's `tone` prop rather than duplicating them here.
+   ------------------------------------------------------------------- */
+
+html[data-app-theme="jungle"] .sasa-shell:not(.is-dark) {
+  --sasa-page: #f1f6f2;
+  --sasa-surface-2: #e8f1ea;
+  --sasa-surface-3: #dbe8de;
+  --sasa-line: #d7e3da;
+  --sasa-line-soft: #e4ede6;
+  --sasa-brand: #14714a;
+  --sasa-brand-strong: #0f5c3c;
+  --sasa-brand-soft: #e0f0e7;
+}
+
+html[data-app-theme="magic"] .sasa-shell:not(.is-dark) {
+  --sasa-page: #f8f4fb;
+  --sasa-surface-2: #f1eaf6;
+  --sasa-surface-3: #e7dcef;
+  --sasa-line: #e3d8ea;
+  --sasa-line-soft: #eee6f3;
+  --sasa-brand: #8a2bb0;
+  --sasa-brand-strong: #74228f;
+  --sasa-brand-soft: #f4e6fa;
+}
+
+html[data-app-theme="dino"] .sasa-shell:not(.is-dark) {
+  --sasa-page: #f8f6f0;
+  --sasa-surface-2: #f2eee3;
+  --sasa-surface-3: #e8e2d3;
+  --sasa-line: #e4ded0;
+  --sasa-line-soft: #eee9de;
+  --sasa-brand: #a4550f;
+  --sasa-brand-strong: #8a4709;
+  --sasa-brand-soft: #f8ecdd;
+}
+
+html[data-app-theme="space"] .sasa-shell.is-dark {
+  --sasa-page: #0c1020;
+  --sasa-surface: #151a2e;
+  --sasa-surface-2: #1e2440;
+  --sasa-surface-3: #262d4c;
+  --sasa-line: #2a3152;
+  --sasa-line-soft: #212745;
+  --sasa-brand-soft: #232c56;
+}
+
+/* ── Panels and form controls ─────────────────────────────────────── */
+
+.sasa-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--sasa-line);
+  border-radius: var(--sasa-radius);
+  background: var(--sasa-surface);
+  color: var(--sasa-ink);
+  text-align: start;
+}
+
+.sasa-panel.is-stat {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.sasa-panel.is-stat:hover {
+  background: var(--sasa-surface-2);
+}
+
+.sasa-panel-text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sasa-panel-text strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sasa-panel-text span {
+  display: block;
+  color: var(--sasa-ink-2);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.sasa-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--sasa-line);
+  border-radius: var(--sasa-radius-sm);
+  background: var(--sasa-surface);
+  color: var(--sasa-ink);
+  font-size: 15px;
+}
+
+.sasa-input:focus-visible {
+  border-color: var(--sasa-brand);
+  outline: 2px solid var(--sasa-brand);
+  outline-offset: 1px;
+}
+
+/* The standalone pages (/videos, /photos, /learn) have no side rail, so
+   their bottom navigation stays visible at every width. */
+.sasa-tabbar.is-standalone {
+  display: flex;
+}
+
+.sasa-tabbar.is-standalone a {
+  display: flex;
+  min-width: 0;
+  min-height: 50px;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 2px;
+  border-radius: 10px;
+  color: var(--sasa-ink-2);
+  font-size: 10px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sasa-tabbar.is-standalone a.is-current {
+  color: var(--sasa-brand);
+  font-weight: 700;
+}
+
+.sasa-tabbar.is-standalone a:focus-visible {
+  outline: 2px solid var(--sasa-brand);
+  outline-offset: 2px;
+}
