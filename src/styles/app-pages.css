@@ -1345,7 +1345,15 @@
 
 .sasa-form-page {
   display: flex;
-  min-height: 100dvh;
+  /* SASA_PIN_MOBILE_FIT_V17 — parent login/register is the one PIN-adjacent
+     screen with real text inputs, so it is the one that actually meets the
+     on-screen keyboard. `100dvh` does not shrink reliably in the Capacitor
+     WebView; `--app-visible-height` mirrors window.visualViewport (see
+     use-visible-viewport-height.ts) and falls back to 100dvh elsewhere.
+     `align-items: flex-start` once the viewport is short stops the centred
+     card from being pushed half-off the top when the keyboard takes ~40%
+     of the screen. */
+  min-height: var(--app-visible-height, 100dvh);
   align-items: center;
   justify-content: center;
   overflow-y: auto;
@@ -1372,6 +1380,36 @@
   }
 }
 
+/* Keyboard open (or any very short viewport): stop vertically centring the
+   card so the focused field and the submit button stay reachable by scrolling
+   from the top instead of being clipped at both ends. */
+@media (max-height: 620px) {
+  .sasa-form-page {
+    align-items: flex-start;
+    padding-block: 8px;
+  }
+
+  .sasa-form-card {
+    margin-block: 0;
+    padding: 14px 16px;
+  }
+
+  /* The decorative avatar is the tallest non-functional element in the card;
+     dropping it (and tightening the mode switch) is what brings the submit
+     button back on screen alongside the focused field at 360x800 / 390x844. */
+  .sasa-form-card .sasa-avatar.is-lg {
+    display: none;
+  }
+
+  .sasa-form-card .sasa-segmented {
+    margin-block: 10px;
+  }
+
+  .sasa-form-card .text-center.pt-5 {
+    padding-top: 4px;
+  }
+}
+
 .sasa-form-back {
   position: absolute;
   inset-inline-start: 8px;
@@ -1390,7 +1428,10 @@
 
 .sasa-segmented button {
   display: inline-flex;
-  min-height: 40px;
+  /* SASA_PIN_MOBILE_FIT_V17 — 40px sat under the 44px minimum touch target
+     on every phone viewport; this is the login/register mode switch, so it
+     is one of the first controls a parent has to hit. */
+  min-height: 44px;
   flex: 1 1 0;
   align-items: center;
   justify-content: center;
@@ -1667,6 +1708,21 @@
 
   .parent-dashboard button[role="switch"],
   .parent-dashboard .parent-dashboard-bottom-nav button {
+    min-height: 44px;
+  }
+
+  /* SASA_PIN_MOBILE_FIT_V17 — the mobile header's icon buttons (open the nav
+     drawer, exit the dashboard) rendered 38x38, under the 44px minimum. These
+     are the dashboard's primary navigation controls, so they are raised to a
+     full target without changing the header's height. */
+  .parent-dashboard .parent-dashboard-mobile-header button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Every action inside a dashboard dialog — the Change PIN dialog's Cancel
+     and Save PIN in particular — sat at ~40px from `py-2.5` alone. */
+  .parent-dashboard [role="dialog"] button {
     min-height: 44px;
   }
 }

@@ -42,3 +42,7 @@ node_modules/
 
 # Temporary source backups
 *.before-*
+
+# Local verification artefacts (not part of the app)
+release-apk/
+mobile-screenshots/

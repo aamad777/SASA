@@ -319,7 +319,9 @@ export async function setChildPin(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      child_id: Number(childId),
+      // SASA_UPLOAD_UUID_FIX_V18 — `profiles.id` is a uuid, so Number() here
+      // produced NaN, which JSON.stringify writes as null. Sent unchanged.
+      child_id: childId,
       pin,
     }),
   });
@@ -542,33 +544,164 @@ async function readApiResponse(response: Response) {
   return parseJsonOrExplain(response, "Talking to the SARA API");
 }
 
-export async function uploadParentVideo(token: string, file: File, input: ParentMediaInput) {
+/* SASA_UPLOAD_UUID_FIX_V18
+ *
+ * Photo and video uploads both failed here, and the cause was this function,
+ * not the form or the backend. `child_profile_id` in `media_child_access` is a
+ * `uuid NOT NULL` referencing `profiles(id)`, and `DatabaseChild.id` already
+ * carries that uuid as a string. The previous line ran the ids through
+ * `.map(Number)`, which turns a uuid into `NaN`, and `JSON.stringify` then
+ * serialises `NaN` as `null`. The backend received `[null]`, tried to insert
+ * it, and Postgres rejected the row:
+ *
+ *   null value in column "child_profile_id" of relation "media_child_access"
+ *   violates not-null constraint
+ *
+ * The file itself uploaded fine every time — the assignment insert is what
+ * failed, so the whole request errored and the parent saw a failed upload.
+ * The ids are sent unchanged now, exactly like updateMediaChildren already
+ * does with `child_ids`. No URL, method, header or field name changed.
+ */
+export const ALLOWED_UPLOAD_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+] as const;
+
+// Client-side guard only, and deliberately well under the ingress's
+// `proxy-body-size: 500m` so an oversized file is rejected instantly instead
+// of being uploaded for minutes and then refused. The backend's own limit
+// still applies and its error is surfaced verbatim.
+export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Returns an error message, or null when the file is acceptable. */
+export function validateUploadFile(file: File): string | null {
+  if (file.size === 0) {
+    return `"${file.name}" is empty (0 bytes). Choose a different file.`;
+  }
+
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return (
+      `"${file.name}" is ${formatBytes(file.size)}, over the ` +
+      `${formatBytes(MAX_UPLOAD_BYTES)} limit. Choose a smaller file.`
+    );
+  }
+
+  if (!(ALLOWED_UPLOAD_MIME_TYPES as readonly string[]).includes(file.type)) {
+    return (
+      `"${file.name}" is not a supported format` +
+      `${file.type ? ` (${file.type})` : ""}. ` +
+      `Photos: JPG, PNG, WEBP, GIF. Videos: MP4, WEBM, MOV.`
+    );
+  }
+
+  return null;
+}
+
+export async function uploadParentVideo(
+  token: string,
+  file: File,
+  input: ParentMediaInput,
+  onProgress?: (percent: number) => void,
+) {
   const formData = new FormData();
 
   formData.append("file", file);
   formData.append("title", input.title);
   formData.append("category", input.category);
-  // childIds are the frontend's stringified DatabaseChild.id (see api.ts's
-  // DatabaseChild type) — convert back to numbers for the wire payload,
-  // matching the real numeric child id the backend returns/expects
-  // elsewhere (e.g. setChildPin's child_id).
-  formData.append("childProfileIds", JSON.stringify(input.childIds.map(Number)));
+  // Sent as-is: these are `profiles.id` uuids, not numbers. See the block
+  // comment above — coercing them was the upload bug.
+  formData.append("childProfileIds", JSON.stringify(input.childIds));
 
-  const response = await fetch(`${API_BASE_URL}/media/upload`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
+  // XMLHttpRequest rather than fetch purely because fetch cannot report
+  // upload progress. Same URL, same POST, same Authorization header, same
+  // multipart field names.
+  return new Promise<Record<string, unknown>>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.open("POST", `${API_BASE_URL}/media/upload`);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    if (onProgress) {
+      onProgress(0);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      const contentType = xhr.getResponseHeader("content-type") || "";
+      let data: Record<string, unknown> | null = null;
+
+      if (contentType.includes("application/json")) {
+        try {
+          data = JSON.parse(xhr.responseText);
+        } catch {
+          data = null;
+        }
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress?.(100);
+        resolve(data ?? {});
+        return;
+      }
+
+      // Surface what the server actually said — never a generic success.
+      const serverError = typeof data?.error === "string" ? data.error : "";
+
+      if (serverError) {
+        reject(new Error(serverError));
+        return;
+      }
+
+      if (xhr.status === 401 || xhr.status === 403) {
+        reject(new Error("Your parent session has expired. Sign in again to upload media."));
+        return;
+      }
+
+      if (xhr.status === 413) {
+        reject(new Error(`"${file.name}" was rejected by the server as too large.`));
+        return;
+      }
+
+      if (xhr.status >= 502 && xhr.status <= 504) {
+        reject(
+          new Error(
+            `The SARA API is not responding right now (HTTP ${xhr.status}). Try again shortly.`,
+          ),
+        );
+        return;
+      }
+
+      reject(
+        new Error(`Upload failed (HTTP ${xhr.status}). ${xhr.responseText.slice(0, 160)}`.trim()),
+      );
+    };
+
+    xhr.onerror = () => {
+      reject(new Error("Upload failed: the network request could not be completed."));
+    };
+
+    xhr.onabort = () => {
+      reject(new Error("Upload cancelled."));
+    };
+
+    xhr.send(formData);
   });
-
-  const data = await readApiResponse(response);
-
-  if (!response.ok) {
-    throw new Error(data.error || "Video upload failed.");
-  }
-
-  return data;
 }
 
 export async function addParentYoutubeVideo(

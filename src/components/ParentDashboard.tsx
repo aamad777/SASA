@@ -17,6 +17,8 @@ import {
   updateParentMedia,
   updateParentMediaAccess,
   uploadParentVideo,
+  validateUploadFile,
+  formatBytes,
   type DatabaseChild,
   type ParentMediaItem,
 } from "../lib/api";
@@ -245,6 +247,7 @@ export default function ParentDashboard({
   const [selectedMediaChildIds, setSelectedMediaChildIds] = useState<string[]>([]);
 
   const [mediaSaving, setMediaSaving] = useState(false);
+  const [mediaProgress, setMediaProgress] = useState(0);
 
   const [mediaMessage, setMediaMessage] = useState("");
 
@@ -534,6 +537,13 @@ export default function ParentDashboard({
   };
 
   const saveParentMedia = async () => {
+    // SASA_UPLOAD_UUID_FIX_V18 — a second click while the first upload is in
+    // flight would start a duplicate POST (and a duplicate media row). The
+    // button is disabled during the upload; this guards the handler itself.
+    if (mediaSaving) {
+      return;
+    }
+
     setMediaError("");
     setMediaMessage("");
 
@@ -552,6 +562,15 @@ export default function ParentDashboard({
       return;
     }
 
+    if (mediaMode === "upload" && mediaFile) {
+      const fileError = validateUploadFile(mediaFile);
+
+      if (fileError) {
+        setMediaError(fileError);
+        return;
+      }
+    }
+
     if (mediaMode === "youtube" && !youtubeUrl.trim()) {
       setMediaError("Enter a YouTube link.");
       return;
@@ -563,14 +582,20 @@ export default function ParentDashboard({
     }
 
     setMediaSaving(true);
+    setMediaProgress(0);
 
     try {
       if (mediaMode === "upload" && mediaFile) {
-        await uploadParentVideo(parentToken, mediaFile, {
-          title: mediaTitle.trim(),
-          category: mediaCategory.trim() || "Parent Upload",
-          childIds: selectedMediaChildIds,
-        });
+        await uploadParentVideo(
+          parentToken,
+          mediaFile,
+          {
+            title: mediaTitle.trim(),
+            category: mediaCategory.trim() || "Parent Upload",
+            childIds: selectedMediaChildIds,
+          },
+          setMediaProgress,
+        );
       } else {
         await addParentYoutubeVideo(parentToken, {
           url: youtubeUrl.trim(),
@@ -580,7 +605,13 @@ export default function ParentDashboard({
         });
       }
 
-      setMediaMessage(`Media assigned to ${selectedMediaChildIds.length} child profile(s).`);
+      // Only reached when the backend returned 2xx — never an optimistic
+      // success. The count is read before the selection is cleared below.
+      setMediaMessage(
+        mediaMode === "upload" && mediaFile
+          ? `"${mediaFile.name}" uploaded and assigned to ${selectedMediaChildIds.length} child profile(s).`
+          : `Media assigned to ${selectedMediaChildIds.length} child profile(s).`,
+      );
 
       setMediaTitle("");
       setYoutubeUrl("");
@@ -600,6 +631,7 @@ export default function ParentDashboard({
       setMediaError(error instanceof Error ? error.message : "Unable to save media.");
     } finally {
       setMediaSaving(false);
+      setMediaProgress(0);
     }
   };
 
@@ -1083,16 +1115,25 @@ export default function ParentDashboard({
                           screenLimitEnabled: !screenLimitEnabled,
                         });
                       }}
-                      className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        screenLimitEnabled ? "bg-sky-500" : "bg-slate-300"
-                      }`}
+                      role="switch"
+                      aria-checked={screenLimitEnabled}
+                      className="group relative inline-flex h-11 w-14 shrink-0 cursor-pointer items-center justify-center bg-transparent focus:outline-none"
                       aria-label="Toggle screen limit"
                     >
+                      {/* SASA_PIN_MOBILE_FIT_V17 — the 32px-tall track was the
+                          tap target itself, under the 44px minimum. The track
+                          keeps its size; the button around it is now 44px. */}
                       <span
-                        className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                          screenLimitEnabled ? "translate-x-6" : "translate-x-0"
+                        className={`pointer-events-none flex h-8 w-14 items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                          screenLimitEnabled ? "bg-sky-500" : "bg-slate-300"
                         }`}
-                      />
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                            screenLimitEnabled ? "translate-x-6" : "translate-x-0"
+                          }`}
+                        />
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -1119,7 +1160,7 @@ export default function ParentDashboard({
                             screenMinutes: Math.max(15, screenMinutes - 15),
                           });
                         }}
-                        className="px-3.5 py-2 rounded-xl bg-white hover:bg-sky-100 disabled:opacity-40 font-black text-sky-700 shadow-sm border border-sky-200 text-sm transition"
+                        className="min-h-11 rounded-xl border border-sky-200 bg-white px-3.5 py-2 text-sm font-black text-sky-700 shadow-sm transition hover:bg-sky-100 disabled:opacity-40"
                       >
                         -15 min
                       </button>
@@ -1133,7 +1174,7 @@ export default function ParentDashboard({
                             screenMinutes: screenMinutes + 15,
                           });
                         }}
-                        className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 disabled:opacity-40 font-black text-white shadow-sm text-sm transition"
+                        className="min-h-11 rounded-xl bg-sky-600 px-3.5 py-2 text-sm font-black text-white shadow-sm transition hover:bg-sky-700 disabled:opacity-40"
                       >
                         +15 min
                       </button>
@@ -1304,10 +1345,13 @@ export default function ParentDashboard({
                             bedtimeEnabled: !bedtimeEnabled,
                           });
                         }}
-                        className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase transition ${
+                        role="switch"
+                        aria-checked={bedtimeEnabled}
+                        aria-label="Toggle bedtime curfew"
+                        className={`min-h-11 rounded-full px-4 text-xs font-extrabold uppercase transition ${
                           bedtimeEnabled
                             ? "bg-indigo-500 text-white"
-                            : "bg-slate-800 text-slate-400 border border-slate-700"
+                            : "border border-slate-700 bg-slate-800 text-slate-400"
                         }`}
                       >
                         {bedtimeEnabled ? "ACTIVE" : "OFF"}
@@ -1817,13 +1861,47 @@ export default function ParentDashboard({
                       <input
                         id="parent-media-file"
                         type="file"
+                        disabled={mediaSaving}
                         accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
-                        onChange={(event) => setMediaFile(event.target.files?.[0] || null)}
-                        className="w-full rounded-2xl border border-dashed border-purple-300 bg-purple-50 px-4 py-4 text-sm"
+                        onChange={(event) => {
+                          const picked = event.target.files?.[0] || null;
+
+                          setMediaMessage("");
+
+                          if (!picked) {
+                            setMediaFile(null);
+                            setMediaError("");
+                            return;
+                          }
+
+                          // Validate on selection so the parent finds out
+                          // before waiting through an upload.
+                          const fileError = validateUploadFile(picked);
+
+                          if (fileError) {
+                            setMediaFile(null);
+                            setMediaError(fileError);
+                            event.target.value = "";
+                            return;
+                          }
+
+                          setMediaError("");
+                          setMediaFile(picked);
+                        }}
+                        className="w-full rounded-2xl border border-dashed border-purple-300 bg-purple-50 px-4 py-4 text-sm disabled:opacity-50"
                       />
 
+                      {mediaFile ? (
+                        <span className="flex flex-wrap items-center gap-2 text-xs font-bold text-purple-800">
+                          <span className="rounded-full bg-purple-100 px-2.5 py-1">
+                            {mediaFile.type.startsWith("video/") ? "🎬" : "🖼️"} {mediaFile.name}
+                          </span>
+                          <span className="text-slate-500">{formatBytes(mediaFile.size)}</span>
+                        </span>
+                      ) : null}
+
                       <span className="text-xs font-semibold text-slate-500">
-                        Photos: JPG, PNG, WEBP, GIF. Videos: MP4, WEBM, MOV.
+                        Photos: JPG, PNG, WEBP, GIF. Videos: MP4, WEBM, MOV. Up to 200 MB.
                       </span>
                     </label>
                   ) : (
@@ -1900,6 +1978,28 @@ export default function ParentDashboard({
                   )}
                 </div>
 
+                {mediaSaving && mediaMode === "upload" && (
+                  <div className="mt-4" aria-live="polite">
+                    <div className="mb-1 flex items-center justify-between text-xs font-black text-purple-800">
+                      <span>Uploading{mediaFile ? ` "${mediaFile.name}"` : ""}…</span>
+                      <span>{mediaProgress}%</span>
+                    </div>
+
+                    <div
+                      className="h-2.5 w-full overflow-hidden rounded-full bg-purple-100"
+                      role="progressbar"
+                      aria-valuenow={mediaProgress}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                    >
+                      <div
+                        className="h-full rounded-full bg-purple-600 transition-[width] duration-200"
+                        style={{ width: `${mediaProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {mediaError && (
                   <p className="mt-4 rounded-2xl bg-red-50 border border-red-200 p-3 text-sm font-bold text-red-700">
                     {mediaError}
@@ -1918,7 +2018,11 @@ export default function ParentDashboard({
                   onClick={saveParentMedia}
                   className="mt-5 w-full rounded-2xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-black py-3.5 px-5"
                 >
-                  {mediaSaving ? "Saving..." : "Save and Assign Media"}
+                  {mediaSaving
+                    ? mediaMode === "upload"
+                      ? `Uploading… ${mediaProgress}%`
+                      : "Saving…"
+                    : "Save and Assign Media"}
                 </button>
               </article>
 
@@ -2207,7 +2311,7 @@ export default function ParentDashboard({
                           <button
                             type="button"
                             onClick={() => openChangeChildPin(child)}
-                            className="w-10 h-10 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-800 flex items-center justify-center"
+                            className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-800 hover:bg-amber-200"
                             title={`Change ${child.display_name}'s PIN`}
                           >
                             <Key size={18} />
@@ -2217,7 +2321,7 @@ export default function ParentDashboard({
                             type="button"
                             disabled={deletingDatabaseChildId === child.id}
                             onClick={() => removeDatabaseChild(child)}
-                            className="w-10 h-10 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 flex items-center justify-center disabled:opacity-50"
+                            className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
                             title={`Delete ${child.display_name}`}
                           >
                             <Trash2 size={18} />

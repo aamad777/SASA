@@ -102,7 +102,7 @@ export default function ParentalGate({
 
   return (
     <motion.main
-      className="parental-gate-page relative min-h-screen w-full flex flex-col items-center justify-between p-6 bg-gradient-to-b from-sky-400 via-sky-300 to-sky-500 overflow-hidden"
+      className="parental-gate-page relative w-full flex flex-col items-center justify-between gap-2 overflow-hidden bg-gradient-to-b from-sky-400 via-sky-300 to-sky-500 px-4 sm:px-6"
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0 }}
@@ -119,21 +119,21 @@ export default function ParentalGate({
       <div className="gate-floating gate-bubble-two pointer-events-none" />
 
       {/* Header */}
-      <header className="relative z-10 pt-8 pb-4 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-white font-bold text-sm mb-3 shadow-sm border border-white/30">
+      <header className="relative z-10 pt-2 pb-1 text-center sm:pt-6 sm:pb-3">
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/20 px-3 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-md mb-1 sm:mb-3 sm:px-4 sm:py-1.5 sm:text-sm">
           <ShieldCheck size={18} className="text-amber-300" /> Grown-Ups Only
         </div>
 
-        <h1 className="parental-gate-title text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md">
+        <h1 className="parental-gate-title text-2xl font-black tracking-tight text-white drop-shadow-md sm:text-4xl md:text-5xl">
           Parental Gate
         </h1>
-        <p className="mt-1 text-lg sm:text-xl font-bold text-sky-100 drop-shadow">
-          Verify to access parent settings & controls
+        <p className="mt-0.5 hidden text-base font-bold text-sky-100 drop-shadow sm:block sm:text-xl">
+          Verify to access parent settings &amp; controls
         </p>
       </header>
 
       {/* Mode Toggle Switch */}
-      <div className="relative z-10 flex items-center bg-sky-900/20 p-1.5 rounded-2xl backdrop-blur-md border border-white/30 shadow-inner mb-4">
+      <div className="relative z-10 mb-2 flex items-center rounded-2xl border border-white/30 bg-sky-900/20 p-1 shadow-inner backdrop-blur-md sm:mb-4 sm:p-1.5">
         <button
           type="button"
           onClick={() => {
@@ -141,7 +141,7 @@ export default function ParentalGate({
             setGateMode("pin");
             setError("");
           }}
-          className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-black transition-all ${
+          className={`flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-black transition-all sm:px-5 ${
             gateMode === "pin"
               ? "bg-white text-sky-800 shadow-md scale-105"
               : "text-white hover:bg-white/10"
@@ -157,7 +157,7 @@ export default function ParentalGate({
             setGateMode("math");
             setError("");
           }}
-          className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-black transition-all ${
+          className={`flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-black transition-all sm:px-5 ${
             gateMode === "math"
               ? "bg-white text-sky-800 shadow-md scale-105"
               : "text-white hover:bg-white/10"
@@ -168,25 +168,25 @@ export default function ParentalGate({
       </div>
 
       {/* Content Area */}
-      <section className="relative z-10 flex w-full max-w-md flex-1 flex-col items-center justify-center my-auto">
+      <section className="relative z-10 flex w-full max-w-md flex-1 flex-col items-center justify-center">
         {/* Animated Cute Penguin Cartoon Mascot */}
         <motion.div
           animate={{ y: [0, -8, 0], rotate: [0, 2, -2, 0] }}
           transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
-          className="relative z-10 -mb-6 flex flex-col items-center pointer-events-none"
+          className="pointer-events-none relative z-10 -mb-4 flex flex-col items-center sm:-mb-6"
         >
           {/* Speech Bubble */}
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="mb-2 bg-white text-sky-900 font-extrabold text-xs px-3.5 py-1.5 rounded-full shadow-lg border-2 border-sky-200 flex items-center gap-1.5"
+            className="mb-1.5 hidden items-center gap-1.5 rounded-full border-2 border-sky-200 bg-white px-3.5 py-1.5 text-xs font-extrabold text-sky-900 shadow-lg min-[380px]:flex sm:mb-2"
           >
             <span className="text-sm">🐧</span>
             <span>Pippin the Penguin is guarding the gate!</span>
           </motion.div>
 
           {/* Penguin Avatar Frame */}
-          <div className="relative w-36 h-36 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-gradient-to-b from-sky-200 to-indigo-300 ring-4 ring-sky-300/50">
+          <div className="relative h-20 w-20 overflow-hidden rounded-full border-4 border-white bg-gradient-to-b from-sky-200 to-indigo-300 shadow-2xl ring-4 ring-sky-300/50 sm:h-28 sm:w-28 md:h-36 md:w-36">
             <img
               src={penguinImg}
               alt="Pippin the Cute Penguin Mascot"
@@ -207,18 +207,18 @@ export default function ParentalGate({
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
-            className="relative z-10 w-full bg-white p-6 sm:p-8 text-center shadow-2xl rounded-3xl border-4 border-sky-100"
+            className="relative z-10 w-full rounded-3xl border-4 border-sky-100 bg-white p-4 text-center shadow-2xl sm:p-6 md:p-8"
           >
-            <h2 className="text-2xl font-black text-slate-800 flex items-center justify-center gap-2">
+            <h2 className="flex items-center justify-center gap-2 text-xl font-black text-slate-800 sm:text-2xl">
               <Lock className="text-sky-500" size={22} /> Enter Parent PIN
             </h2>
-            <p className="text-xs text-slate-500 font-medium mt-1 mb-4">
+            <p className="mt-0.5 mb-2 text-xs font-medium text-slate-500 sm:mb-4">
               Enter your 4 to 6 digit private PIN
             </p>
 
             {/* PIN Display Dots */}
-            <div className="relative flex items-center justify-center gap-3 my-4">
-              <div className="flex items-center gap-2.5 bg-slate-100 px-6 py-3 rounded-2xl border-2 border-slate-200">
+            <div className="relative my-2 flex items-center justify-center gap-2 sm:my-4 sm:gap-3">
+              <div className="flex items-center gap-2.5 rounded-2xl border-2 border-slate-200 bg-slate-100 px-4 py-2.5 sm:px-6 sm:py-3">
                 {Array.from({ length: Math.max(4, pin.length) }).map((_, i) => (
                   <span
                     key={i}
@@ -232,7 +232,7 @@ export default function ParentalGate({
               <button
                 type="button"
                 onClick={() => setShowPin(!showPin)}
-                className="text-slate-400 hover:text-sky-600 p-2"
+                className="flex h-11 w-11 items-center justify-center text-slate-400 hover:text-sky-600"
                 title={showPin ? "Hide PIN" : "Show PIN"}
               >
                 {showPin ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -244,7 +244,7 @@ export default function ParentalGate({
             )}
 
             {/* Touch Keypad */}
-            <div className="grid grid-cols-3 gap-2.5 max-w-xs mx-auto mt-4">
+            <div className="mx-auto mt-2 grid max-w-xs grid-cols-3 gap-2 sm:mt-4 sm:gap-2.5">
               {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
                 <motion.button
                   key={digit}
@@ -295,7 +295,7 @@ export default function ParentalGate({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.96 }}
               type="button"
-              className="mt-5 w-full py-3.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-black rounded-2xl shadow-lg transition-all text-base"
+              className="mt-3 w-full rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 py-3 text-base font-black text-white shadow-lg transition-all hover:from-sky-600 hover:to-blue-700 sm:mt-5 sm:py-3.5"
               onClick={submitPin}
             >
               Unlock Dashboard
@@ -308,7 +308,7 @@ export default function ParentalGate({
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
-            className="relative z-10 w-full bg-white p-6 sm:p-8 text-center shadow-2xl rounded-3xl border-4 border-sky-100"
+            className="relative z-10 w-full rounded-3xl border-4 border-sky-100 bg-white p-4 text-center shadow-2xl sm:p-6 md:p-8"
           >
             <p className="text-sm font-extrabold text-sky-600 uppercase tracking-wider mb-2">
               Solve to Prove You&apos;re an Adult
@@ -347,7 +347,7 @@ export default function ParentalGate({
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="mt-4 font-black text-rose-600 bg-white/95 border-2 border-rose-200 px-5 py-2.5 rounded-full shadow-lg text-sm"
+              className="mt-2 rounded-full border-2 border-rose-200 bg-white/95 px-5 py-2.5 text-sm font-black text-rose-600 shadow-lg sm:mt-4"
             >
               ⚠️ {error}
             </motion.p>
@@ -356,12 +356,12 @@ export default function ParentalGate({
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 pb-6 pt-4">
+      <footer className="relative z-10 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pt-4 sm:pb-6">
         <motion.button
           whileHover={{ scale: 1.06 }}
           whileTap={{ scale: 0.94 }}
           type="button"
-          className="flex items-center gap-2 rounded-full border-2 border-white/40 bg-white/80 hover:bg-white px-8 py-3 text-lg font-black text-sky-800 shadow-lg backdrop-blur-md transition-all"
+          className="flex min-h-11 items-center gap-2 rounded-full border-2 border-white/40 bg-white/80 px-6 py-2.5 text-base font-black text-sky-800 shadow-lg backdrop-blur-md transition-all hover:bg-white sm:px-8 sm:py-3 sm:text-lg"
           onClick={() => {
             playPopSound();
             onCancel();

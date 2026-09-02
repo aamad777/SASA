@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "online.khaderai.sara"
+    namespace = "online.dadai.sasa"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "online.khaderai.sara"
+        applicationId "online.dadai.sasa"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
