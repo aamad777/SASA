@@ -90,6 +90,17 @@ app.use(helmet({
  * cannot flood it. Limits are per-IP and deliberately generous enough that
  * ordinary family use never reaches them.
  */
+/* SASA_ADMIN_V24 — the API sits behind the cluster's nginx ingress, which adds
+ * X-Forwarded-For. Without trust proxy Express reports the ingress IP as the
+ * client for every request, so express-rate-limit put the whole platform in a
+ * single bucket: twenty sign-in attempts from anyone locked everyone out for
+ * fifteen minutes. Observed exactly that while running the test suites.
+ *
+ * `1` trusts one hop - the value our own ingress appended - rather than the
+ * whole header, so a client cannot spoof its address by sending its own
+ * X-Forwarded-For. */
+app.set("trust proxy", 1);
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
