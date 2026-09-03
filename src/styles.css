@@ -5,6 +5,7 @@
 
 @import "./styles/app-shell.css";
 @import "./styles/app-pages.css";
+@import "./styles/pin.css";
 
 @custom-variant dark (&:is(.dark *)); /*
  * Design system for Little Explorers — a toddler-friendly video, photo,
@@ -1037,20 +1038,28 @@ button {
 }
 
 .parent-switch {
+  /* SASA_PARENT_SHELL_V22 — the visible track stays 56x32, but the button
+     itself is 44px tall so the tap target meets the minimum. The extra height
+     is transparent padding drawn outside the pill: background-clip keeps the
+     grey track exactly where it was, and the knob is positioned from the
+     content box so it still lines up. */
   position: relative;
+  box-sizing: content-box;
   width: 56px;
   height: 32px;
   flex: 0 0 auto;
+  padding-block: 6px;
   border: 0;
   border-radius: 999px;
   background: #dfe3e7;
+  background-clip: content-box;
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.12);
   transition: background 0.2s ease;
 }
 
 .parent-switch span {
   position: absolute;
-  top: 4px;
+  top: 10px;
   left: 4px;
   width: 24px;
   height: 24px;
@@ -4446,10 +4455,7 @@ button {
   }
 
   .parent-dashboard-bottom-nav {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    position: static;
     width: 100%;
     padding-bottom: max(6px, env(safe-area-inset-bottom));
   }
@@ -4928,8 +4934,9 @@ button {
     touch-action: manipulation;
   }
 
+  /* Clearance no longer needed: the tab bar is in flow (SASA_PARENT_SHELL_V22). */
   .parent-dashboard-main {
-    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+    padding-bottom: 0;
   }
 }
 
@@ -4968,9 +4975,19 @@ button {
        scroll to it. Reset them here so the dashboard grows with its
        content and the document scrolls normally, per SARA PARENT MOBILE
        RECOVERY V12. */
-    height: auto;
-    min-height: 100dvh;
-    max-height: none;
+    /* SASA_PARENT_SHELL_V22 — the outer page is fixed to exactly one visible
+       viewport and never scrolls. This supersedes SARA PARENT MOBILE RECOVERY
+       V12 (which let the document grow) and SARA PARENT SINGLE SCROLL V13
+       (which made the document the only scroller): both meant the header, the
+       tab bar and a tab's primary action could sit below the fold, which is
+       the thing that had to stop. Scrolling now happens *inside*
+       .parent-dashboard-main, a clearly bounded content area, so navigation
+       and actions are always on screen. --app-visible-height is used rather
+       than 100dvh so a browser address bar or the Android WebView cannot push
+       the tab bar off the bottom. */
+    height: var(--app-visible-height, 100dvh);
+    min-height: 0;
+    max-height: var(--app-visible-height, 100dvh);
     /* SASA_PIN_MOBILE_FIT_V17 — `overflow-x: hidden` here forced the computed
        `overflow-y` to `auto` (CSS makes a visible/hidden pair compute to
        auto), quietly turning this element into the page's scroll container.
@@ -4981,20 +4998,29 @@ button {
        .parent-dashboard-content, both of which still set overflow-x: hidden,
        so dropping it here changes nothing visually and hands scrolling back
        to the document (which SARA PARENT SINGLE SCROLL V13 already wanted). */
-    overflow: visible;
+    display: flex !important;
+    flex-direction: column;
+    overflow: hidden;
   }
 
+  /* The one scroll container on the screen. */
   .parent-dashboard-main {
     display: block !important;
     width: 100%;
     min-width: 0;
-    min-height: calc(100dvh - 64px);
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
     /* This rule wins (last + !important) over the earlier 72px/84px-plus-
        safe-area attempts above, but it had dropped the safe-area-inset-bottom
        term entirely, letting content sit under the fixed bottom nav on
        phones with a large home-indicator inset. Restoring the inset here
        instead of adding another block. */
-    padding: 0 0 calc(88px + env(safe-area-inset-bottom)) !important;
+    /* The tab bar is a sibling in the column now, not an overlay, so no
+       bottom clearance is needed and nothing can ever be hidden under it. */
+    padding: 0 !important;
     overflow-x: hidden;
   }
 
@@ -5002,7 +5028,7 @@ button {
     display: block;
     width: 100%;
     max-width: 100%;
-    padding: 16px 12px 28px !important;
+    padding: 12px 12px 20px !important;
   }
 
   /* Ensure dashboard sections stack vertically */
@@ -5021,14 +5047,16 @@ button {
 
   /* Keep the new bottom navigation visible */
 
+  /* SASA_PARENT_SHELL_V22 — the tab bar is the last row of the fixed shell
+     column rather than an overlay pinned to the viewport. Being in normal
+     flow, it cannot cover content and content cannot hide beneath it, so the
+     bottom-clearance padding this used to need is gone. */
   .parent-dashboard-bottom-nav {
     display: flex !important;
-    position: fixed !important;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    position: static !important;
     z-index: 80;
     width: 100%;
+    flex: 0 0 auto;
   }
 }
 

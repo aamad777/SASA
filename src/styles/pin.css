@@ -1,0 +1,473 @@
+/* =====================================================================
+   SASA_PIN_SCREEN_V22 — the single PIN layout
+   ---------------------------------------------------------------------
+   Every PIN surface renders through PinPad and is sized by this file, so
+   they cannot drift apart. The rules that matter:
+
+   - The container is bounded by the *visible* viewport, not 100vh.
+     --app-visible-height mirrors window.visualViewport (see
+     use-visible-viewport-height.ts) and falls back to 100dvh, so a browser
+     address bar or the Android WebView chrome cannot push the keypad and
+     the primary action below the fold.
+   - It is a flex column whose keypad is the only element allowed to
+     shrink. Title, indicators, message and actions keep their size, so the
+     things a parent must see and press are never the parts that get
+     squeezed out.
+   - Everything is padded by the safe-area insets, and the actions carry
+     the bottom inset so a home indicator or bottom bar never sits on them.
+   - Every key and button is at least 44px.
+   ===================================================================== */
+
+.sasa-pin {
+  display: flex;
+  width: 100%;
+  max-width: 380px;
+  max-height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.sasa-pin-badge {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  margin: 0 auto 6px;
+  border-radius: 999px;
+  background: var(--sasa-brand-soft, #efeaff);
+  color: var(--sasa-brand, #5b3ce0);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.sasa-pin-title {
+  flex: 0 0 auto;
+  margin: 0;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.sasa-pin-hint {
+  flex: 0 0 auto;
+  margin: 4px 0 0;
+  color: var(--sasa-ink-2, #545a63);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+/* Only ever shows how many digits are in, never which. */
+.sasa-pin-dots {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: center;
+  gap: 12px;
+  margin-block: 12px 0;
+}
+
+.sasa-pin-dots span {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--sasa-line, #dfe1e6);
+  border-radius: 999px;
+  background: transparent;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.sasa-pin-dots span.is-filled {
+  border-color: var(--sasa-brand, #5b3ce0);
+  background: var(--sasa-brand, #5b3ce0);
+}
+
+/* Reserves its line whether or not there is a message, so showing an error
+   never shifts the keypad under the user's finger. */
+.sasa-pin-msg {
+  flex: 0 0 auto;
+  min-height: 18px;
+  margin: 8px 0 0;
+  color: var(--sasa-ink-3, #79808a);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.sasa-pin-msg.is-error {
+  color: var(--sasa-danger, #c02626);
+}
+
+.sasa-pin-keys {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-content: center;
+  margin-block: 10px 0;
+  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.sasa-pin-keys button {
+  display: grid;
+  min-height: 44px;
+  place-items: center;
+  border: 1px solid var(--sasa-line, #dfe1e6);
+  border-radius: 14px;
+  background: var(--sasa-surface, #fff);
+  color: var(--sasa-ink, #16181d);
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.sasa-pin-keys button:active {
+  background: var(--sasa-surface-2, #f0f1f4);
+}
+
+.sasa-pin-keys button.is-soft {
+  background: var(--sasa-surface-2, #f0f1f4);
+  color: var(--sasa-ink-2, #545a63);
+}
+
+.sasa-pin-keys button:disabled {
+  opacity: 0.5;
+}
+
+.sasa-pin-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 10px;
+  margin-block-start: 12px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.sasa-pin-btn {
+  min-height: 46px;
+  flex: 1 1 0;
+  border: 1px solid var(--sasa-line, #dfe1e6);
+  border-radius: 14px;
+  background: var(--sasa-surface-2, #f0f1f4);
+  color: var(--sasa-ink, #16181d);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.sasa-pin-btn.is-primary {
+  border-color: transparent;
+  background: var(--sasa-brand, #5b3ce0);
+  color: #fff;
+}
+
+.sasa-pin-btn:disabled {
+  opacity: 0.45;
+}
+
+.sasa-pin-footer {
+  flex: 0 0 auto;
+  margin-block-start: 10px;
+}
+
+/* Full-screen host, used when the PIN owns the whole screen (parent gate,
+   child unlock) rather than sitting inside a dialog. */
+.sasa-pin-page {
+  display: flex;
+  min-height: var(--app-visible-height, 100dvh);
+  max-height: var(--app-visible-height, 100dvh);
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+/* Short screens (landscape phones, keyboard-shrunk viewports): drop the
+   decorative badge and tighten, rather than letting anything scroll away. */
+@media (max-height: 560px) {
+  .sasa-pin-badge {
+    display: none;
+  }
+
+  .sasa-pin-dots {
+    margin-block-start: 6px;
+  }
+
+  .sasa-pin-keys {
+    gap: 6px;
+    margin-block-start: 6px;
+  }
+
+  .sasa-pin-keys button {
+    font-size: 17px;
+  }
+}
+
+/* Scrim host, used when the PIN sits over another screen (child unlock,
+   manage PIN). Same bounded height as .sasa-pin-page so the pad is centred
+   in the visible viewport rather than in a taller layout viewport. */
+.sasa-pin-scrim {
+  position: fixed;
+  z-index: 10000;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: grid;
+  height: var(--app-visible-height, 100dvh);
+  place-items: center;
+  overflow: hidden;
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.sasa-pin-scrim .sasa-pin {
+  max-height: 100%;
+  padding: 16px 16px 12px;
+  border-radius: 20px;
+  background: var(--sasa-surface, #fff);
+}
+
+/* =====================================================================
+   SASA_CHILD_CREATE_V22 — compact create/edit sheet
+   Full-height sheet on phones, centred card from 640px up. Header and
+   footer are pinned and only the field list scrolls, so Cancel and the
+   primary action can never end up under the keyboard or the bottom bar.
+   ===================================================================== */
+
+.sasa-sheet-scrim-full {
+  position: fixed;
+  z-index: 9999;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: grid;
+  height: var(--app-visible-height, 100dvh);
+  place-items: end stretch;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.65);
+}
+
+@media (min-width: 640px) {
+  .sasa-sheet-scrim-full {
+    place-items: center;
+    padding: 24px;
+  }
+}
+
+.sasa-formsheet {
+  display: flex;
+  max-height: var(--app-visible-height, 100dvh);
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 20px 20px 0 0;
+  background: var(--sasa-surface, #fff);
+  color: var(--sasa-ink, #16181d);
+}
+
+@media (min-width: 640px) {
+  .sasa-formsheet {
+    width: min(440px, 100%);
+    max-height: min(640px, var(--app-visible-height, 100dvh));
+    margin-inline: auto;
+    border-radius: 20px;
+  }
+}
+
+.sasa-formsheet-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--sasa-line-soft, #ebedf0);
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+.sasa-formsheet-head h2 {
+  margin: 0;
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* The only scrolling region in the sheet. */
+.sasa-formsheet-body {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-content: start;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.sasa-formsheet-foot {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 10px;
+  padding: 12px 14px max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--sasa-line-soft, #ebedf0);
+}
+
+.sasa-formsheet-error {
+  margin: 0;
+  color: var(--sasa-danger, #c02626);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.sasa-field {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.sasa-field > span,
+.sasa-field > legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  color: var(--sasa-ink-2, #545a63);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.sasa-field em {
+  color: var(--sasa-danger, #c02626);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.sasa-field em.is-optional {
+  color: var(--sasa-ink-3, #79808a);
+  font-weight: 600;
+}
+
+.sasa-field input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--sasa-line, #dfe1e6);
+  border-radius: 12px;
+  background: var(--sasa-surface, #fff);
+  color: inherit;
+  font-family: inherit;
+  font-size: 15px;
+  padding-inline: 12px;
+}
+
+.sasa-field input[aria-invalid="true"] {
+  border-color: var(--sasa-danger, #c02626);
+}
+
+/* Errors and hints share the same slot, so showing one does not move the
+   fields below it. */
+.sasa-field strong,
+.sasa-field small {
+  min-height: 15px;
+  font-size: 11.5px;
+  line-height: 15px;
+}
+
+.sasa-field strong {
+  color: var(--sasa-danger, #c02626);
+  font-weight: 700;
+}
+
+.sasa-field small {
+  color: var(--sasa-ink-3, #79808a);
+}
+
+.sasa-avatar-pick > div {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.sasa-avatar-pick button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 2px solid var(--sasa-line, #dfe1e6);
+  border-radius: 999px;
+  background: var(--sasa-surface-2, #f0f1f4);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.sasa-avatar-pick button.is-selected {
+  border-color: var(--sasa-brand, #5b3ce0);
+  background: var(--sasa-brand-soft, #efeaff);
+}
+
+.sasa-pin-linkbtn {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--sasa-ink-2, #545a63);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.sasa-pin-linkbtn:disabled {
+  opacity: 0.45;
+}
+
+/* Child chooser shown before the PIN pad when no child is selected yet. */
+.sasa-pin-childlist {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-content: start;
+  gap: 8px;
+  overflow-y: auto;
+  margin-block: 12px 0;
+}
+
+.sasa-pin-childlist button {
+  display: grid;
+  min-height: 52px;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--sasa-line, #dfe1e6);
+  border-radius: 14px;
+  background: var(--sasa-surface, #fff);
+  color: inherit;
+  font-family: inherit;
+  grid-template-areas: "emoji name" "emoji meta";
+  grid-template-columns: 32px 1fr;
+  text-align: start;
+}
+
+.sasa-pin-childlist button > span:first-child {
+  grid-area: emoji;
+  font-size: 24px;
+}
+
+.sasa-pin-childlist button > span:nth-child(2) {
+  grid-area: name;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sasa-pin-childlist small {
+  grid-area: meta;
+  color: var(--sasa-ink-3, #79808a);
+  font-size: 11.5px;
+}

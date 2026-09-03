@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Eye, EyeOff, LockKeyhole, Plus, X, Settings } from "lucide-react";
 import BrandMark from "./layout/BrandMark";
 import ProfileAvatar from "./layout/ProfileAvatar";
+import PinPad from "./pin/PinPad";
 
 // SARA_PIN_RESET_V5 — aliased on import: this file also declares a local
 // `setChildPin` state setter (useState below) for the *verify* PIN input.
@@ -10,7 +11,9 @@ import ProfileAvatar from "./layout/ProfileAvatar";
 // calling the React state setter (which just no-ops on 3 arguments) instead
 // of ever hitting the backend — it looked like it saved but nothing changed.
 import {
+  CHILD_PIN_LENGTH,
   createChild,
+  isValidChildPin,
   loginChild,
   selectChildProfile,
   setChildPin as updateChildPin,
@@ -32,6 +35,16 @@ type Props = {
 };
 
 const emojis = ["🦁", "🐼", "🐰", "🐻", "🦊", "🐸"];
+
+/** The avatar presets a parent can choose; stored as "emoji:<char>". */
+const AVATAR_CHOICES = emojis;
+
+function slugifyLogin(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
 const colors = ["#ffa62b", "#95d5b2", "#ff8fa3", "#8ecae6", "#c89f7a", "#b8e986"];
 
 // child.id is the backend's real (string) id — hash it the same way
@@ -90,6 +103,16 @@ export default function DatabaseProfileSelection({
       : "Parent";
 
   const [showForm, setShowForm] = useState(false);
+  const [avatar, setAvatar] = useState("");
+  const [loginTouched, setLoginTouched] = useState(false);
+  /* SASA_CHILD_CREATE_V22 — a ref, not the `saving` state, because several
+   * clicks landing in the same tick all read the same pre-update state value
+   * and every one of them fired a POST. Measured: three taps produced three
+   * requests. A ref flips synchronously on the first call. */
+  const creatingRef = useRef(false);
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; login?: string; pin?: string }>(
+    {},
+  );
   const [name, setName] = useState("");
   const [loginName, setLoginName] = useState("");
   const [age, setAge] = useState("");
@@ -109,6 +132,7 @@ export default function DatabaseProfileSelection({
   const [showChildPin, setShowChildPin] = useState(false);
 
   const [showManagePin, setShowManagePin] = useState(false);
+  const [pinStep, setPinStep] = useState<"enter" | "confirm">("enter");
 
   const [managedChildId, setManagedChildId] = useState<string | null>(null);
 
@@ -165,13 +189,19 @@ export default function DatabaseProfileSelection({
     setShowChildPin(false);
   };
 
+  const closeChildPin = () => {
+    setPendingChild(null);
+    setChildPin("");
+    setChildPinError("");
+  };
+
   const verifyChildPin = async () => {
     if (!pendingChild?.login_name) {
       return;
     }
 
-    if (childPin.length < 4) {
-      setChildPinError("Enter the child PIN.");
+    if (!isValidChildPin(childPin)) {
+      setChildPinError(`Enter the ${CHILD_PIN_LENGTH}-digit PIN.`);
       return;
     }
 
@@ -192,8 +222,34 @@ export default function DatabaseProfileSelection({
       onSelectChild(verifiedChild);
     } catch (error) {
       setChildPinError(error instanceof Error ? error.message : "Wrong child PIN.");
+      /* Clear the entered digits after a rejected attempt. Without this the
+       * indicators stayed full, every further tap was ignored because the PIN
+       * was already at its full length, and the only way to try again was to
+       * hit Clear — which reads as the screen having frozen. */
+      setChildPin("");
     } finally {
       setCheckingChildPin(false);
+    }
+  };
+
+  const managedChild = children.find((child) => child.id === managedChildId) ?? null;
+
+  const clearManagedPin = async () => {
+    if (!managedChildId || savingManagedPin) return;
+
+    setSavingManagedPin(true);
+    setManagePinError("");
+
+    try {
+      // The backend treats an empty pin as "remove it", which is the reset case.
+      await updateChildPin(token, managedChildId, "");
+      onChildPinChanged(managedChildId);
+      setManagePinSuccess("PIN removed.");
+      window.setTimeout(() => closeManagePin(), 900);
+    } catch (error) {
+      setManagePinError(error instanceof Error ? error.message : "Unable to remove the PIN.");
+    } finally {
+      setSavingManagedPin(false);
     }
   };
 
@@ -207,6 +263,7 @@ export default function DatabaseProfileSelection({
     setManagePinError("");
     setManagePinSuccess("");
     setShowNewChildPin(false);
+    setPinStep("enter");
   };
 
   const saveManagedPin = async () => {
@@ -215,13 +272,15 @@ export default function DatabaseProfileSelection({
       return;
     }
 
-    if (newChildPin.length < 4 || !/^\d+$/.test(newChildPin)) {
-      setManagePinError("PIN must contain at least 4 digits.");
+    if (!isValidChildPin(newChildPin)) {
+      setManagePinError(`The PIN must be exactly ${CHILD_PIN_LENGTH} digits.`);
+      setPinStep("enter");
       return;
     }
 
     if (newChildPin !== confirmChildPin) {
-      setManagePinError("The two PIN values do not match.");
+      setManagePinError("Those did not match. Try the confirmation again.");
+      setConfirmChildPin("");
       return;
     }
 
@@ -238,6 +297,7 @@ export default function DatabaseProfileSelection({
 
       setNewChildPin("");
       setConfirmChildPin("");
+      setPinStep("enter");
 
       window.setTimeout(() => {
         closeManagePin();
@@ -249,25 +309,44 @@ export default function DatabaseProfileSelection({
     }
   };
 
+  /* SASA_CHILD_CREATE_V22 — the Create button is enabled only for input the
+   * backend will actually accept, so the form cannot invite a request that is
+   * guaranteed to fail. The PIN is the case that used to break: the field
+   * advertised "minimum 4 digits" and allowed ten, while the API requires
+   * exactly four. */
+  const isFormValid =
+    name.trim().length > 0 &&
+    loginName.trim().length > 0 &&
+    (pin.length === 0 || isValidChildPin(pin));
+
+  const closeForm = () => {
+    if (saving) return;
+    setShowForm(false);
+    setFormError("");
+    setFieldErrors({});
+  };
+
   const saveChild = async () => {
+    // Guards a second tap landing before the button re-renders as disabled.
+    if (creatingRef.current) return;
+
     const cleanName = name.trim();
     const cleanLogin = loginName.trim().toLowerCase();
+    const errors: { name?: string; login?: string; pin?: string } = {};
 
-    if (!cleanName) {
-      setFormError("Enter the child name.");
+    if (!cleanName) errors.name = "Enter the child name.";
+    if (!cleanLogin) errors.login = "Enter a login name.";
+    if (pin && !isValidChildPin(pin))
+      errors.pin = `The PIN must be exactly ${CHILD_PIN_LENGTH} digits.`;
+
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      setFormError("");
       return;
     }
 
-    if (!cleanLogin) {
-      setFormError("Enter the child login name.");
-      return;
-    }
-
-    if (pin && (!/^\d+$/.test(pin) || pin.length < 4)) {
-      setFormError("PIN must contain at least 4 digits.");
-      return;
-    }
-
+    creatingRef.current = true;
     setSaving(true);
     setFormError("");
 
@@ -277,6 +356,7 @@ export default function DatabaseProfileSelection({
         login_name: cleanLogin,
         age: age ? Number(age) : null,
         pin: pin || undefined,
+        avatar_url: avatar ? `emoji:${avatar}` : undefined,
       });
 
       onChildCreated({
@@ -290,10 +370,24 @@ export default function DatabaseProfileSelection({
       setLoginName("");
       setAge("");
       setPin("");
+      setAvatar("");
+      setLoginTouched(false);
+      setFieldErrors({});
       setShowForm(false);
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Unable to create child.");
+      const message = err instanceof Error ? err.message : "Unable to create child.";
+
+      // Put the server's answer next to the field it is about, so a duplicate
+      // login name does not read as a generic failure.
+      if (/login id already exists|child login/i.test(message)) {
+        setFieldErrors((current) => ({ ...current, login: "That login name is already taken." }));
+      } else if (/pin/i.test(message)) {
+        setFieldErrors((current) => ({ ...current, pin: message }));
+      } else {
+        setFormError(message);
+      }
     } finally {
+      creatingRef.current = false;
       setSaving(false);
     }
   };
@@ -430,677 +524,283 @@ export default function DatabaseProfileSelection({
 
       {showForm && (
         <div
-          style={{
-            position: "fixed",
-            zIndex: 9999,
-            top: 0,
-            right: 0,
-            left: 0,
-            // SARA_ANDROID_KEYBOARD_DIALOG_V15 — `inset: 0` sized this
-            // overlay to the layout viewport, which real-device testing
-            // showed does not reliably shrink when the Android keyboard
-            // opens (100dvh has the same problem in this WebView). Using
-            // the visualViewport-driven height here means the overlay
-            // itself is never taller than what's actually visible, so the
-            // section's own maxHeight/overflow below has real overflow to
-            // scroll rather than content silently sitting behind the
-            // keyboard with nothing to trigger a scrollbar.
-            height: "var(--app-visible-height, 100dvh)",
-            display: "grid",
-            placeItems: "center",
-            // SARA_ANDROID_AUTH_RECOVERY_V10 — matches the Manage PIN modal
-            // below: without this, a short viewport (landscape phone, or the
-            // keyboard covering half the screen) had no way to reach the
-            // Create Child button.
-            overflowY: "auto",
-            // SARA WHO IS WATCHING MOBILE V14 — landscape cutout devices.
-            padding:
-              "max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left))",
-            background: "rgba(15,23,42,.6)",
+          className="sasa-sheet-scrim-full"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeForm();
           }}
         >
+          {/* SASA_CHILD_CREATE_V22 — a full-height sheet on phones and a
+              centred card from 640px up. Header and actions are pinned; only
+              the field list between them scrolls, so Cancel and Create are
+              never pushed under the keyboard or the bottom bar. */}
           <section
-            style={{
-              width: "min(500px, 100%)",
-              // SARA_ANDROID_KEYBOARD_DIALOG_V15 — lets this dialog's own
-              // content scroll internally once it's taller than the visible
-              // (keyboard-aware) viewport, instead of relying solely on the
-              // overlay's scroll (which centers the section and so never
-              // shows a scrollbar for overflow past its own edges).
-              maxHeight: "calc(var(--app-visible-height, 100dvh) - 40px)",
-              overflowY: "auto",
-              padding: 25,
-              borderRadius: 24,
-              background: "white",
-            }}
+            className="sasa-formsheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-child-title"
           >
-            <header
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <div>
-                <h2 style={{ margin: 0 }}>Add Child</h2>
-                <p style={{ color: "#64748b" }}>Create a database child profile.</p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                style={{
-                  border: 0,
-                  background: "#f1f5f9",
-                  padding: 9,
-                  borderRadius: 10,
-                  cursor: "pointer",
-                }}
-              >
+            <header className="sasa-formsheet-head">
+              <h2 id="add-child-title">Add a child</h2>
+              <button type="button" className="sasa-iconbtn" aria-label="Close" onClick={closeForm}>
                 <X size={20} />
               </button>
             </header>
 
-            <div
-              style={{
-                display: "grid",
-                gap: 15,
-                marginTop: 15,
-              }}
-            >
-              <input
-                value={name}
-                placeholder="Child name"
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setName(value);
-
-                  if (!loginName) {
-                    setLoginName(
-                      value
-                        .toLowerCase()
-                        .replace(/[^a-z0-9]+/g, "-")
-                        .replace(/^-|-$/g, ""),
-                    );
-                  }
-                }}
-              />
-
-              <input
-                value={loginName}
-                placeholder="Child login name"
-                onChange={(event) => setLoginName(event.target.value)}
-              />
-
-              <input
-                type="number"
-                min="1"
-                max="17"
-                value={age}
-                placeholder="Age"
-                onChange={(event) => setAge(event.target.value)}
-              />
-
-              <div style={{ position: "relative" }}>
+            <div className="sasa-formsheet-body">
+              <label className="sasa-field">
+                <span>
+                  Child name <em>required</em>
+                </span>
                 <input
-                  type={showPin ? "text" : "password"}
-                  value={pin}
-                  placeholder="Optional PIN, minimum 4 digits"
-                  onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 10))}
-                  style={{ width: "100%", paddingRight: 48 }}
-                />
+                  value={name}
+                  autoComplete="off"
+                  aria-invalid={Boolean(fieldErrors.name)}
+                  placeholder="e.g. Sara"
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setName(value);
+                    setFieldErrors((current) => ({ ...current, name: "" }));
 
-                <button
-                  type="button"
-                  onClick={() => setShowPin(!showPin)}
-                  style={{
-                    position: "absolute",
-                    right: 7,
-                    top: 7,
-                    border: 0,
-                    background: "transparent",
-                    cursor: "pointer",
+                    if (!loginTouched) setLoginName(slugifyLogin(value));
                   }}
-                >
-                  {showPin ? <EyeOff size={19} /> : <Eye size={19} />}
-                </button>
-              </div>
+                />
+                {fieldErrors.name ? <strong>{fieldErrors.name}</strong> : null}
+              </label>
 
-              {formError && <div style={{ color: "#b91c1c" }}>{formError}</div>}
+              <label className="sasa-field">
+                <span>
+                  Login name <em>required</em>
+                </span>
+                <input
+                  value={loginName}
+                  autoComplete="off"
+                  aria-invalid={Boolean(fieldErrors.login)}
+                  placeholder="e.g. sara"
+                  onChange={(event) => {
+                    setLoginTouched(true);
+                    setLoginName(slugifyLogin(event.target.value));
+                    setFieldErrors((current) => ({ ...current, login: "" }));
+                  }}
+                />
+                {fieldErrors.login ? (
+                  <strong>{fieldErrors.login}</strong>
+                ) : (
+                  <small>Used to sign this child in. Letters, numbers and dashes.</small>
+                )}
+              </label>
 
+              <fieldset className="sasa-field sasa-avatar-pick">
+                <legend>Avatar</legend>
+                <div>
+                  {AVATAR_CHOICES.map((choice) => (
+                    <button
+                      key={choice}
+                      type="button"
+                      className={avatar === choice ? "is-selected" : undefined}
+                      aria-pressed={avatar === choice}
+                      aria-label={`Choose ${choice}`}
+                      onClick={() => setAvatar(avatar === choice ? "" : choice)}
+                    >
+                      {choice}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <label className="sasa-field">
+                <span>
+                  Age <em className="is-optional">optional</em>
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  max="17"
+                  value={age}
+                  placeholder="6"
+                  onChange={(event) => setAge(event.target.value)}
+                />
+              </label>
+
+              <label className="sasa-field">
+                <span>
+                  PIN <em className="is-optional">optional</em>
+                </span>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  value={pin}
+                  aria-invalid={Boolean(fieldErrors.pin)}
+                  placeholder={`${CHILD_PIN_LENGTH} digits`}
+                  onChange={(event) => {
+                    setPin(event.target.value.replace(/\D/g, "").slice(0, CHILD_PIN_LENGTH));
+                    setFieldErrors((current) => ({ ...current, pin: "" }));
+                  }}
+                />
+                {fieldErrors.pin ? (
+                  <strong>{fieldErrors.pin}</strong>
+                ) : (
+                  <small>
+                    Leave empty for no PIN. With a PIN, this child is asked for it before their
+                    profile opens.
+                  </small>
+                )}
+              </label>
+
+              {formError ? (
+                <p className="sasa-formsheet-error" role="alert">
+                  {formError}
+                </p>
+              ) : null}
+            </div>
+
+            <footer className="sasa-formsheet-foot">
+              <button type="button" className="sasa-pin-btn" onClick={closeForm} disabled={saving}>
+                Cancel
+              </button>
               <button
                 type="button"
+                className="sasa-pin-btn is-primary"
                 onClick={saveChild}
-                disabled={saving}
-                style={{
-                  padding: 13,
-                  border: 0,
-                  borderRadius: 14,
-                  background: "#2563eb",
-                  color: "white",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
+                disabled={saving || !isFormValid}
               >
-                {saving ? "Creating..." : "Create Child"}
+                {saving ? "Creating…" : "Create child"}
               </button>
-            </div>
+            </footer>
           </section>
         </div>
       )}
 
       {pendingChild && (
         <div
-          style={{
-            position: "fixed",
-            zIndex: 10000,
-            top: 0,
-            right: 0,
-            left: 0,
-            // SARA_ANDROID_KEYBOARD_DIALOG_V15 — see the Add Child modal
-            // above for why this replaces `inset: 0`.
-            height: "var(--app-visible-height, 100dvh)",
-            display: "grid",
-            placeItems: "center",
-            // SARA_ANDROID_AUTH_RECOVERY_V10 — matches the Manage PIN modal
-            // below: keeps the PIN input/submit button reachable when the
-            // on-screen keyboard shrinks the visible viewport.
-            overflowY: "auto",
-            // SARA WHO IS WATCHING MOBILE V14 — landscape cutout devices.
-            padding:
-              "max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left))",
-            background: "rgba(15,23,42,.65)",
+          className="sasa-pin-scrim"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeChildPin();
           }}
         >
-          <section
-            style={{
-              width: "min(430px, 100%)",
-              // SARA_ANDROID_KEYBOARD_DIALOG_V15 — see the Add Child modal
-              // above; keeps Cancel/Open Profile reachable under the numeric
-              // keyboard.
-              maxHeight: "calc(var(--app-visible-height, 100dvh) - 40px)",
-              overflowY: "auto",
-              padding: 27,
-              borderRadius: 25,
-              background: "#ffffff",
-              boxShadow: "0 30px 80px rgba(15,23,42,.35)",
-            }}
-          >
-            <div
-              style={{
-                width: 78,
-                height: 78,
-                margin: "0 auto",
-                display: "grid",
-                placeItems: "center",
-                borderRadius: "50%",
-                background: getDatabaseProfileColor(pendingChild.id),
-                fontSize: 42,
-              }}
-            >
-              {getSavedChildImage(pendingChild) ? (
-                <img
-                  src={getSavedChildImage(pendingChild)}
-                  alt={pendingChild.display_name}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    borderRadius: "50%",
-                    objectFit: "cover",
-                  }}
-                />
-              ) : (
-                getDatabaseProfileEmoji(pendingChild.id)
-              )}
-            </div>
-
-            <h2
-              style={{
-                margin: "15px 0 5px",
-                textAlign: "center",
-              }}
-            >
-              Enter {pendingChild.display_name}&apos;s PIN
-            </h2>
-
-            <p
-              style={{
-                margin: "0 0 20px",
-                color: "#64748b",
-                textAlign: "center",
-              }}
-            >
-              This profile is protected.
-            </p>
-
-            <div
-              style={{
-                position: "relative",
-              }}
-            >
-              <input
-                type={showChildPin ? "text" : "password"}
-                value={childPin}
-                inputMode="numeric"
-                autoFocus
-                placeholder="Enter PIN"
-                onChange={(event) => {
-                  setChildPin(event.target.value.replace(/\D/g, "").slice(0, 10));
-                  setChildPinError("");
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    verifyChildPin();
-                  }
-                }}
-                style={{
-                  width: "100%",
-                  padding: "14px 52px 14px 15px",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: 14,
-                  fontSize: 18,
-                  letterSpacing: 4,
-                  outline: "none",
-                }}
+          <PinPad
+            title={`Enter ${pendingChild.display_name}'s PIN`}
+            hint="This profile is protected."
+            badge={
+              <ProfileAvatar
+                image={getSavedChildImage(pendingChild)}
+                fallback={getDatabaseProfileEmoji(pendingChild.id)}
               />
-
-              <button
-                type="button"
-                onClick={() => setShowChildPin((current) => !current)}
-                style={{
-                  position: "absolute",
-                  top: 7,
-                  right: 7,
-                  width: 40,
-                  height: 40,
-                  display: "grid",
-                  placeItems: "center",
-                  border: 0,
-                  borderRadius: 11,
-                  background: "#f1f5f9",
-                  cursor: "pointer",
-                }}
-              >
-                {showChildPin ? <EyeOff size={19} /> : <Eye size={19} />}
-              </button>
-            </div>
-
-            {childPinError && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: 11,
-                  borderRadius: 11,
-                  background: "#fff1f2",
-                  color: "#b91c1c",
-                  fontWeight: 700,
-                  textAlign: "center",
-                }}
-              >
-                {childPinError}
-              </div>
-            )}
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 10,
-                marginTop: 18,
-              }}
-            >
-              <button
-                type="button"
-                disabled={checkingChildPin}
-                onClick={() => {
-                  setPendingChild(null);
-                  setChildPin("");
-                  setChildPinError("");
-                }}
-                style={{
-                  padding: 13,
-                  border: 0,
-                  borderRadius: 13,
-                  background: "#e2e8f0",
-                  color: "#475569",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                disabled={checkingChildPin}
-                onClick={verifyChildPin}
-                style={{
-                  padding: 13,
-                  border: 0,
-                  borderRadius: 13,
-                  background: "#2563eb",
-                  color: "#ffffff",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                {checkingChildPin ? "Checking..." : "Open Profile"}
-              </button>
-            </div>
-          </section>
+            }
+            value={childPin}
+            onChange={(next) => {
+              setChildPin(next);
+              setChildPinError("");
+            }}
+            onSubmit={verifyChildPin}
+            onCancel={closeChildPin}
+            cancelLabel="Cancel"
+            submitLabel="Open Profile"
+            busy={checkingChildPin}
+            error={childPinError}
+            autoSubmit
+          />
         </div>
       )}
 
       {showManagePin && (
         <div
-          style={{
-            position: "fixed",
-            zIndex: 10020,
-            top: 0,
-            right: 0,
-            left: 0,
-            // SARA_ANDROID_KEYBOARD_DIALOG_V15 — see the Add Child modal
-            // above for why this replaces `inset: 0`.
-            height: "var(--app-visible-height, 100dvh)",
-            display: "grid",
-            placeItems: "center",
-            overflowY: "auto",
-            // SARA WHO IS WATCHING MOBILE V14 — landscape cutout devices.
-            padding:
-              "max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left))",
-            background: "rgba(15,23,42,.65)",
-          }}
+          className="sasa-pin-scrim"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              closeManagePin();
-            }
+            if (event.target === event.currentTarget) closeManagePin();
           }}
         >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="manage-pin-title"
-            style={{
-              width: "min(470px, 100%)",
-              // SARA_ANDROID_KEYBOARD_DIALOG_V15 — keeps Update PIN/Cancel
-              // reachable under the numeric keyboard; see the Add Child
-              // modal above for the full rationale.
-              maxHeight: "calc(var(--app-visible-height, 100dvh) - 40px)",
-              overflowY: "auto",
-              padding: 26,
-              borderRadius: 25,
-              background: "#ffffff",
-              boxShadow: "0 30px 80px rgba(15,23,42,.35)",
-            }}
-          >
-            <header
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 15,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                }}
-              >
-                <span
-                  style={{
-                    display: "grid",
-                    width: 48,
-                    height: 48,
-                    placeItems: "center",
-                    borderRadius: 14,
-                    background: "#fef3c7",
-                    color: "#92400e",
-                  }}
-                >
-                  <LockKeyhole size={23} />
-                </span>
+          {/* SASA_PIN_SCREEN_V22 — set / change / reset runs through the same
+              pad as every other PIN surface: pick the child, enter, confirm.
+              The child step replaces the dropdown the old dialog used; a list
+              of tappable rows fits the narrow pad and meets the touch target
+              minimum, which a native select control did not. */}
+          {!managedChildId ? (
+            <div className="sasa-pin">
+              <h2 className="sasa-pin-title">Manage a child PIN</h2>
+              <p className="sasa-pin-hint">Choose whose PIN you want to set or change.</p>
 
-                <div>
-                  <h2 id="manage-pin-title" style={{ margin: 0 }}>
-                    Manage Child PIN
-                  </h2>
-
-                  <p
-                    style={{
-                      margin: "4px 0 0",
-                      color: "#64748b",
-                    }}
-                  >
-                    Select a child and enter a new PIN.
-                  </p>
-                </div>
+              <div className="sasa-pin-childlist">
+                {children.length === 0 ? (
+                  <p className="sasa-pin-hint">Add a child first.</p>
+                ) : (
+                  children.map((child) => (
+                    <button
+                      key={child.id}
+                      type="button"
+                      onClick={() => {
+                        setManagedChildId(child.id);
+                        setPinStep("enter");
+                        setNewChildPin("");
+                        setConfirmChildPin("");
+                        setManagePinError("");
+                      }}
+                    >
+                      <span aria-hidden="true">{getDatabaseProfileEmoji(child.id)}</span>
+                      <span>{child.display_name}</span>
+                      <small>{child.has_pin ? "PIN set" : "No PIN"}</small>
+                    </button>
+                  ))
+                )}
               </div>
 
-              <button
-                type="button"
-                onClick={closeManagePin}
-                disabled={savingManagedPin}
-                aria-label="Close"
-                style={{
-                  display: "grid",
-                  width: 40,
-                  height: 40,
-                  placeItems: "center",
-                  border: 0,
-                  borderRadius: 11,
-                  background: "#f1f5f9",
-                  cursor: "pointer",
-                }}
-              >
-                <X size={20} />
-              </button>
-            </header>
-
-            <div
-              style={{
-                display: "grid",
-                gap: 15,
-                marginTop: 22,
-              }}
-            >
-              <label
-                style={{
-                  display: "grid",
-                  gap: 7,
-                  textAlign: "left",
-                }}
-              >
-                <strong>Child</strong>
-
-                <select
-                  value={managedChildId ?? ""}
-                  onChange={(event) => {
-                    setManagedChildId(event.target.value || null);
-                    setManagePinError("");
-                    setManagePinSuccess("");
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "13px 14px",
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 13,
-                    background: "#ffffff",
-                    font: "inherit",
-                  }}
-                >
-                  <option value="">Select a child</option>
-
-                  {children.map((child) => (
-                    <option key={`pin-child-${child.id}`} value={child.id}>
-                      {child.display_name}
-                      {child.has_pin ? " — PIN protected" : " — No PIN"}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label
-                style={{
-                  display: "grid",
-                  gap: 7,
-                  textAlign: "left",
-                }}
-              >
-                <strong>New PIN</strong>
-
-                <div style={{ position: "relative" }}>
-                  <input
-                    type={showNewChildPin ? "text" : "password"}
-                    inputMode="numeric"
-                    autoComplete="new-password"
-                    value={newChildPin}
-                    placeholder="Minimum 4 digits"
-                    onChange={(event) => {
-                      setNewChildPin(event.target.value.replace(/\D/g, "").slice(0, 10));
-                      setManagePinError("");
-                      setManagePinSuccess("");
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "13px 52px 13px 14px",
-                      border: "1px solid #cbd5e1",
-                      borderRadius: 13,
-                      font: "inherit",
-                    }}
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => setShowNewChildPin((current) => !current)}
-                    style={{
-                      position: "absolute",
-                      top: 6,
-                      right: 6,
-                      display: "grid",
-                      width: 40,
-                      height: 40,
-                      placeItems: "center",
-                      border: 0,
-                      borderRadius: 10,
-                      background: "#f1f5f9",
-                      cursor: "pointer",
-                    }}
-                    aria-label={showNewChildPin ? "Hide PIN" : "Show PIN"}
-                  >
-                    {showNewChildPin ? <EyeOff size={19} /> : <Eye size={19} />}
-                  </button>
-                </div>
-              </label>
-
-              <label
-                style={{
-                  display: "grid",
-                  gap: 7,
-                  textAlign: "left",
-                }}
-              >
-                <strong>Confirm new PIN</strong>
-
-                <input
-                  type={showNewChildPin ? "text" : "password"}
-                  inputMode="numeric"
-                  autoComplete="new-password"
-                  value={confirmChildPin}
-                  placeholder="Enter the same PIN again"
-                  onChange={(event) => {
-                    setConfirmChildPin(event.target.value.replace(/\D/g, "").slice(0, 10));
-                    setManagePinError("");
-                    setManagePinSuccess("");
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      saveManagedPin();
-                    }
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "13px 14px",
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 13,
-                    font: "inherit",
-                  }}
-                />
-              </label>
-
-              {managePinError && (
-                <div
-                  style={{
-                    padding: 12,
-                    borderRadius: 11,
-                    background: "#fff1f2",
-                    color: "#b91c1c",
-                    fontWeight: 700,
-                  }}
-                >
-                  {managePinError}
-                </div>
-              )}
-
-              {managePinSuccess && (
-                <div
-                  style={{
-                    padding: 12,
-                    borderRadius: 11,
-                    background: "#ecfdf5",
-                    color: "#047857",
-                    fontWeight: 700,
-                  }}
-                >
-                  {managePinSuccess}
-                </div>
-              )}
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 10,
-                  marginTop: 3,
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={closeManagePin}
-                  disabled={savingManagedPin}
-                  style={{
-                    padding: 13,
-                    border: 0,
-                    borderRadius: 13,
-                    background: "#e2e8f0",
-                    color: "#475569",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                  }}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={saveManagedPin}
-                  disabled={savingManagedPin}
-                  style={{
-                    padding: 13,
-                    border: 0,
-                    borderRadius: 13,
-                    background: "#2563eb",
-                    color: "#ffffff",
-                    fontWeight: 800,
-                    cursor: savingManagedPin ? "wait" : "pointer",
-                  }}
-                >
-                  {savingManagedPin ? "Saving..." : "Update PIN"}
+              <div className="sasa-pin-actions">
+                <button type="button" className="sasa-pin-btn" onClick={closeManagePin}>
+                  Close
                 </button>
               </div>
             </div>
-          </section>
+          ) : (
+            <PinPad
+              title={pinStep === "confirm" ? "Confirm the new PIN" : "Set a new PIN"}
+              hint={
+                pinStep === "confirm"
+                  ? "Enter the same digits again."
+                  : managedChild
+                    ? `${managedChild.display_name} will use this to open their profile.`
+                    : "Choose a child first."
+              }
+              badge={managedChild ? getDatabaseProfileEmoji(managedChild.id) : "🔐"}
+              value={pinStep === "confirm" ? confirmChildPin : newChildPin}
+              onChange={(next) => {
+                setManagePinError("");
+                if (pinStep === "confirm") setConfirmChildPin(next);
+                else setNewChildPin(next);
+              }}
+              onSubmit={() => {
+                if (pinStep === "enter") {
+                  setPinStep("confirm");
+                  setConfirmChildPin("");
+                  return;
+                }
+                saveManagedPin();
+              }}
+              onCancel={() => {
+                if (pinStep === "confirm") {
+                  setPinStep("enter");
+                  setConfirmChildPin("");
+                  setManagePinError("");
+                  return;
+                }
+                closeManagePin();
+              }}
+              cancelLabel={pinStep === "confirm" ? "Back" : "Cancel"}
+              submitLabel={pinStep === "confirm" ? "Save PIN" : "Next"}
+              busy={savingManagedPin}
+              error={managePinError}
+              success={managePinSuccess}
+              autoSubmit={pinStep === "enter"}
+              footer={
+                <button
+                  type="button"
+                  className="sasa-pin-linkbtn"
+                  onClick={clearManagedPin}
+                  disabled={savingManagedPin || !managedChildId}
+                >
+                  Remove this child&apos;s PIN
+                </button>
+              }
+            />
+          )}
         </div>
       )}
     </main>

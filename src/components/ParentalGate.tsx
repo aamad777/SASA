@@ -4,6 +4,7 @@ import confetti from "canvas-confetti";
 import { playPopSound, playSuccessSound } from "../lib/sound";
 import { Lock, Calculator, Eye, EyeOff, ShieldCheck, Delete, Sparkles } from "lucide-react";
 import penguinImg from "../assets/images/penguin_avatar_1784920051288.jpg";
+import PinPad from "./pin/PinPad";
 
 type ParentalGateProps = {
   onSuccess: () => void;
@@ -200,107 +201,31 @@ export default function ParentalGate({
           </div>
         </motion.div>
 
-        {/* PIN MODE */}
+        {/* SASA_PIN_SCREEN_V22 — the parent gate uses the same pad as every
+            other PIN surface, so the gate and the child unlock cannot drift
+            apart in layout, sizing or keypad behaviour. The gate's own PIN
+            check is unchanged; only the UI is shared. */}
         {gateMode === "pin" ? (
-          <motion.div
+          <div
             key="pin-box"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            className="relative z-10 w-full rounded-3xl border-4 border-sky-100 bg-white p-4 text-center shadow-2xl sm:p-6 md:p-8"
+            className="relative z-10 w-full rounded-3xl border-4 border-sky-100 bg-white p-4 shadow-2xl sm:p-6"
           >
-            <h2 className="flex items-center justify-center gap-2 text-xl font-black text-slate-800 sm:text-2xl">
-              <Lock className="text-sky-500" size={22} /> Enter Parent PIN
-            </h2>
-            <p className="mt-0.5 mb-2 text-xs font-medium text-slate-500 sm:mb-4">
-              Enter your 4 to 6 digit private PIN
-            </p>
-
-            {/* PIN Display Dots */}
-            <div className="relative my-2 flex items-center justify-center gap-2 sm:my-4 sm:gap-3">
-              <div className="flex items-center gap-2.5 rounded-2xl border-2 border-slate-200 bg-slate-100 px-4 py-2.5 sm:px-6 sm:py-3">
-                {Array.from({ length: Math.max(4, pin.length) }).map((_, i) => (
-                  <span
-                    key={i}
-                    className={`h-4 w-4 rounded-full transition-all ${
-                      i < pin.length ? "bg-sky-500 scale-110 shadow-sm" : "bg-slate-300"
-                    }`}
-                  />
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowPin(!showPin)}
-                className="flex h-11 w-11 items-center justify-center text-slate-400 hover:text-sky-600"
-                title={showPin ? "Hide PIN" : "Show PIN"}
-              >
-                {showPin ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            </div>
-
-            {showPin && pin && (
-              <p className="text-lg font-mono font-bold text-sky-600 tracking-widest my-1">{pin}</p>
-            )}
-
-            {/* Touch Keypad */}
-            <div className="mx-auto mt-2 grid max-w-xs grid-cols-3 gap-2 sm:mt-4 sm:gap-2.5">
-              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
-                <motion.button
-                  key={digit}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.92 }}
-                  type="button"
-                  onClick={() => handleKeypadPress(digit)}
-                  className="h-12 rounded-2xl bg-sky-50 hover:bg-sky-100 font-black text-xl text-sky-800 shadow-sm border border-sky-100 flex items-center justify-center"
-                >
-                  {digit}
-                </motion.button>
-              ))}
-
-              <motion.button
-                whileTap={{ scale: 0.9 }}
-                type="button"
-                onClick={() => {
-                  playPopSound();
-                  setPin("");
-                  setError("");
-                }}
-                className="h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 font-bold text-xs text-slate-600 flex items-center justify-center"
-              >
-                Clear
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.92 }}
-                type="button"
-                onClick={() => handleKeypadPress("0")}
-                className="h-12 rounded-2xl bg-sky-50 hover:bg-sky-100 font-black text-xl text-sky-800 shadow-sm border border-sky-100 flex items-center justify-center"
-              >
-                0
-              </motion.button>
-
-              <motion.button
-                whileTap={{ scale: 0.9 }}
-                type="button"
-                onClick={handleKeypadDelete}
-                className="h-12 rounded-2xl bg-rose-50 hover:bg-rose-100 font-bold text-rose-600 flex items-center justify-center"
-              >
-                <Delete size={20} />
-              </motion.button>
-            </div>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.96 }}
-              type="button"
-              className="mt-3 w-full rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 py-3 text-base font-black text-white shadow-lg transition-all hover:from-sky-600 hover:to-blue-700 sm:mt-5 sm:py-3.5"
-              onClick={submitPin}
-            >
-              Unlock Dashboard
-            </motion.button>
-          </motion.div>
+            <PinPad
+              title="Enter Parent PIN"
+              hint={`Enter your ${parentPin.length || 4}-digit private PIN`}
+              value={pin}
+              length={parentPin.length || 4}
+              onChange={(next) => {
+                playPopSound();
+                setError("");
+                setPin(next);
+              }}
+              onSubmit={() => submitPin()}
+              submitLabel="Unlock Dashboard"
+              error={error}
+              autoSubmit
+            />
+          </div>
         ) : (
           /* MATH CHALLENGE MODE */
           <motion.div
@@ -342,7 +267,7 @@ export default function ParentalGate({
         )}
 
         <AnimatePresence>
-          {error && (
+          {error && gateMode === "math" && (
             <motion.p
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
