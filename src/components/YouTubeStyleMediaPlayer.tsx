@@ -528,7 +528,9 @@ export default function YouTubeStyleMediaPlayer({
       }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      onClick={togglePlay}
+      /* With native controls the browser owns taps on the video surface;
+         intercepting them here would double-toggle playback. */
+      onClick={isPhoto ? togglePlay : undefined}
     >
       {isPhoto ? (
         <motion.img
@@ -571,7 +573,17 @@ export default function YouTubeStyleMediaPlayer({
           className="sasa-cinema-media"
           src={media.sourceUrl}
           poster={media.image}
-          controls={false}
+          /* SASA_WATCH_COMPACT_V23 — the browser's own controls for video.
+           * The custom bar below rendered whenever the player was paused, which
+           * is the state the page opens in, so a full-width black panel with a
+           * seek bar and ten buttons sat permanently over the poster and hid
+           * the thumbnail the video had just been given. Native controls are
+           * compact, auto-hide on their own, and bring play/pause, seek,
+           * volume and fullscreen with them. The custom bar is kept only for
+           * photos, which have no native controls and do need a slideshow
+           * timer — so the two are never shown at the same time. */
+          controls
+          controlsList="nodownload"
           playsInline
           preload="metadata"
           muted={muted}
@@ -654,7 +666,7 @@ export default function YouTubeStyleMediaPlayer({
 
       {/* Title / category / type overlay — fades in and out together with the bottom controls */}
       <div
-        className={["sasa-cinema-top-overlay", showControls ? "visible" : ""]
+        className={["sasa-cinema-top-overlay", showControls && isPhoto ? "visible" : ""]
           .filter(Boolean)
           .join(" ")}
         onClick={(event) => event.stopPropagation()}
@@ -675,7 +687,7 @@ export default function YouTubeStyleMediaPlayer({
 
       <motion.button
         type="button"
-        className={["sasa-cinema-center-play", showControls ? "visible" : ""]
+        className={["sasa-cinema-center-play", showControls && isPhoto ? "visible" : ""]
           .filter(Boolean)
           .join(" ")}
         whileHover={reduceMotion ? undefined : { scale: 1.08 }}
@@ -706,161 +718,166 @@ export default function YouTubeStyleMediaPlayer({
         </button>
       )}
 
-      <div
-        className={["sasa-cinema-controlbar", showControls ? "visible" : ""]
-          .filter(Boolean)
-          .join(" ")}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <input
-          className="sasa-cinema-seek"
-          style={
-            {
-              "--fill": `${progressPercent}%`,
-              "--buffered": `${isPhoto ? 0 : bufferedPercent}%`,
-            } as React.CSSProperties
-          }
-          type="range"
-          min="0"
-          max={progressMaximum}
-          step={isPhoto ? 0.1 : 0.25}
-          value={progressValue}
-          onChange={(event) => {
-            seek(Number(event.currentTarget.value));
-          }}
-          aria-label={isPhoto ? "Photo slideshow progress" : "Video progress"}
-        />
+      {/* The screen lock is a fullscreen-only control and has its own pill
+          above (`sasa-cinema-lock-pill`), so it survives the custom bar being
+          limited to photos — nothing is lost by that change. */}
+      {isPhoto && (
+        <div
+          className={["sasa-cinema-controlbar", showControls ? "visible" : ""]
+            .filter(Boolean)
+            .join(" ")}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <input
+            className="sasa-cinema-seek"
+            style={
+              {
+                "--fill": `${progressPercent}%`,
+                "--buffered": `${isPhoto ? 0 : bufferedPercent}%`,
+              } as React.CSSProperties
+            }
+            type="range"
+            min="0"
+            max={progressMaximum}
+            step={isPhoto ? 0.1 : 0.25}
+            value={progressValue}
+            onChange={(event) => {
+              seek(Number(event.currentTarget.value));
+            }}
+            aria-label={isPhoto ? "Photo slideshow progress" : "Video progress"}
+          />
 
-        <div className="sasa-cinema-control-row">
-          <div className="sasa-cinema-control-group">
-            <motion.button
-              type="button"
-              className="sasa-cinema-btn"
-              whileHover={reduceMotion ? undefined : { scale: 1.12 }}
-              whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-              onClick={() => previousRef.current()}
-              disabled={!hasAdjacentMedia}
-              aria-label="Previous media"
-            >
-              <ChevronLeft size={22} />
-            </motion.button>
-
-            <motion.button
-              type="button"
-              className="sasa-cinema-btn"
-              whileHover={reduceMotion ? undefined : { scale: 1.12 }}
-              whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-              onClick={togglePlay}
-              aria-label={playing ? "Pause" : "Play"}
-            >
-              {playing ? (
-                <Pause size={22} fill="currentColor" />
-              ) : (
-                <Play size={22} fill="currentColor" />
-              )}
-            </motion.button>
-
-            <motion.button
-              type="button"
-              className="sasa-cinema-btn"
-              whileHover={reduceMotion ? undefined : { scale: 1.12 }}
-              whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-              onClick={() => nextRef.current()}
-              disabled={!hasAdjacentMedia}
-              aria-label="Next media"
-            >
-              <ChevronRight size={22} />
-            </motion.button>
-
-            {!isPhoto && (
-              <>
-                <motion.button
-                  type="button"
-                  className="sasa-cinema-btn"
-                  whileHover={reduceMotion ? undefined : { scale: 1.12 }}
-                  whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-                  onClick={toggleMute}
-                  aria-label={muted ? "Unmute" : "Mute"}
-                >
-                  {volumeIcon}
-                </motion.button>
-
-                <input
-                  className="sasa-cinema-volume-slider"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={muted ? 0 : volume}
-                  onChange={(event) => handleVolumeChange(Number(event.currentTarget.value))}
-                  aria-label="Volume"
-                />
-              </>
-            )}
-
-            <span className="sasa-cinema-time">
-              {isPhoto
-                ? `${formatTime(elapsedPhotoSeconds)} / ${formatTime(PHOTO_SECONDS)}`
-                : `${formatTime(currentTime)} / ${formatTime(duration)}`}
-            </span>
-
-            {positionLabel && <span className="sasa-cinema-position">{positionLabel}</span>}
-
-            {isPhoto && (
-              <span className="sasa-cinema-photo-caption">
-                {autoplayEnabled ? `Next in ${remainingPhotoSeconds}s` : "Autoplay off"}
-              </span>
-            )}
-          </div>
-
-          <div className="sasa-cinema-control-group">
-            <motion.button
-              type="button"
-              className={["sasa-cinema-btn", autoplayEnabled ? "is-active" : ""]
-                .filter(Boolean)
-                .join(" ")}
-              whileHover={reduceMotion ? undefined : { scale: 1.12 }}
-              whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-              onClick={() => {
-                onToggleAutoplay();
-                revealControls();
-              }}
-              aria-pressed={autoplayEnabled}
-              aria-label={autoplayEnabled ? "Turn autoplay off" : "Turn autoplay on"}
-              title={autoplayEnabled ? "Autoplay on" : "Autoplay off"}
-            >
-              <Repeat size={19} />
-            </motion.button>
-
-            {fullscreen && (
+          <div className="sasa-cinema-control-row">
+            <div className="sasa-cinema-control-group">
               <motion.button
                 type="button"
                 className="sasa-cinema-btn"
                 whileHover={reduceMotion ? undefined : { scale: 1.12 }}
                 whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-                onClick={() => {
-                  setLocked((current) => !current);
-                  setControlsVisible(true);
-                }}
-                aria-label={locked ? "Unlock player" : "Lock player"}
+                onClick={() => previousRef.current()}
+                disabled={!hasAdjacentMedia}
+                aria-label="Previous media"
               >
-                {locked ? <Unlock size={19} /> : <Lock size={19} />}
+                <ChevronLeft size={22} />
               </motion.button>
-            )}
 
-            <motion.button
-              type="button"
-              className="sasa-cinema-btn"
-              whileHover={reduceMotion ? undefined : { scale: 1.12 }}
-              whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-              onClick={() => void toggleFullscreen()}
-              aria-label={fullscreen ? "Exit full screen" : "Full screen"}
-            >
-              {fullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
-            </motion.button>
+              <motion.button
+                type="button"
+                className="sasa-cinema-btn"
+                whileHover={reduceMotion ? undefined : { scale: 1.12 }}
+                whileTap={reduceMotion ? undefined : { scale: 0.88 }}
+                onClick={togglePlay}
+                aria-label={playing ? "Pause" : "Play"}
+              >
+                {playing ? (
+                  <Pause size={22} fill="currentColor" />
+                ) : (
+                  <Play size={22} fill="currentColor" />
+                )}
+              </motion.button>
+
+              <motion.button
+                type="button"
+                className="sasa-cinema-btn"
+                whileHover={reduceMotion ? undefined : { scale: 1.12 }}
+                whileTap={reduceMotion ? undefined : { scale: 0.88 }}
+                onClick={() => nextRef.current()}
+                disabled={!hasAdjacentMedia}
+                aria-label="Next media"
+              >
+                <ChevronRight size={22} />
+              </motion.button>
+
+              {!isPhoto && (
+                <>
+                  <motion.button
+                    type="button"
+                    className="sasa-cinema-btn"
+                    whileHover={reduceMotion ? undefined : { scale: 1.12 }}
+                    whileTap={reduceMotion ? undefined : { scale: 0.88 }}
+                    onClick={toggleMute}
+                    aria-label={muted ? "Unmute" : "Mute"}
+                  >
+                    {volumeIcon}
+                  </motion.button>
+
+                  <input
+                    className="sasa-cinema-volume-slider"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={muted ? 0 : volume}
+                    onChange={(event) => handleVolumeChange(Number(event.currentTarget.value))}
+                    aria-label="Volume"
+                  />
+                </>
+              )}
+
+              <span className="sasa-cinema-time">
+                {isPhoto
+                  ? `${formatTime(elapsedPhotoSeconds)} / ${formatTime(PHOTO_SECONDS)}`
+                  : `${formatTime(currentTime)} / ${formatTime(duration)}`}
+              </span>
+
+              {positionLabel && <span className="sasa-cinema-position">{positionLabel}</span>}
+
+              {isPhoto && (
+                <span className="sasa-cinema-photo-caption">
+                  {autoplayEnabled ? `Next in ${remainingPhotoSeconds}s` : "Autoplay off"}
+                </span>
+              )}
+            </div>
+
+            <div className="sasa-cinema-control-group">
+              <motion.button
+                type="button"
+                className={["sasa-cinema-btn", autoplayEnabled ? "is-active" : ""]
+                  .filter(Boolean)
+                  .join(" ")}
+                whileHover={reduceMotion ? undefined : { scale: 1.12 }}
+                whileTap={reduceMotion ? undefined : { scale: 0.88 }}
+                onClick={() => {
+                  onToggleAutoplay();
+                  revealControls();
+                }}
+                aria-pressed={autoplayEnabled}
+                aria-label={autoplayEnabled ? "Turn autoplay off" : "Turn autoplay on"}
+                title={autoplayEnabled ? "Autoplay on" : "Autoplay off"}
+              >
+                <Repeat size={19} />
+              </motion.button>
+
+              {fullscreen && (
+                <motion.button
+                  type="button"
+                  className="sasa-cinema-btn"
+                  whileHover={reduceMotion ? undefined : { scale: 1.12 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.88 }}
+                  onClick={() => {
+                    setLocked((current) => !current);
+                    setControlsVisible(true);
+                  }}
+                  aria-label={locked ? "Unlock player" : "Lock player"}
+                >
+                  {locked ? <Unlock size={19} /> : <Lock size={19} />}
+                </motion.button>
+              )}
+
+              <motion.button
+                type="button"
+                className="sasa-cinema-btn"
+                whileHover={reduceMotion ? undefined : { scale: 1.12 }}
+                whileTap={reduceMotion ? undefined : { scale: 0.88 }}
+                onClick={() => void toggleFullscreen()}
+                aria-label={fullscreen ? "Exit full screen" : "Full screen"}
+              >
+                {fullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
+              </motion.button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

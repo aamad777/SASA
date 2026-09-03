@@ -1280,72 +1280,6 @@ export default function ParentDashboard({
 
               {/* Grid Layout: Weekly Overview & Side Cards */}
               <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Weekly Activity Chart Card — real recorded events only */}
-                <div className="lg:col-span-2 bg-white rounded-3xl p-6 sm:p-8 shadow-md border border-slate-100">
-                  <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-100">
-                    <div>
-                      <h3 className="text-xl font-black text-slate-800">Weekly activity</h3>
-                      <p className="text-xs text-slate-500 font-medium">
-                        Items opened and reactions recorded in the last 7 days
-                      </p>
-                    </div>
-                    <span className="px-3 py-1 bg-sky-50 text-sky-700 font-bold text-xs rounded-full border border-sky-200">
-                      {weeklyActivityTotal} {weeklyActivityTotal === 1 ? "event" : "events"}
-                    </span>
-                  </div>
-
-                  {weeklyActivityTotal === 0 ? (
-                    <div className="sasa-notice" role="status">
-                      No activity recorded for this profile in the last 7 days.
-                    </div>
-                  ) : (
-                    <div className="sasa-chart">
-                      {weeklyActivity.map((day) => (
-                        <div className="sasa-chart-col" key={day.key}>
-                          <div className="sasa-chart-bars">
-                            {(
-                              [
-                                ["videos", day.videos],
-                                ["photos", day.photos],
-                                ["reactions", day.reactions],
-                              ] as const
-                            ).map(([kind, value]) =>
-                              value > 0 ? (
-                                <span
-                                  key={kind}
-                                  className={`sasa-chart-bar is-${kind}`}
-                                  style={{
-                                    height: `${(value / weeklyActivityMax) * 100}%`,
-                                  }}
-                                  title={`${kind}: ${value}`}
-                                />
-                              ) : null,
-                            )}
-                          </div>
-                          <span className="sasa-chart-label">{day.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="sasa-chart-legend">
-                    <span>
-                      <i className="is-videos" /> Videos
-                    </span>
-                    <span>
-                      <i className="is-photos" /> Photos
-                    </span>
-                    <span>
-                      <i className="is-reactions" /> Reactions
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-slate-500 font-medium mt-3">
-                    Watch duration is not recorded by the backend, so this chart counts events
-                    rather than minutes.
-                  </p>
-                </div>
-
                 {/* Right Column: Bedtime & Instant Lock */}
                 <div className="space-y-6">
                   {/* Bedtime Mode Card */}
@@ -1642,6 +1576,75 @@ export default function ParentDashboard({
 
           {activeSection === "activity-history" && (
             <section className="activity-history-page">
+              {/* SASA_ACTIVITY_TAB_V23 — the weekly chart lives here now. It was
+                  rendered inside the Screen Time tab, which both made that tab
+                  a long scrolling page and duplicated what this tab already
+                  owns: Activity has its own bottom-nav destination. Real
+                  recorded events only. */}
+              <div className="lg:col-span-2 bg-white rounded-3xl p-6 sm:p-8 shadow-md border border-slate-100">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800">Weekly activity</h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Items opened and reactions recorded in the last 7 days
+                    </p>
+                  </div>
+                  <span className="px-3 py-1 bg-sky-50 text-sky-700 font-bold text-xs rounded-full border border-sky-200">
+                    {weeklyActivityTotal} {weeklyActivityTotal === 1 ? "event" : "events"}
+                  </span>
+                </div>
+
+                {weeklyActivityTotal === 0 ? (
+                  <div className="sasa-notice" role="status">
+                    No activity recorded for this profile in the last 7 days.
+                  </div>
+                ) : (
+                  <div className="sasa-chart">
+                    {weeklyActivity.map((day) => (
+                      <div className="sasa-chart-col" key={day.key}>
+                        <div className="sasa-chart-bars">
+                          {(
+                            [
+                              ["videos", day.videos],
+                              ["photos", day.photos],
+                              ["reactions", day.reactions],
+                            ] as const
+                          ).map(([kind, value]) =>
+                            value > 0 ? (
+                              <span
+                                key={kind}
+                                className={`sasa-chart-bar is-${kind}`}
+                                style={{
+                                  height: `${(value / weeklyActivityMax) * 100}%`,
+                                }}
+                                title={`${kind}: ${value}`}
+                              />
+                            ) : null,
+                          )}
+                        </div>
+                        <span className="sasa-chart-label">{day.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="sasa-chart-legend">
+                  <span>
+                    <i className="is-videos" /> Videos
+                  </span>
+                  <span>
+                    <i className="is-photos" /> Photos
+                  </span>
+                  <span>
+                    <i className="is-reactions" /> Reactions
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-500 font-medium mt-3">
+                  Watch duration is not recorded by the backend, so this chart counts events rather
+                  than minutes.
+                </p>
+              </div>
               {activityProfiles.length > 0 && (
                 <label className="activity-child-select">
                   <strong>Viewing activity for</strong>

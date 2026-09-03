@@ -1014,7 +1014,7 @@ export default function KidsVideoPlayer({
                 aria-label="Previous item (P)"
               >
                 <SkipBack size={18} />
-                <span className="sasa-watch-actionlabel">Previous</span>
+                <span className="sasa-watch-actionlabel">Prev</span>
               </button>
 
               <button
@@ -1039,7 +1039,7 @@ export default function KidsVideoPlayer({
               >
                 <Repeat size={18} />
                 <span className="sasa-watch-actionlabel">
-                  Autoplay {autoplayEnabled ? "on" : "off"}
+                  Auto {autoplayEnabled ? "on" : "off"}
                 </span>
               </button>
 
@@ -1069,7 +1069,7 @@ export default function KidsVideoPlayer({
                 >
                   <ListVideo size={18} />
                   <span className="sasa-watch-actionlabel">
-                    {relatedHidden ? "Show related" : "Hide related"}
+                    {relatedHidden ? "Related" : "Related"}
                   </span>
                 </button>
               )}
@@ -1084,7 +1084,7 @@ export default function KidsVideoPlayer({
               >
                 <Users size={18} />
                 <span className="sasa-watch-actionlabel">
-                  {activeWatchPartyBuddy ? "Party on" : "Watch party"}
+                  {activeWatchPartyBuddy ? "Party on" : "Party"}
                 </span>
               </button>
 
@@ -1113,7 +1113,11 @@ export default function KidsVideoPlayer({
 
             <section className="sasa-watch-block" aria-label="React to this item">
               <h2 className="sasa-watch-block-title">How was it?</h2>
-              <div className="sasa-hscroll">
+              {/* SASA_WATCH_COMPACT_V23 — a grid, not a sideways scroller.
+                  Four labelled pills never fit a phone width, so the last one
+                  was always sliced down the middle and looked broken. Two rows
+                  of two fit every size in the test matrix whole. */}
+              <div className="sasa-reaction-grid">
                 {reactions.map((item) => {
                   const selected = reaction === item.id;
 

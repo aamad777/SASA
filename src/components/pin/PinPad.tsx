@@ -1,5 +1,6 @@
 import { Delete, X } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
+import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { CHILD_PIN_LENGTH } from "@/lib/api";
 
 type Props = {
@@ -58,6 +59,10 @@ export function PinPad({
   footer,
   autoSubmit = false,
 }: Props) {
+  // Every PIN surface shares this, so none of them can be dragged around
+  // while the pad is up.
+  useScrollLock();
+
   const complete = value.length === length;
   const submittedFor = useRef<string | null>(null);
 
