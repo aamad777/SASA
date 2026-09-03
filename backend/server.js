@@ -7,6 +7,14 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { generateVideoThumbnail, removeThumbnailFile } from "./thumbnails.js";
+import {
+  AVATAR_SIZE,
+  MAX_AVATAR_BYTES,
+  MAX_PUBLIC_IMAGE_BYTES,
+  detectImageType,
+  makeAvatar,
+  makeDisplayImage
+} from "./images.js";
 import { testDbConnection, pool } from "./db.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -19,6 +27,16 @@ const __dirname = path.dirname(__filename);
 
 const UPLOAD_DIR = path.join(__dirname, "uploads");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+/* SASA_ADMIN_V24 — avatars live on the same persistent volume as uploads, but
+ * they are private family content and must never be readable without a
+ * session. This block sits BEFORE the static mount, so /uploads/avatars/... is
+ * a flat 404 no matter what path is requested; the only way to read an avatar
+ * is GET /api/profiles/:id/avatar, which re-checks family membership. Order
+ * matters here: express.static would otherwise happily serve the file. */
+app.use("/uploads/avatars", (_req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
 
 app.use("/uploads", express.static(UPLOAD_DIR));
 
@@ -117,6 +135,87 @@ function requireAuth(req, res, next) {
     return res.status(401).json({
       error: "Invalid or expired token"
     });
+  }
+}
+
+/* SASA_ADMIN_V24 — a valid signature is no longer enough.
+ *
+ * The JWT is stateless, so on its own it keeps working after an account is
+ * suspended or its sessions are revoked. This re-reads the account on every
+ * authenticated request and rejects the token when the account is suspended,
+ * gone, or older than the account's tokens_valid_after watermark. It also
+ * refreshes req.user.role from the database, so a role can never be taken from
+ * the browser's copy of the token.
+ */
+async function loadAccount(req, res, next) {
+  try {
+    const result = await pool.query(
+      `SELECT id, email, role, status, tokens_valid_after FROM users WHERE id = $1 LIMIT 1`,
+      [req.user.id]
+    );
+
+    const account = result.rows[0];
+
+    if (!account) {
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
+
+    if (account.status === "suspended") {
+      return res.status(403).json({ error: "This account is suspended." });
+    }
+
+    if (account.tokens_valid_after) {
+      const issuedAt = req.user.iat ? new Date(req.user.iat * 1000) : null;
+
+      if (!issuedAt || issuedAt <= new Date(account.tokens_valid_after)) {
+        return res.status(401).json({ error: "Session ended. Sign in again." });
+      }
+    }
+
+    req.account = account;
+    req.user.role = account.role;
+    next();
+  } catch (error) {
+    console.error("Account check error:", error);
+    res.status(500).json({ error: "Unable to verify the session" });
+  }
+}
+
+const requireSession = [requireAuth, loadAccount];
+
+/** Administrator-only. Never satisfied by anything the browser sends. */
+const requireAdmin = [
+  requireAuth,
+  loadAccount,
+  (req, res, next) => {
+    if (req.account?.role !== "admin") {
+      // Same answer whether the caller is a guest, a child or a parent, so the
+      // existence of admin endpoints is not confirmed to a non-admin.
+      return res.status(403).json({ error: "Administrator access required" });
+    }
+    next();
+  }
+];
+
+/** Append-only audit trail. Never called with a secret in `details`. */
+async function recordAudit(req, action, targetType, targetId, details = {}) {
+  try {
+    await pool.query(
+      `INSERT INTO admin_audit_log (actor_user_id, actor_email, action, target_type, target_id, details)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        req.account?.id ?? req.user?.id ?? null,
+        req.account?.email ?? null,
+        action,
+        targetType,
+        targetId ? String(targetId) : null,
+        JSON.stringify(details || {})
+      ]
+    );
+  } catch (error) {
+    // Auditing must never take down the operation it is recording, but a
+    // failure has to be visible in the logs.
+    console.error("Audit log write failed:", action, error.message);
   }
 }
 
@@ -264,7 +363,7 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT id, email, password_hash, role, created_at
+      `SELECT id, email, password_hash, role, status, created_at
        FROM users
        WHERE email = $1`,
       [email]
@@ -283,6 +382,16 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
     if (!passwordOk) {
       return res.status(401).json({
         error: "Invalid email or password"
+      });
+    }
+
+    /* SASA_ADMIN_V24 — a suspended account cannot start a new session. The
+     * password is verified first so this answer cannot be used to tell a
+     * suspended account apart from a wrong password without knowing the
+     * password in the first place. */
+    if (user.status === "suspended") {
+      return res.status(403).json({
+        error: "This account is suspended. Contact an administrator."
       });
     }
 
@@ -621,6 +730,715 @@ app.post("/api/auth/set-kid-pin", authLimiter, requireAuth, async (req, res) => 
   } catch (error) {
     console.error("Set kid PIN error:", error);
     res.status(500).json({ error: "Unable to update the child PIN" });
+  }
+});
+
+/* =====================================================================
+   SASA_ADMIN_V24 — administrator API
+   Every route below is behind requireAdmin, which re-reads the account from
+   the database on each request. A role from the browser's token is never
+   trusted, and a suspended or session-revoked admin is rejected like anyone
+   else. Sensitive actions are rate limited and written to admin_audit_log.
+   No password, PIN or hash is selected into any response.
+   ===================================================================== */
+
+const adminWriteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many administrative changes. Try again shortly." }
+});
+
+/** Refuses to leave the platform with no usable administrator. */
+async function otherActiveAdminCount(excludeUserId) {
+  const result = await pool.query(
+    `SELECT count(*)::int AS n FROM users
+      WHERE role = 'admin' AND status = 'active' AND id <> $1`,
+    [excludeUserId]
+  );
+  return result.rows[0].n;
+}
+
+app.get("/api/admin/overview", ...requireAdmin, async (req, res) => {
+  try {
+    const [parents, children, media, uploads, actions] = await Promise.all([
+      pool.query(`SELECT status, count(*)::int AS n FROM users WHERE role = 'parent' GROUP BY status`),
+      pool.query(`SELECT count(*)::int AS n FROM profiles WHERE is_parent = false`),
+      pool.query(
+        `SELECT media_type, visibility, publication_status, count(*)::int AS n
+           FROM media_files GROUP BY 1,2,3`
+      ),
+      pool.query(
+        `SELECT id, title, media_type, visibility, publication_status, created_at
+           FROM media_files ORDER BY created_at DESC LIMIT 5`
+      ),
+      pool.query(
+        `SELECT id, actor_email, action, target_type, target_id, created_at
+           FROM admin_audit_log ORDER BY created_at DESC LIMIT 5`
+      )
+    ]);
+
+    const byStatus = Object.fromEntries(parents.rows.map((r) => [r.status, r.n]));
+    const pick = (type, vis, pub) =>
+      media.rows
+        .filter((r) => (!type || r.media_type === type) && (!vis || r.visibility === vis) && (!pub || r.publication_status === pub))
+        .reduce((sum, r) => sum + r.n, 0);
+
+    res.json({
+      status: "ok",
+      stats: {
+        parentsActive: byStatus.active || 0,
+        parentsSuspended: byStatus.suspended || 0,
+        children: children.rows[0].n,
+        publicVideosPublished: pick("video", "public", "published"),
+        publicPhotosPublished: pick("photo", "public", "published"),
+        publicDrafts: pick(null, "public", "draft"),
+        privateFamilyMedia: pick(null, "private", null)
+      },
+      recentUploads: uploads.rows,
+      recentActions: actions.rows
+    });
+  } catch (error) {
+    console.error("Admin overview error:", error);
+    res.status(500).json({ error: "Unable to load the overview" });
+  }
+});
+
+app.get("/api/admin/parents", ...requireAdmin, async (req, res) => {
+  try {
+    const search = String(req.query.search || "").trim().toLowerCase();
+    const statusFilter = String(req.query.status || "").trim();
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+
+    const where = [`u.role = 'parent'`];
+    const params = [];
+
+    if (search) {
+      params.push(`%${search}%`);
+      where.push(`lower(u.email) LIKE $${params.length}`);
+    }
+
+    if (statusFilter === "active" || statusFilter === "suspended") {
+      params.push(statusFilter);
+      where.push(`u.status = $${params.length}`);
+    }
+
+    const totalResult = await pool.query(
+      `SELECT count(*)::int AS n FROM users u WHERE ${where.join(" AND ")}`,
+      params
+    );
+
+    params.push(limit, offset);
+
+    const rows = await pool.query(
+      `SELECT
+         u.id, u.email, u.status, u.created_at, u.suspended_at,
+         (SELECT count(*)::int FROM profiles p
+           WHERE p.created_by_parent = u.id AND p.is_parent = false) AS child_count,
+         (SELECT count(*)::int FROM media_files m WHERE m.owner_user_id = u.id) AS media_count
+       FROM users u
+      WHERE ${where.join(" AND ")}
+      ORDER BY u.created_at DESC
+      LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+
+    res.json({ status: "ok", total: totalResult.rows[0].n, parents: rows.rows, limit, offset });
+  } catch (error) {
+    console.error("Admin parents error:", error);
+    res.status(500).json({ error: "Unable to list parent accounts" });
+  }
+});
+
+app.get("/api/admin/parents/:id", ...requireAdmin, async (req, res) => {
+  try {
+    const account = await pool.query(
+      `SELECT id, email, role, status, created_at, suspended_at, tokens_valid_after
+         FROM users WHERE id = $1 AND role = 'parent' LIMIT 1`,
+      [req.params.id]
+    );
+
+    if (!account.rows[0]) return res.status(404).json({ error: "Parent account not found" });
+
+    // has_pin only. The hash is never selected, so it cannot be returned.
+    const children = await pool.query(
+      `SELECT id, display_name, age, child_login_id, avatar_url, created_at,
+              (pin_hash IS NOT NULL AND length(trim(pin_hash)) > 0) AS has_pin
+         FROM profiles
+        WHERE created_by_parent = $1 AND is_parent = false
+        ORDER BY created_at DESC`,
+      [req.params.id]
+    );
+
+    const media = await pool.query(
+      `SELECT count(*)::int AS n, coalesce(sum(size_bytes), 0)::bigint AS bytes
+         FROM media_files WHERE owner_user_id = $1`,
+      [req.params.id]
+    );
+
+    const audit = await pool.query(
+      `SELECT id, actor_email, action, created_at, details
+         FROM admin_audit_log
+        WHERE target_type = 'parent' AND target_id = $1
+        ORDER BY created_at DESC LIMIT 20`,
+      [req.params.id]
+    );
+
+    res.json({
+      status: "ok",
+      parent: account.rows[0],
+      children: children.rows,
+      media: { count: media.rows[0].n, bytes: Number(media.rows[0].bytes) },
+      audit: audit.rows
+    });
+  } catch (error) {
+    console.error("Admin parent detail error:", error);
+    res.status(500).json({ error: "Unable to load the account" });
+  }
+});
+
+app.post("/api/admin/parents/:id/status", adminWriteLimiter, ...requireAdmin, async (req, res) => {
+  try {
+    const next = String(req.body?.status || "").trim();
+
+    if (next !== "active" && next !== "suspended") {
+      return res.status(400).json({ error: "status must be 'active' or 'suspended'" });
+    }
+
+    const target = await pool.query(
+      `SELECT id, email, role, status FROM users WHERE id = $1 LIMIT 1`,
+      [req.params.id]
+    );
+
+    const account = target.rows[0];
+
+    if (!account) return res.status(404).json({ error: "Account not found" });
+
+    // Never leave the platform without a way back in.
+    if (account.role === "admin" && next === "suspended") {
+      if ((await otherActiveAdminCount(account.id)) === 0) {
+        return res.status(409).json({ error: "This is the last active administrator." });
+      }
+    }
+
+    if (next === "suspended") {
+      /* Suspending also moves the token watermark forward, so sessions the
+       * account already holds stop working immediately rather than lasting
+       * until the JWT expires. A child of a suspended parent keeps their
+       * current session but cannot start a new one, because child sign-in
+       * runs through the parent's family. */
+      await pool.query(
+        `UPDATE users SET status = 'suspended', suspended_at = now(), suspended_by = $2,
+                          tokens_valid_after = now()
+          WHERE id = $1`,
+        [account.id, req.account.id]
+      );
+    } else {
+      await pool.query(
+        `UPDATE users SET status = 'active', suspended_at = NULL, suspended_by = NULL WHERE id = $1`,
+        [account.id]
+      );
+    }
+
+    await recordAudit(req, next === "suspended" ? "parent.suspend" : "parent.restore", "parent", account.id, {
+      email: account.email,
+      from: account.status,
+      to: next
+    });
+
+    res.json({ status: "ok", accountStatus: next });
+  } catch (error) {
+    console.error("Admin status error:", error);
+    res.status(500).json({ error: "Unable to change the account status" });
+  }
+});
+
+app.post("/api/admin/parents/:id/revoke-sessions", adminWriteLimiter, ...requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE users SET tokens_valid_after = now() WHERE id = $1 RETURNING id, email`,
+      [req.params.id]
+    );
+
+    if (!result.rows[0]) return res.status(404).json({ error: "Account not found" });
+
+    await recordAudit(req, "parent.revoke_sessions", "parent", req.params.id, {
+      email: result.rows[0].email
+    });
+
+    res.json({ status: "ok" });
+  } catch (error) {
+    console.error("Admin revoke error:", error);
+    res.status(500).json({ error: "Unable to revoke sessions" });
+  }
+});
+
+app.get("/api/admin/audit", ...requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+
+    const total = await pool.query(`SELECT count(*)::int AS n FROM admin_audit_log`);
+    const rows = await pool.query(
+      `SELECT id, actor_email, action, target_type, target_id, details, created_at
+         FROM admin_audit_log ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+
+    res.json({ status: "ok", total: total.rows[0].n, entries: rows.rows, limit, offset });
+  } catch (error) {
+    console.error("Admin audit error:", error);
+    res.status(500).json({ error: "Unable to load the audit log" });
+  }
+});
+
+/* =====================================================================
+   SASA_ADMIN_V24 — public media library
+   Separate from private family media by the `visibility` column. Nothing is
+   visible to a guest until an administrator publishes it, and new uploads are
+   always created as public/draft, never published implicitly.
+   ===================================================================== */
+
+/** Guest feed. No authentication, and deliberately narrow. */
+app.get("/api/public/media", async (req, res) => {
+  try {
+    const type = String(req.query.type || "").trim();
+    const limit = Math.min(60, Math.max(1, Number(req.query.limit) || 30));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+
+    const params = [];
+    let typeClause = "";
+
+    if (type === "video" || type === "photo") {
+      params.push(type);
+      typeClause = ` AND media_type = $${params.length}`;
+    }
+
+    params.push(limit, offset);
+
+    /* The visibility/publication pair is the whole access rule, and the two
+     * columns are filtered here rather than anywhere in the client. Private
+     * family media and drafts can never match. owner_user_id is deliberately
+     * not selected: a guest has no business learning which administrator
+     * uploaded an item. */
+    const rows = await pool.query(
+      `SELECT id, media_type, title, description, category, public_url, thumbnail_url,
+              is_featured, published_at, created_at
+         FROM media_files
+        WHERE visibility = 'public' AND publication_status = 'published'${typeClause}
+        ORDER BY is_featured DESC, sort_order ASC, published_at DESC NULLS LAST, created_at DESC
+        LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+
+    res.json({ status: "ok", media: rows.rows });
+  } catch (error) {
+    console.error("Public media error:", error);
+    res.status(500).json({ error: "Unable to load public media" });
+  }
+});
+
+/** Admin listing: every public item, including drafts. */
+app.get("/api/admin/public-media", ...requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+
+    const total = await pool.query(
+      `SELECT count(*)::int AS n FROM media_files WHERE visibility = 'public'`
+    );
+
+    const rows = await pool.query(
+      `SELECT id, media_type, title, description, category, public_url, thumbnail_url,
+              publication_status, is_featured, sort_order, size_bytes, mime_type,
+              owner_user_id, published_at, created_at, updated_at
+         FROM media_files
+        WHERE visibility = 'public'
+        ORDER BY created_at DESC
+        LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+
+    res.json({ status: "ok", total: total.rows[0].n, media: rows.rows, limit, offset });
+  } catch (error) {
+    console.error("Admin public media error:", error);
+    res.status(500).json({ error: "Unable to list public media" });
+  }
+});
+
+app.post(
+  "/api/admin/public-media",
+  adminWriteLimiter,
+  ...requireAdmin,
+  upload.single("file"),
+  async (req, res) => {
+    if (!req.file) return res.status(400).json({ status: "error", message: "No file uploaded" });
+
+    const cleanup = async () => {
+      try { await fs.promises.unlink(req.file.path); } catch { /* already gone */ }
+    };
+
+    try {
+      const declaredType = String(req.file.mimetype || "");
+      const isVideo = declaredType.startsWith("video/");
+
+      /* Real file inspection, not the extension or the client's Content-Type.
+       * For images the magic bytes decide; SVG and anything executable simply
+       * has no matching signature and is rejected here. */
+      if (!isVideo) {
+        const realType = await detectImageType(req.file.path);
+
+        if (!realType) {
+          await cleanup();
+          return res.status(400).json({
+            status: "error",
+            message: "That file is not a supported image (JPEG, PNG or WebP)."
+          });
+        }
+
+        if (req.file.size > MAX_PUBLIC_IMAGE_BYTES) {
+          await cleanup();
+          return res.status(400).json({ status: "error", message: "That image is too large." });
+        }
+      }
+
+      const title = String(req.body.title || req.file.originalname || "Untitled").slice(0, 200);
+      const description = req.body.description ? String(req.body.description).slice(0, 2000) : null;
+      const category = String(req.body.category || "general").slice(0, 80);
+
+      let publicUrl = `/uploads/${req.file.filename}`;
+      let thumbnailUrl = null;
+
+      if (isVideo) {
+        try {
+          const thumb = await generateVideoThumbnail({
+            videoPath: req.file.path,
+            uploadDir: UPLOAD_DIR,
+            videoFilename: req.file.filename
+          });
+          thumbnailUrl = thumb.publicUrl;
+        } catch (thumbError) {
+          console.error("Public video thumbnail failed:", thumbError.message);
+        }
+      } else {
+        // Re-encoded, bounded and stripped of EXIF/GPS before it is ever served.
+        const displayName = `${path.parse(req.file.filename).name}.display.webp`;
+        const display = await makeDisplayImage({
+          sourcePath: req.file.path,
+          outputDir: UPLOAD_DIR,
+          outputName: displayName
+        });
+        publicUrl = `/uploads/${path.basename(display.filePath)}`;
+        thumbnailUrl = publicUrl;
+      }
+
+      const result = await pool.query(
+        `INSERT INTO media_files
+           (owner_user_id, media_type, title, description, category, file_path, public_url,
+            thumbnail_url, original_filename, mime_type, size_bytes, visibility, publication_status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'public','draft')
+         RETURNING *`,
+        [
+          req.account.id,
+          isVideo ? "video" : "photo",
+          title,
+          description,
+          category,
+          req.file.path,
+          publicUrl,
+          thumbnailUrl,
+          req.file.originalname,
+          req.file.mimetype,
+          req.file.size
+        ]
+      );
+
+      await recordAudit(req, "public_media.upload", "media", result.rows[0].id, {
+        title,
+        media_type: isVideo ? "video" : "photo"
+      });
+
+      res.status(201).json({ status: "ok", media: result.rows[0] });
+    } catch (error) {
+      console.error("Public media upload error:", error);
+      await cleanup();
+      res.status(500).json({ status: "error", message: "Upload failed" });
+    }
+  }
+);
+
+app.patch("/api/admin/public-media/:id", adminWriteLimiter, ...requireAdmin, async (req, res) => {
+  try {
+    const fields = [];
+    const params = [req.params.id];
+    const audit = {};
+
+    const push = (column, value) => {
+      params.push(value);
+      fields.push(`${column} = $${params.length}`);
+    };
+
+    if (typeof req.body.title === "string") { push("title", req.body.title.slice(0, 200)); audit.title = true; }
+    if (typeof req.body.description === "string") { push("description", req.body.description.slice(0, 2000)); audit.description = true; }
+    if (typeof req.body.category === "string") { push("category", req.body.category.slice(0, 80)); audit.category = true; }
+    if (typeof req.body.is_featured === "boolean") { push("is_featured", req.body.is_featured); audit.is_featured = req.body.is_featured; }
+    if (Number.isInteger(req.body.sort_order)) { push("sort_order", req.body.sort_order); }
+
+    if (req.body.publication_status === "published" || req.body.publication_status === "draft") {
+      push("publication_status", req.body.publication_status);
+      push("published_at", req.body.publication_status === "published" ? new Date() : null);
+      audit.publication_status = req.body.publication_status;
+    }
+
+    if (!fields.length) return res.status(400).json({ error: "Nothing to update" });
+
+    // Scoped to visibility='public' so this can never be used to reach into
+    // a family's private media.
+    const result = await pool.query(
+      `UPDATE media_files SET ${fields.join(", ")}, updated_at = now()
+        WHERE id = $1 AND visibility = 'public'
+        RETURNING *`,
+      params
+    );
+
+    if (!result.rows[0]) return res.status(404).json({ error: "Public media not found" });
+
+    await recordAudit(req, "public_media.update", "media", req.params.id, audit);
+
+    res.json({ status: "ok", media: result.rows[0] });
+  } catch (error) {
+    console.error("Public media update error:", error);
+    res.status(500).json({ error: "Unable to update the item" });
+  }
+});
+
+app.delete("/api/admin/public-media/:id", adminWriteLimiter, ...requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM media_files WHERE id = $1 AND visibility = 'public'
+       RETURNING title, thumbnail_url, public_url, file_path`,
+      [req.params.id]
+    );
+
+    const row = result.rows[0];
+
+    if (!row) return res.status(404).json({ error: "Public media not found" });
+
+    await removeThumbnailFile(UPLOAD_DIR, row.thumbnail_url);
+
+    for (const candidate of [row.public_url, row.file_path]) {
+      if (!candidate) continue;
+      try {
+        await fs.promises.unlink(path.join(UPLOAD_DIR, path.basename(String(candidate))));
+      } catch { /* already gone */ }
+    }
+
+    await recordAudit(req, "public_media.delete", "media", req.params.id, { title: row.title });
+
+    res.json({ status: "ok" });
+  } catch (error) {
+    console.error("Public media delete error:", error);
+    res.status(500).json({ error: "Unable to delete the item" });
+  }
+});
+
+/* =====================================================================
+   SASA_ADMIN_V24 — child avatars
+   A child may change only their own avatar, and an uploaded avatar is private
+   family content: it is stored outside the public /uploads mount and served
+   only through an authorised route. It can never become guest content, and
+   this endpoint cannot be used as a general media upload - the output is a
+   fixed 512x512 WebP with all metadata removed, and nothing is written to
+   media_files.
+   ===================================================================== */
+
+const AVATAR_DIR = process.env.AVATAR_DIR || path.join(UPLOAD_DIR, "avatars");
+fs.mkdirSync(AVATAR_DIR, { recursive: true });
+
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, AVATAR_DIR),
+    filename: (_req, _file, cb) => cb(null, `${crypto.randomUUID()}.upload`)
+  }),
+  limits: { fileSize: MAX_AVATAR_BYTES }
+});
+
+const avatarLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 12,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many avatar changes. Try again in a few minutes." }
+});
+
+/**
+ * May `req` change this profile's avatar?
+ * A parent may manage any child they created. A child may change only their
+ * own profile. Nobody else, including another family's parent.
+ */
+async function canManageAvatar(req, profileId) {
+  const result = await pool.query(
+    `SELECT id, user_id, created_by_parent, avatar_url FROM profiles
+      WHERE id = $1 AND is_parent = false LIMIT 1`,
+    [profileId]
+  );
+
+  const profile = result.rows[0];
+
+  if (!profile) return { allowed: false, reason: "not_found" };
+
+  if (req.account.role === "admin") return { allowed: true, profile };
+  if (req.account.role === "parent" && profile.created_by_parent === req.account.id) {
+    return { allowed: true, profile };
+  }
+  if (req.account.role === "child" && profile.user_id === req.account.id) {
+    return { allowed: true, profile };
+  }
+
+  return { allowed: false, reason: "forbidden", profile };
+}
+
+app.post(
+  "/api/profiles/:id/avatar",
+  avatarLimiter,
+  ...requireSession,
+  avatarUpload.single("file"),
+  async (req, res) => {
+    const cleanup = async (target) => {
+      if (!target) return;
+      try { await fs.promises.unlink(target); } catch { /* already gone */ }
+    };
+
+    try {
+      const check = await canManageAvatar(req, req.params.id);
+
+      if (!check.allowed) {
+        await cleanup(req.file?.path);
+        // Same answer for "not yours" and "does not exist", so profile ids
+        // cannot be probed.
+        return res.status(404).json({ error: "Profile not found" });
+      }
+
+      // A preset needs no file at all.
+      const preset = req.body?.avatarUrl ? String(req.body.avatarUrl).trim() : "";
+
+      if (!req.file && /^emoji:.{1,8}$/u.test(preset)) {
+        const previous = check.profile.avatar_url;
+
+        await pool.query(
+          `UPDATE profiles SET avatar_url = $2, avatar_updated_at = now() WHERE id = $1`,
+          [req.params.id, preset]
+        );
+
+        if (previous && previous.startsWith("/avatars/")) {
+          await cleanup(path.join(AVATAR_DIR, path.basename(previous)));
+        }
+
+        return res.json({ status: "ok", avatar_url: preset });
+      }
+
+      if (!req.file) return res.status(400).json({ error: "No image uploaded" });
+
+      /* Real signature check. A .jpg holding SVG or a script has no matching
+       * magic bytes and stops here, before ffmpeg is ever invoked. */
+      const realType = await detectImageType(req.file.path);
+
+      if (!realType) {
+        await cleanup(req.file.path);
+        return res.status(400).json({
+          error: "That file is not a supported image. Use a JPEG, PNG or WebP photo."
+        });
+      }
+
+      let crop = null;
+      if (req.body?.crop) {
+        try { crop = JSON.parse(req.body.crop); } catch { crop = null; }
+      }
+
+      const outputName = `${crypto.randomUUID()}.webp`;
+
+      let processed;
+      try {
+        processed = await makeAvatar({
+          sourcePath: req.file.path,
+          outputDir: AVATAR_DIR,
+          outputName,
+          crop
+        });
+      } catch (processError) {
+        console.error("Avatar processing failed:", processError.message);
+        await cleanup(req.file.path);
+        // The previous avatar is untouched, because nothing was written yet.
+        return res.status(400).json({ error: "That photo could not be processed." });
+      }
+
+      const avatarUrl = `/avatars/${outputName}`;
+      const previous = check.profile.avatar_url;
+
+      try {
+        await pool.query(
+          `UPDATE profiles SET avatar_url = $2, avatar_updated_at = now() WHERE id = $1`,
+          [req.params.id, avatarUrl]
+        );
+      } catch (dbError) {
+        // Database write failed: discard the new file and keep the old avatar.
+        console.error("Avatar db update failed:", dbError.message);
+        await cleanup(processed.filePath);
+        await cleanup(req.file.path);
+        return res.status(500).json({ error: "Could not save the new avatar." });
+      }
+
+      await cleanup(req.file.path);
+
+      // Only now that the replacement is committed is the old one removed.
+      if (previous && previous.startsWith("/avatars/")) {
+        await cleanup(path.join(AVATAR_DIR, path.basename(previous)));
+      }
+
+      res.json({ status: "ok", avatar_url: avatarUrl, bytes: processed.bytes, size: AVATAR_SIZE });
+    } catch (error) {
+      console.error("Avatar upload error:", error);
+      await cleanup(req.file?.path);
+      res.status(500).json({ error: "Unable to update the avatar" });
+    }
+  }
+);
+
+/**
+ * Authorised avatar delivery. Avatars live outside the static /uploads mount,
+ * so the only way to read one is through this route, which re-checks that the
+ * caller belongs to the family. A guest gets 404 - not a redirect, and not the
+ * file.
+ */
+app.get("/api/profiles/:id/avatar", ...requireSession, async (req, res) => {
+  try {
+    const check = await canManageAvatar(req, req.params.id);
+
+    if (!check.allowed) return res.status(404).json({ error: "Profile not found" });
+
+    const avatar = check.profile.avatar_url;
+
+    if (!avatar || !avatar.startsWith("/avatars/")) {
+      return res.status(404).json({ error: "No uploaded avatar" });
+    }
+
+    const name = path.basename(avatar);
+    const filePath = path.join(AVATAR_DIR, name);
+
+    if (path.dirname(path.resolve(filePath)) !== path.resolve(AVATAR_DIR)) {
+      return res.status(400).json({ error: "Bad avatar reference" });
+    }
+
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: "No uploaded avatar" });
+
+    res.type("image/webp");
+    res.setHeader("Cache-Control", "private, max-age=60");
+    fs.createReadStream(filePath).pipe(res);
+  } catch (error) {
+    console.error("Avatar read error:", error);
+    res.status(500).json({ error: "Unable to load the avatar" });
   }
 });
 

@@ -20,6 +20,8 @@ RUN npm install --no-audit --no-fund --omit=dev express-rate-limit@^7.4.0 \
 COPY package.json /app/package.json
 COPY server.js /app/server.js
 COPY thumbnails.js /app/thumbnails.js
+COPY images.js /app/images.js
+COPY migrations /app/migrations
 COPY backfill-thumbnails.js /app/backfill-thumbnails.js
 
 USER node
