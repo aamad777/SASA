@@ -3,6 +3,7 @@ import { Eye, EyeOff, LockKeyhole, Plus, X, Settings } from "lucide-react";
 import BrandMark from "./layout/BrandMark";
 import ProfileAvatar from "./layout/ProfileAvatar";
 import PinPad from "./pin/PinPad";
+import { useScrollLock } from "@/hooks/use-scroll-lock";
 
 // SARA_PIN_RESET_V5 — aliased on import: this file also declares a local
 // `setChildPin` state setter (useState below) for the *verify* PIN input.
@@ -110,6 +111,10 @@ export default function DatabaseProfileSelection({
    * and every one of them fired a POST. Measured: three taps produced three
    * requests. A ref flips synchronously on the first call. */
   const creatingRef = useRef(false);
+
+  // The create/edit sheet is the one PIN-adjacent surface with real text
+  // inputs, so it meets the native keyboard; freeze the page behind it too.
+  useScrollLock(showForm);
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; login?: string; pin?: string }>(
     {},
   );

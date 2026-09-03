@@ -589,15 +589,64 @@
   opacity: 0.6;
 }
 
-/* Action row — scrolls sideways on narrow screens instead of wrapping
-   into a tall block or overflowing the page. */
+/* SASA_WATCH_COMPACT_V23 — the action strip.
+   It scrolled sideways before but nothing stopped it resting mid-button, so
+   the row ended with a half-cut control and read as broken rather than as
+   something to swipe. Scroll snapping means it can only ever come to rest on
+   a button boundary, and the inline padding is cancelled so the first and last
+   buttons sit flush with the page edge — the standard phone affordance of a
+   partially visible *next* item, never a clipped one. */
 .sasa-watch-actions {
-  margin-block: 14px;
+  margin-block: 10px;
   padding-block: 2px;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: max(var(--sasa-gutter), var(--sasa-sal));
+}
+
+.sasa-watch-actions > * {
+  scroll-snap-align: start;
 }
 
 .sasa-watch-actions .sasa-btn {
   min-height: 40px;
+  flex: 0 0 auto;
+  gap: 6px;
+  padding-inline: 12px;
+  font-size: 13px;
+}
+
+/* SASA_WATCH_COMPACT_V23 — on phones the strip stops scrolling altogether and
+   becomes a fixed five-column grid, so all nine actions are on screen whole.
+   A snapped scroller still left one button sliced by the container edge at
+   rest, which reads as broken rather than as an invitation to swipe. Two tidy
+   rows are shorter than the old single oversized row was, and every action
+   keeps its label. */
+@media (max-width: 900px) {
+  .sasa-watch-actions {
+    display: grid;
+    overflow: visible;
+    gap: 6px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .sasa-watch-actions .sasa-btn {
+    min-width: 0;
+    min-height: 52px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 2px;
+    font-size: 10.5px;
+    line-height: 1.15;
+  }
+
+  .sasa-watch-actionlabel {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 /* The action row scrolls sideways, so labels stay visible at every width —
@@ -680,15 +729,23 @@
   font-weight: 700;
 }
 
-/* Channel / source card */
+/* Channel / source row. SASA_WATCH_COMPACT_V23 — this was a bordered card
+   with its own padding restating what the metadata line above already said.
+   It is one quiet row now: avatar, who shared it, and the approval chip. */
 .sasa-watch-channel {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--sasa-line);
-  border-radius: var(--sasa-radius);
-  background: var(--sasa-surface);
+  gap: 10px;
+  padding: 8px 0;
+  border: 0;
+  border-block: 1px solid var(--sasa-line-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+.sasa-watch-channel .sasa-avatar.is-lg {
+  width: 36px;
+  height: 36px;
 }
 
 .sasa-watch-channel-text {
@@ -721,6 +778,23 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.sasa-reaction-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 560px) {
+  .sasa-reaction-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.sasa-reaction-grid .sasa-reaction {
+  min-width: 0;
+  justify-content: center;
 }
 
 .sasa-reaction {
@@ -1928,6 +2002,21 @@
      and Save PIN in particular — sat at ~40px from `py-2.5` alone. */
   .parent-dashboard [role="dialog"] button {
     min-height: 44px;
+  }
+
+  /* SASA_PARENT_TABS_V23 — the Filters and Media tabs are built from Tailwind
+     utility buttons (category chips at 36px, block/unblock rows at 42px, the
+     media filter pills at 40px) that all sat just under the minimum. Raising
+     them here keeps the tabs' own styling and avoids editing a few dozen
+     className strings by hand. `.parent-dashboard-content button` is scoped to
+     the tab body, so the header and the tab bar keep the sizes set above. */
+  .parent-dashboard .parent-dashboard-content button {
+    min-height: 44px;
+  }
+
+  /* Chips and pills sit in horizontal rows, so they also need a real width. */
+  .parent-dashboard .parent-dashboard-content button {
+    min-width: 44px;
   }
 }
 
