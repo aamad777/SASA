@@ -6,6 +6,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { generateVideoThumbnail, removeThumbnailFile } from "./thumbnails.js";
 import { testDbConnection, pool } from "./db.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -1092,7 +1093,34 @@ app.post("/api/media/upload", requireAuth, upload.single("file"), async (req, re
       ]
     );
 
-    const media = result.rows[0];
+    let media = result.rows[0];
+
+    /* SASA_VIDEO_THUMBNAILS_V21 — uploaded videos showed only the generic
+     * placeholder because thumbnail_url was never populated. The frame is
+     * extracted after the row exists, so a thumbnail failure can never lose a
+     * video that is already safely stored: the upload still succeeds and the
+     * record simply keeps thumbnail_url = null, which the client renders as
+     * the fallback icon. */
+    if (mediaType === "video") {
+      try {
+        const thumb = await generateVideoThumbnail({
+          videoPath: req.file.path,
+          uploadDir: UPLOAD_DIR,
+          videoFilename: req.file.filename,
+        });
+
+        const updated = await pool.query(
+          `UPDATE media_files SET thumbnail_url = $2, updated_at = now()
+            WHERE id = $1
+        RETURNING *`,
+          [media.id, thumb.publicUrl]
+        );
+
+        if (updated.rows[0]) media = updated.rows[0];
+      } catch (thumbError) {
+        console.error("Thumbnail generation failed for", media.id, thumbError.message);
+      }
+    }
 
     let childProfileIds = [];
     try {
@@ -1396,11 +1424,32 @@ app.delete("/api/media/:mediaId", requireAuth, async (req, res) => {
   try {
     const { mediaId } = req.params;
 
-    await pool.query(
+    /* SASA_VIDEO_THUMBNAILS_V21 — RETURNING lets us clean the files up after
+     * the row goes. Ownership is still enforced by the WHERE clause, so a
+     * caller who owns nothing deletes nothing and removes no files. Deleting
+     * the row without its files is what left orphaned uploads on the volume
+     * before. */
+    const deleted = await pool.query(
       `DELETE FROM media_files
-       WHERE id = $1 AND (owner_user_id = $2 OR $3 = 'admin')`,
+       WHERE id = $1 AND (owner_user_id = $2 OR $3 = 'admin')
+       RETURNING thumbnail_url, file_path`,
       [mediaId, req.user.id, req.user.role]
     );
+
+    const row = deleted.rows[0];
+
+    if (row) {
+      await removeThumbnailFile(UPLOAD_DIR, row.thumbnail_url);
+
+      if (row.file_path) {
+        try {
+          const name = path.basename(String(row.file_path));
+          await fs.promises.unlink(path.join(UPLOAD_DIR, name));
+        } catch {
+          // Already gone, or never written - nothing to report.
+        }
+      }
+    }
 
     res.json({ status: "ok", message: "Media deleted" });
   } catch (error) {
