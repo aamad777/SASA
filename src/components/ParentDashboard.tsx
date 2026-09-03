@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { captureLocalVideoFrame } from "@/lib/video-preview";
 import { playPopSound, playSuccessSound } from "../lib/sound";
 import {
   clearActivityForProfile,
@@ -248,6 +249,14 @@ export default function ParentDashboard({
 
   const [mediaSaving, setMediaSaving] = useState(false);
   const [mediaProgress, setMediaProgress] = useState(0);
+  // SASA_VIDEO_THUMBNAILS_V21 — a frame grabbed from the chosen file so the
+  // parent sees the video before it uploads, then the outcome of the real
+  // server-side thumbnail. Never claims success the server did not report.
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [thumbStatus, setThumbStatus] = useState<"idle" | "processing" | "ready" | "failed">(
+    "idle",
+  );
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
 
   const [mediaMessage, setMediaMessage] = useState("");
 
@@ -584,9 +593,13 @@ export default function ParentDashboard({
     setMediaSaving(true);
     setMediaProgress(0);
 
+    if (mediaMode === "upload" && mediaFile?.type.startsWith("video/")) {
+      setThumbStatus("processing");
+    }
+
     try {
       if (mediaMode === "upload" && mediaFile) {
-        await uploadParentVideo(
+        const uploaded = await uploadParentVideo(
           parentToken,
           mediaFile,
           {
@@ -596,6 +609,20 @@ export default function ParentDashboard({
           },
           setMediaProgress,
         );
+
+        if (mediaFile.type.startsWith("video/")) {
+          // Only what the server actually stored — a null thumbnail_url is
+          // reported as a failure, never papered over with the local preview.
+          const stored = (uploaded?.media as { thumbnail_url?: string | null } | undefined)
+            ?.thumbnail_url;
+
+          if (stored) {
+            setThumbUrl(getApiAssetUrl(stored));
+            setThumbStatus("ready");
+          } else {
+            setThumbStatus("failed");
+          }
+        }
       } else {
         await addParentYoutubeVideo(parentToken, {
           url: youtubeUrl.trim(),
@@ -617,6 +644,7 @@ export default function ParentDashboard({
       setYoutubeUrl("");
       setMediaFile(null);
       setSelectedMediaChildIds([]);
+      setMediaPreview(null);
 
       await loadParentMedia();
 
@@ -1887,6 +1915,15 @@ export default function ParentDashboard({
 
                           setMediaError("");
                           setMediaFile(picked);
+                          setThumbStatus("idle");
+                          setThumbUrl(null);
+                          setMediaPreview(null);
+
+                          if (picked.type.startsWith("video/")) {
+                            captureLocalVideoFrame(picked)
+                              .then((frame) => setMediaPreview(frame))
+                              .catch(() => setMediaPreview(null));
+                          }
                         }}
                         className="w-full rounded-2xl border border-dashed border-purple-300 bg-purple-50 px-4 py-4 text-sm disabled:opacity-50"
                       />
@@ -1977,6 +2014,48 @@ export default function ParentDashboard({
                     </div>
                   )}
                 </div>
+
+                {mediaMode === "upload" && (mediaPreview || thumbStatus !== "idle") && (
+                  <div className="mt-4 flex items-center gap-3">
+                    <span className="relative block w-32 shrink-0 overflow-hidden rounded-xl bg-slate-900 aspect-video">
+                      {mediaPreview || thumbUrl ? (
+                        <img
+                          src={
+                            thumbStatus === "ready" && thumbUrl
+                              ? thumbUrl
+                              : (mediaPreview as string)
+                          }
+                          alt=""
+                          className="h-full w-full object-contain"
+                        />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-xl">
+                          🎬
+                        </span>
+                      )}
+                    </span>
+
+                    <span className="min-w-0 text-xs font-bold" aria-live="polite">
+                      {thumbStatus === "processing" && (
+                        <span className="text-purple-800">Processing preview…</span>
+                      )}
+                      {thumbStatus === "ready" && (
+                        <span className="text-emerald-700">
+                          Preview saved — this is what everyone will see.
+                        </span>
+                      )}
+                      {thumbStatus === "failed" && (
+                        <span className="text-amber-700">
+                          Couldn&apos;t make a preview from this video. It will show the SASA icon
+                          instead; the video itself uploaded fine.
+                        </span>
+                      )}
+                      {thumbStatus === "idle" && (
+                        <span className="text-slate-500">Preview from the file you picked.</span>
+                      )}
+                    </span>
+                  </div>
+                )}
 
                 {mediaSaving && mediaMode === "upload" && (
                   <div className="mt-4" aria-live="polite">
