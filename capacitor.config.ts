@@ -20,7 +20,7 @@ const config: CapacitorConfig = {
   appName: "SASA",
   webDir: "mobile-shell",
   server: {
-    url: "https://sasa.dad-ai.online",
+    url: "https://sasa.khader-ai.online",
     // HTTPS only — cleartext explicitly left disabled per the task's
     // security requirement.
     androidScheme: "https",

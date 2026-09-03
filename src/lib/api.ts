@@ -192,19 +192,51 @@ export async function getChildren(token: string): Promise<DatabaseChild[]> {
     avatar_url: child.avatar_url ?? null,
     selected_theme: child.selected_theme ?? null,
     login_code: child.child_login_id ?? null,
-    // A login name is required for every child, so it is not a valid stand-in
-    // for "has a PIN" — that made every child look PIN-protected even when no
-    // PIN was ever set, locking kids out of their own profile. Prefer the
-    // backend's own has_pin/pin_set flag when it's present; only fall back to
-    // the login-name heuristic if the API doesn't send one.
+    // SASA_CHILD_PIN_V20 — GET /parent/children now returns an explicit
+    // has_pin boolean, derived server-side from whether a usable bcrypt hash
+    // exists (the hash itself is never sent). The old fallback guessed from
+    // child_login_id, which every child has, so every child looked
+    // PIN-protected and a child with no PIN could never be opened at all.
+    // With no flag from the API the honest answer is "no PIN known" — the
+    // PIN-less path is itself authenticated (see selectChildProfile), so
+    // defaulting to false does not hand anything to an anonymous caller.
     has_pin:
       typeof child.has_pin === "boolean"
         ? child.has_pin
         : typeof child.pin_set === "boolean"
           ? child.pin_set
-          : Boolean(child.child_login_id),
+          : false,
     created_at: child.created_at,
   }));
+}
+
+/**
+ * SASA_CHILD_PIN_V20 — open a child profile that has no PIN.
+ *
+ * This deliberately goes through the backend on the parent's own bearer token
+ * rather than letting the client decide locally: the server re-checks that the
+ * caller is the parent who created the profile, and refuses (409) if the child
+ * actually does have a PIN, so a tampered client cannot skip the PIN prompt.
+ */
+export async function selectChildProfile(
+  token: string,
+  childId: string,
+): Promise<ChildLoginResponse> {
+  const response = await fetch(`${API_BASE_URL}/parent/children/${childId}/select`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const data = await parseJsonOrExplain(response, "Opening the child profile");
+
+  if (!response.ok) {
+    throw new Error(data.error || "Unable to open this child profile.");
+  }
+
+  return data;
 }
 
 export type CreateChildInput = {

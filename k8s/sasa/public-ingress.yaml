@@ -10,6 +10,43 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
+    # SASA_DOMAIN_V20 — sasa.khader-ai.online is the SASA frontend hostname.
+    # It already resolved to the cluster edge but no Ingress declared it, so
+    # nginx answered with its default backend (404). Both paths matter:
+    #   /api and /uploads  -> saratube-backend:4000, the real API. Serving them
+    #     on this host too keeps the app same-origin, because the web build ships
+    #     VITE_API_BASE_URL=/api (a relative path). That is why no CORS or
+    #     allowed-origin change is needed.
+    #   /                  -> sasa-frontend-bridge, an ExternalName service that
+    #     points at sasa-frontend.sasa.svc.cluster.local.
+    # TLS is terminated at Cloudflare with the Universal SSL wildcard
+    # *.khader-ai.online, which already covers this name — this cluster has no
+    # cert-manager installed and no Ingress anywhere carries a tls block.
+    - host: sasa.khader-ai.online
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: saratube-backend
+                port:
+                  number: 4000
+          - path: /uploads
+            pathType: Prefix
+            backend:
+              service:
+                name: saratube-backend
+                port:
+                  number: 4000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sasa-frontend-bridge
+                port:
+                  number: 80
+    # Existing host preserved unchanged.
     - host: sara.khader-ai.online
       http:
         paths:

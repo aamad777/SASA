@@ -16,8 +16,16 @@ Main technologies:
 Project root:
 `/mnt/webapps/sasa-claude-review`
 
-Production application/API domain:
-`https://sara.khader-ai.online`
+Production frontend domain:
+`https://sasa.khader-ai.online`
+
+Production backend/API:
+`https://sara.khader-ai.online/api` — also served same-origin at
+`https://sasa.khader-ai.online/api`, which is what the web build actually uses
+(`VITE_API_BASE_URL=/api`).
+
+Do not confuse the two: `sasa.` is the web application, `sara.` is the API host.
+`sasa.dad-ai.online` was never real — that DNS zone has no NS records.
 
 Local Dell review:
 `http://192.168.0.113:5173`
