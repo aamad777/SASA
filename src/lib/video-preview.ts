@@ -19,6 +19,17 @@ export async function captureLocalVideoFrame(file: File): Promise<string | null>
   }
 
   const objectUrl = URL.createObjectURL(file);
+
+  // URL.createObjectURL only ever returns a blob: URL, but this is a DOM sink
+  // fed by a user-supplied File, so the invariant is asserted rather than
+  // assumed: anything that is not a blob: URL never reaches video.src. That
+  // rules out a javascript: or data: value being assigned here no matter how
+  // the value was produced.
+  if (!objectUrl.startsWith("blob:")) {
+    URL.revokeObjectURL(objectUrl);
+    return null;
+  }
+
   const video = document.createElement("video");
 
   video.muted = true;
