@@ -239,11 +239,25 @@ export async function selectChildProfile(
   return data;
 }
 
+/* SASA_CHILD_CREATE_V22 — the child PIN is exactly four digits everywhere.
+ * The backend enforces /^\d{4}$/ on create, on /child/login and on
+ * set-kid-pin, but the create form advertised "minimum 4 digits" and accepted
+ * up to ten, so a parent who typed a five- or six-digit PIN was rejected with
+ * HTTP 400 "PIN must be 4 digits" and could not create the child at all. One
+ * rule, stated once, shared by every PIN surface. */
+export const CHILD_PIN_LENGTH = 4;
+
+export function isValidChildPin(pin: string): boolean {
+  return new RegExp(`^\\d{${CHILD_PIN_LENGTH}}$`).test(pin);
+}
+
 export type CreateChildInput = {
   display_name: string;
   login_name: string;
   age: number | null;
   pin?: string;
+  /** "emoji:<char>" preset, or a relative /uploads path. */
+  avatar_url?: string;
 };
 
 export async function createChild(token: string, input: CreateChildInput): Promise<DatabaseChild> {
@@ -258,6 +272,7 @@ export async function createChild(token: string, input: CreateChildInput): Promi
       childLoginId: input.login_name,
       age: input.age,
       pin: input.pin,
+      avatarUrl: input.avatar_url,
       selectedTheme: "rainbow",
     }),
   });

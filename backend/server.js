@@ -410,6 +410,16 @@ app.post("/api/parent/children", requireAuth, async (req, res) => {
     const displayName = String(req.body?.displayName || "").trim();
     const age = req.body?.age ? Number(req.body.age) : null;
     const selectedTheme = req.body?.selectedTheme || "rainbow";
+    /* SASA_CHILD_CREATE_V22 — profiles.avatar_url already existed but nothing
+     * could ever set it, so a parent had no way to choose how a child appears.
+     * Accepted here and bounded: either an "emoji:<char>" preset or a relative
+     * /uploads path. An absolute URL is refused so this cannot become a way to
+     * point a profile picture at an arbitrary remote host. */
+    const rawAvatar = req.body?.avatarUrl ? String(req.body.avatarUrl).trim() : "";
+    const avatarUrl =
+      rawAvatar && (/^emoji:.{1,8}$/u.test(rawAvatar) || /^\/uploads\/[\w.-]+$/.test(rawAvatar))
+        ? rawAvatar
+        : null;
     const childLoginId = req.body?.childLoginId
       ? String(req.body.childLoginId).trim().toLowerCase()
       : displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -445,9 +455,9 @@ app.post("/api/parent/children", requireAuth, async (req, res) => {
 
     const profileResult = await pool.query(
       `INSERT INTO profiles
-         (user_id, display_name, age, selected_theme, is_parent, created_by_parent, child_login_id, pin_hash)
+         (user_id, display_name, age, selected_theme, is_parent, created_by_parent, child_login_id, pin_hash, avatar_url)
        VALUES
-         ($1, $2, $3, $4, false, $5, $6, $7)
+         ($1, $2, $3, $4, false, $5, $6, $7, $8)
        RETURNING
          id,
          user_id,
@@ -465,7 +475,8 @@ app.post("/api/parent/children", requireAuth, async (req, res) => {
         selectedTheme,
         req.user.id,
         childLoginId,
-        pinHash
+        pinHash,
+        avatarUrl
       ]
     );
 
