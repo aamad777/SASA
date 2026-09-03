@@ -10,3 +10,9 @@ routeTree.gen.ts
 results.sarif
 *.sarif
 android/app/src/debug/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.config.json
+
+# Express API source mirrored from its container image. Reformatting it here
+# would make the committed source stop matching the image it documents, so it
+# is left exactly as deployed (see backend/README.md).
+backend/
