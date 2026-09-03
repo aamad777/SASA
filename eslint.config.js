@@ -14,6 +14,9 @@ export default tseslint.config(
       // Generated Capacitor/Android build output and native runtime bridge
       // (e.g. native-bridge.js, cordova.js) — not application source.
       "android/**",
+      // The Express API source mirrored from its container image; it is plain
+      // Node ESM, not part of the Vite/React application build.
+      "backend/**",
     ],
   },
   {
