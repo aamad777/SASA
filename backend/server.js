@@ -292,7 +292,14 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
     const email = String(req.body?.email || "").trim().toLowerCase();
     const password = String(req.body?.password || "");
     const displayName = String(req.body?.displayName || "").trim();
-    const role = req.body?.role || "parent";
+    /* SASA_ADMIN_V24 — registration always creates a parent.
+     *
+     * This used to read the role straight from the request body and accept
+     * "admin", so anyone who could reach the public registration endpoint
+     * could make themselves an administrator by adding one field to the JSON.
+     * The role is now fixed here and can only be changed server-side, which is
+     * what the admin-authorization suite asserts. */
+    const role = "parent";
 
     if (!email || !password || !displayName) {
       return res.status(400).json({
@@ -300,7 +307,7 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
       });
     }
 
-    if (!["parent", "child", "admin"].includes(role)) {
+    if (role !== "parent") {
       return res.status(400).json({
         error: "Invalid role"
       });
@@ -420,7 +427,7 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
 
 
 
-app.get("/api/auth/me", requireAuth, async (req, res) => {
+app.get("/api/auth/me", ...requireSession, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, email, role, created_at
@@ -452,7 +459,7 @@ app.get("/api/auth/me", requireAuth, async (req, res) => {
 
 
 
-app.get("/api/parent/children", requireAuth, async (req, res) => {
+app.get("/api/parent/children", ...requireSession, async (req, res) => {
   try {
     if (req.user.role !== "parent" && req.user.role !== "admin") {
       return res.status(403).json({
@@ -508,7 +515,7 @@ app.get("/api/parent/children", requireAuth, async (req, res) => {
   }
 });
 
-app.post("/api/parent/children", requireAuth, async (req, res) => {
+app.post("/api/parent/children", ...requireSession, async (req, res) => {
   try {
     if (req.user.role !== "parent" && req.user.role !== "admin") {
       return res.status(403).json({
@@ -625,7 +632,7 @@ app.post("/api/parent/children", requireAuth, async (req, res) => {
  *   - it returns exactly the same child payload as /api/child/login and
  *     grants no parent capability.
  */
-app.post("/api/parent/children/:profileId/select", requireAuth, async (req, res) => {
+app.post("/api/parent/children/:profileId/select", ...requireSession, async (req, res) => {
   try {
     if (req.user.role !== "parent" && req.user.role !== "admin") {
       return res.status(403).json({ error: "Parent access required" });
@@ -689,7 +696,7 @@ app.post("/api/parent/children/:profileId/select", requireAuth, async (req, res)
  * /api/parent/children already creates a PIN: bcrypt, cost 12. Sending an
  * empty pin clears it, which is the reset case.
  */
-app.post("/api/auth/set-kid-pin", authLimiter, requireAuth, async (req, res) => {
+app.post("/api/auth/set-kid-pin", authLimiter, ...requireSession, async (req, res) => {
   try {
     if (req.user.role !== "parent" && req.user.role !== "admin") {
       return res.status(403).json({ error: "Parent access required" });
@@ -1684,7 +1691,7 @@ Answer in 1 to 4 short sentences.
 
 
 
-app.delete("/api/parent/children/:profileId", requireAuth, async (req, res) => {
+app.delete("/api/parent/children/:profileId", ...requireSession, async (req, res) => {
   const client = await pool.connect();
 
   try {
@@ -1875,7 +1882,7 @@ app.get("/api/media/files", async (req, res) => {
   }
 });
 
-app.post("/api/media/upload", requireAuth, upload.single("file"), async (req, res) => {
+app.post("/api/media/upload", ...requireSession, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -1992,7 +1999,7 @@ app.post("/api/media/upload", requireAuth, upload.single("file"), async (req, re
 });
 
 
-app.post("/api/media/upload-v2", requireAuth, upload.single("file"), async (req, res) => {
+app.post("/api/media/upload-v2", ...requireSession, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ status: "error", message: "No file uploaded" });
@@ -2091,7 +2098,7 @@ app.post("/api/media/upload-v2", requireAuth, upload.single("file"), async (req,
   }
 });
 
-app.get("/api/media/manage", requireAuth, async (req, res) => {
+app.get("/api/media/manage", ...requireSession, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT
@@ -2138,7 +2145,7 @@ app.get("/api/media/manage", requireAuth, async (req, res) => {
   }
 });
 
-app.post("/api/media/:mediaId/access", requireAuth, async (req, res) => {
+app.post("/api/media/:mediaId/access", ...requireSession, async (req, res) => {
   try {
     const { mediaId } = req.params;
     const { childProfileId, noLimit, dailyLimitMinutes, availableFrom, availableUntil } = req.body;
@@ -2187,7 +2194,7 @@ app.post("/api/media/:mediaId/access", requireAuth, async (req, res) => {
 });
 
 
-app.patch("/api/media/:mediaId", requireAuth, async (req, res) => {
+app.patch("/api/media/:mediaId", ...requireSession, async (req, res) => {
   try {
     const { mediaId } = req.params;
     const { title, description, category } = req.body;
@@ -2232,7 +2239,7 @@ app.patch("/api/media/:mediaId", requireAuth, async (req, res) => {
   }
 });
 
-app.delete("/api/media/:mediaId/access/:childProfileId", requireAuth, async (req, res) => {
+app.delete("/api/media/:mediaId/access/:childProfileId", ...requireSession, async (req, res) => {
   try {
     const { mediaId, childProfileId } = req.params;
 
@@ -2249,7 +2256,7 @@ app.delete("/api/media/:mediaId/access/:childProfileId", requireAuth, async (req
   }
 });
 
-app.delete("/api/media/:mediaId", requireAuth, async (req, res) => {
+app.delete("/api/media/:mediaId", ...requireSession, async (req, res) => {
   try {
     const { mediaId } = req.params;
 
