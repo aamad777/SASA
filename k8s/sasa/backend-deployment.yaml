@@ -1,0 +1,133 @@
+# SASA_CHILD_PIN_V20 — the SaraTube backend API that serves /api and /uploads
+# for both SASA hostnames.
+#
+# This Deployment existed only as a live object created with `kubectl apply`:
+# there was no Git source for it, and no Argo CD application owned it, so the
+# only way to change it was to mutate the cluster by hand. It is brought under
+# the same GitOps flow that already manages the saratube-public Ingress and the
+# sasa-frontend-bridge Service from this directory (both carry
+# argocd.argoproj.io/tracking-id: sasa-frontend), so the backend image is now
+# rolled forward and rolled back through Git like everything else.
+#
+# The spec below was taken from the live object field-for-field. Secrets are
+# referenced exactly as before via secretKeyRef against saratube-backend-secret;
+# no secret value appears here.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: saratube-backend
+  namespace: saratube
+  labels:
+    app: saratube-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: saratube-backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        app: saratube-backend
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: backend-api
+          image: 192.168.0.101:5050/saratube-backend:v6
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 4000
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "4000"
+            # The web build calls the API same-origin (VITE_API_BASE_URL=/api),
+            # so CORS is not exercised in normal use. This value was still a
+            # stale dev address; it now names the real browser origins so any
+            # genuinely cross-origin call is allowed rather than silently
+            # rejected. The backend splits this on commas.
+            - name: FRONTEND_ORIGIN
+              value: https://sasa.khader-ai.online,https://sara.khader-ai.online
+            - name: DB_HOST
+              value: saratube-postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: saratube
+            - name: DB_USER
+              value: saratube
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: saratube-backend-secret
+                  key: DB_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: saratube-backend-secret
+                  key: JWT_SECRET
+            - name: OLLAMA_URL
+              value: http://192.168.0.113:11434
+            - name: OLLAMA_MODEL
+              value: mistral
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/uploads
+            - name: tmp
+              mountPath: /tmp
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 4000
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 4000
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: saratube-uploads-pvc
+        - name: tmp
+          emptyDir: {}

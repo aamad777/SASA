@@ -12,6 +12,7 @@ import ProfileAvatar from "./layout/ProfileAvatar";
 import {
   createChild,
   loginChild,
+  selectChildProfile,
   setChildPin as updateChildPin,
   type DatabaseChild,
 } from "../lib/api";
@@ -117,17 +118,38 @@ export default function DatabaseProfileSelection({
 
   const [showNewChildPin, setShowNewChildPin] = useState(false);
 
+  const [openingChildId, setOpeningChildId] = useState<string | null>(null);
+
   const [managePinError, setManagePinError] = useState("");
 
   const [managePinSuccess, setManagePinSuccess] = useState("");
 
   const [savingManagedPin, setSavingManagedPin] = useState(false);
 
-  const openChildProfile = (child: DatabaseChild) => {
+  const openChildProfile = async (child: DatabaseChild) => {
+    // SASA_CHILD_PIN_V20 — a child with no PIN is opened through the backend on
+    // the signed-in parent's token, not by the client deciding on its own. The
+    // server re-checks ownership and refuses if the child does have a PIN, so
+    // this is an authorization check rather than a frontend shortcut.
     if (!child.has_pin) {
-      localStorage.removeItem("sasa-child-token");
+      setOpeningChildId(child.id);
+      setChildPinError("");
 
-      onSelectChild(child);
+      try {
+        await selectChildProfile(token, child.id);
+
+        localStorage.removeItem("sasa-child-token");
+
+        onSelectChild(child);
+      } catch (error) {
+        setPendingChild(child);
+        setChildPinError(
+          error instanceof Error ? error.message : "Unable to open this child profile.",
+        );
+      } finally {
+        setOpeningChildId(null);
+      }
+
       return;
     }
 
