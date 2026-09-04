@@ -15,6 +15,11 @@ if (!API_BASE_URL) {
  * the real condition. It changes no URL, method, header or payload — only
  * how a response that is not JSON is described.
  */
+/** Shared with admin-api.ts, which needs the same non-JSON handling. */
+export async function parseJsonOrExplainPublic(response: Response, action: string) {
+  return parseJsonOrExplain(response, action);
+}
+
 async function parseJsonOrExplain(response: Response, action: string) {
   const contentType = response.headers.get("content-type") || "";
 
@@ -249,6 +254,124 @@ export const CHILD_PIN_LENGTH = 4;
 
 export function isValidChildPin(pin: string): boolean {
   return new RegExp(`^\\d{${CHILD_PIN_LENGTH}}$`).test(pin);
+}
+
+/* SASA_PUBLIC_LIBRARY_V25 — the guest-facing library.
+ *
+ * Deliberately its own endpoint rather than a child-profile one: it needs no
+ * session, and the server filters on visibility='public' AND
+ * publication_status='published', so a draft or a family's private upload can
+ * never come back through it. The response carries no owner_user_id.
+ */
+export type PublicMediaItem = {
+  id: string;
+  media_type: "video" | "photo";
+  title: string;
+  description: string | null;
+  category: string | null;
+  public_url: string | null;
+  thumbnail_url: string | null;
+  is_featured: boolean;
+  published_at: string | null;
+  created_at: string;
+};
+
+export async function getPublicMedia(
+  type?: "video" | "photo",
+  limit = 30,
+): Promise<PublicMediaItem[]> {
+  const params = new URLSearchParams();
+
+  if (type) params.set("type", type);
+  params.set("limit", String(limit));
+
+  const response = await fetch(`${API_BASE_URL}/public/media?${params.toString()}`);
+  const data = await parseJsonOrExplain(response, "Loading the SASA library");
+
+  if (!response.ok) {
+    throw new Error(data.error || "Unable to load the public library.");
+  }
+
+  return Array.isArray(data.media) ? data.media : [];
+}
+
+/* SASA_AVATAR_UI_V25 — avatar changes go through the backend, which decides
+ * whether this session may touch this profile. Nothing here is a permission
+ * check; a child's own session and their parent's both work, anything else
+ * gets the same 404 a nonexistent profile returns.
+ */
+export type AvatarCrop = { x: number; y: number; width: number; height: number };
+
+export function setProfileAvatarPreset(token: string, profileId: string, emoji: string) {
+  const form = new FormData();
+  form.append("avatarUrl", `emoji:${emoji}`);
+
+  return avatarRequest(token, profileId, form);
+}
+
+export function uploadProfileAvatar(
+  token: string,
+  profileId: string,
+  file: File,
+  crop?: AvatarCrop,
+  onProgress?: (percent: number) => void,
+) {
+  const form = new FormData();
+  form.append("file", file);
+  if (crop) form.append("crop", JSON.stringify(crop));
+
+  return avatarRequest(token, profileId, form, onProgress);
+}
+
+function avatarRequest(
+  token: string,
+  profileId: string,
+  form: FormData,
+  onProgress?: (percent: number) => void,
+): Promise<{ avatar_url: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.open("POST", `${API_BASE_URL}/profiles/${profileId}/avatar`);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    if (onProgress) {
+      onProgress(0);
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      let data: { avatar_url?: string; error?: string } = {};
+
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        data = {};
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300 && data.avatar_url) {
+        onProgress?.(100);
+        resolve({ avatar_url: data.avatar_url });
+        return;
+      }
+
+      // The old avatar is kept server-side on any failure, so reporting the
+      // real error here is enough - there is nothing to roll back locally.
+      reject(new Error(data.error || `Could not save the avatar (HTTP ${xhr.status}).`));
+    };
+
+    xhr.onerror = () => reject(new Error("Could not save the avatar: the request failed."));
+    xhr.send(form);
+  });
+}
+
+/** Authorised avatar URL. Avatars are never served from the public mount. */
+export function profileAvatarUrl(profileId: string): string {
+  return `${API_BASE_URL}/profiles/${profileId}/avatar`;
 }
 
 export type CreateChildInput = {
