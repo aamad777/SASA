@@ -26,6 +26,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Blocks a pull request that INTRODUCES a vulnerable dependency, using
+      # GitHub's advisory database rather than the npm audit endpoint. It can
+      # only diff two commits, so it is scoped to pull_request; the Trivy
+      # lockfile scan below covers push builds and the existing tree.
+      - name: Review dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          # Runtime dependencies are what ship. This mirrors the --omit=dev
+          # scope of the npm audit gate this replaces.
+          fail-on-scopes: runtime
+
       - name: Scan repository secrets with Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
@@ -46,8 +59,31 @@ jobs:
       - name: Run lint
         run: npm run lint
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      # Replaces `npm audit --omit=dev --audit-level=high`, which failed on 6 of
+      # 8 runs with 400/503 from registry.npmjs.org's /security/audits/quick
+      # endpoint — an endpoint npm's own response says is being retired. That
+      # conflated "a high-severity vulnerability exists" with "the registry is
+      # unreachable"; both exited 1.
+      #
+      # Trivy resolves package-lock.json against its own vulnerability
+      # database, so a registry outage cannot masquerade as a security finding.
+      # Trivy excludes dev dependencies from lockfiles by default, which keeps
+      # the --omit=dev scope of the gate it replaces (verified on this tree:
+      # 1 finding by default, 3 with --include-dev-deps).
+      #
+      # This is deliberately a separate gate from the image scan below. The
+      # runner image ships a bundled Nitro output with no node_modules and no
+      # package.json at all, so the image scan sees Alpine packages only and
+      # cannot cover application dependencies.
+      - name: Scan production dependencies with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: package-lock.json
+          format: table
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: 1
 
       - name: Build application
         env:
