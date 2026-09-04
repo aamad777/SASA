@@ -21,7 +21,54 @@ for k in sys.argv[1].split('.'):
 print(cur if cur is not None else '')" "$1"; }
 code(){ curl -s -o /tmp/aa.json -w "%{http_code}" -m 30 "$@"; }
 
+# Granting the admin role is a server-side act that registration must never be
+# able to perform, so the suite sets it directly in the database. Export
+# SASA_TEST_PSQL (e.g. "docker exec -i sasa-test-pg psql -U saratube -d saratube -q")
+# to run this suite against an isolated database instead of production.
+promote_admin(){
+  if [ -n "$SASA_TEST_PSQL" ]; then
+    $SASA_TEST_PSQL -c "UPDATE users SET role='admin' WHERE email='$1'" >/dev/null 2>&1
+  else
+    kubectl exec -n saratube pod/saratube-postgres-74cffd5dc5-8rc49 -- \
+      psql -U saratube -d saratube -q -c "UPDATE users SET role='admin' WHERE email='$1'" >/dev/null 2>&1
+  fi
+}
+
 STAMP=$(date +%s)
+
+# Fixtures are built here so the suite is self-contained. They used to be
+# whatever happened to be sitting in /tmp; when those files were absent, curl
+# failed with an empty -F argument and the upload assertions degraded into
+# checks that read a 404 body and still reported PASS. The source JPEG carries
+# real EXIF and GPS so the metadata-stripping assertion cannot pass vacuously.
+FIXDIR=$(mktemp -d)
+trap 'rm -rf "$FIXDIR"' EXIT
+TESTIMG="$FIXDIR/avatar-source.jpg"
+TESTSVG="$FIXDIR/not-an-image.svg"
+python3 - "$TESTIMG" <<'FIX'
+import sys
+from PIL import Image
+img = Image.new("RGB", (900, 700), (40, 110, 180))
+for x in range(0, 900, 90):
+    for y in range(0, 700, 90):
+        if (x // 90 + y // 90) % 2:
+            img.paste((250, 210, 60), (x, y, x + 90, y + 90))
+ex = Image.Exif()
+ex[0x010F] = "SASA-TEST-CAMERA"
+ex[0x0110] = "SASA-TEST-MODEL"
+ex[0x0132] = "2020:01:01 12:00:00"
+gps = ex.get_ifd(0x8825)
+gps[1] = "N"; gps[2] = (51.0, 30.0, 0.0); gps[3] = "W"; gps[4] = (0.0, 7.0, 0.0)
+img.save(sys.argv[1], "JPEG", exif=ex, quality=92)
+FIX
+printf '%s' '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64"/></svg>' > "$TESTSVG"
+python3 -c "
+import sys
+from PIL import Image
+ex = Image.open('$TESTIMG').getexif()
+sys.exit(0 if len(ex) and dict(ex.get_ifd(0x8825)) else 1)" \
+  && ok "the source photo really carries EXIF and GPS (strip test is meaningful)" \
+  || no "fixture exif" "source image has no metadata to strip"
 mkpw(){ echo "$(head -c 18 /dev/urandom | base64 | tr -d '/+=')Aa1!"; }
 
 # --- a parent, with a child ---
@@ -40,8 +87,7 @@ P2TOK=$(curl -s -m 30 -X POST -H "Content-Type: application/json" -d "$(J email 
 # --- an admin, created server-side (never by self-registration) ---
 AEMAIL="sasa-authadmin-${STAMP}@example.invalid"; APW=$(mkpw)
 curl -s -m 30 -X POST -H "Content-Type: application/json" -d "$(J displayName 'Auth Admin' email "$AEMAIL" password "$APW")" "$API/auth/register" >/dev/null
-kubectl exec -n saratube pod/saratube-postgres-74cffd5dc5-8rc49 -- \
-  psql -U saratube -d saratube -q -c "UPDATE users SET role='admin' WHERE email='$AEMAIL'" >/dev/null 2>&1
+promote_admin "$AEMAIL"
 ATOK=$(curl -s -m 30 -X POST -H "Content-Type: application/json" -d "$(J email "$AEMAIL" password "$APW")" "$API/auth/login" | field token)
 [ -n "$ATOK" ] && ok "admin session established (role granted server-side, not by registration)" || no "admin auth" "no token"
 
@@ -95,8 +141,17 @@ S=$(code -H "Authorization: Bearer $PTOK" "$API/parent/children")
 [ "$S" = "403" ] || [ "$S" = "401" ] && ok "the suspended parent's existing token stops working ($S)" || no "existing token" "got $S"
 S=$(code -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $ATOK" -d '{"status":"active"}' "$API/admin/parents/$PID/status")
 [ "$S" = "200" ] && ok "admin can restore the account (200)" || no "restore" "got $S"
+# Suspension stamps tokens_valid_after with sub-second precision and restore
+# deliberately leaves that watermark in place. A JWT's iat is whole seconds, so
+# a token minted later in that SAME second still compares as "issued at or
+# before the cutoff" and is refused. Waiting past the second boundary makes the
+# new session unambiguously newer than the revocation, which is what a real
+# restored user signing in minutes later would get.
+sleep 2
 PTOK=$(curl -s -m 30 -X POST -H "Content-Type: application/json" -d "$(J email "$PEMAIL" password "$PPW")" "$API/auth/login" | field token)
 [ -n "$PTOK" ] && ok "restored parent can sign in again" || no "restored login" "no token"
+S=$(code -H "Authorization: Bearer $PTOK" "$API/auth/me")
+[ "$S" = "200" ] && ok "the restored session actually works on the next request" || no "restored session" "got $S"
 
 echo
 echo "  -- audit trail --"
@@ -120,7 +175,7 @@ S=$(code "$API/public/media")
 [ "$S" = "200" ] && ok "guests can read the public feed without an account (200)" || no "public feed" "got $S"
 BEFORE=$(python3 -c "import json;print(len(json.load(open('/tmp/aa.json')).get('media',[])))")
 S=$(curl -s -o /tmp/aa.json -w "%{http_code}" -m 90 -X POST -H "Authorization: Bearer $ATOK" \
-  -F "file=@${TESTIMG:-/tmp/sasa-test.png};type=image/png" -F "title=Auth Test Photo" -F "category=Nature" \
+  -F "file=@${TESTIMG};type=image/png" -F "title=Auth Test Photo" -F "category=Nature" \
   "$API/admin/public-media")
 MID=$(field media.id < /tmp/aa.json)
 [ "$S" = "201" ] && ok "admin upload to the public library succeeds (201)" || no "admin upload" "got $S"
@@ -138,7 +193,7 @@ S=$(code -X PATCH -H "Content-Type: application/json" -H "Authorization: Bearer 
 S=$(code "$API/public/media"); AFTER3=$(python3 -c "import json;print(len(json.load(open('/tmp/aa.json')).get('media',[])))")
 [ "$AFTER3" = "$BEFORE" ] && ok "unpublishing removes it from the guest feed immediately" || no "unpublish" "$BEFORE -> $AFTER3"
 S=$(curl -s -o /dev/null -w "%{http_code}" -m 60 -X POST -H "Authorization: Bearer $ATOK" \
-  -F "file=@${TESTSVG:-/tmp/sasa-evil.svg};type=image/png" -F "title=Evil" "$API/admin/public-media")
+  -F "file=@${TESTSVG};type=image/png" -F "title=Evil" "$API/admin/public-media")
 [ "$S" = "400" ] && ok "an SVG renamed as a PNG is rejected by signature check (400)" || no "svg reject" "got $S"
 
 echo
@@ -189,20 +244,34 @@ S=$(code "${API%/api}/uploads$AV")
 # The processed avatar must carry no EXIF/GPS.
 S=$(code -H "Authorization: Bearer $PTOK" "$API/profiles/$CHILD/avatar")
 [ "$S" = "200" ] && ok "the family can read the avatar through the authorised route (200)" || no "authorised read" "got $S"
-python3 - <<'INNER'
-import subprocess, json, sys
-out = subprocess.run(["ffprobe","-v","error","-show_entries","format_tags:stream_tags","-of","json","/tmp/aa.json"],
-                     capture_output=True, text=True)
-INNER
 curl -s -m 30 -H "Authorization: Bearer $PTOK" "$API/profiles/$CHILD/avatar" -o /tmp/avatar.webp
-if command -v ffprobe >/dev/null 2>&1; then
-  TAGS=$(ffprobe -v error -show_entries format_tags:stream_tags -of json /tmp/avatar.webp 2>/dev/null | tr -d ' \n')
-  echo "$TAGS" | grep -qiE 'gps|location|make|model|datetime' \
-    && no "avatar has no EXIF/GPS metadata" "tags present" \
-    || ok "the processed avatar carries no EXIF or GPS metadata"
-  DIM=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 /tmp/avatar.webp 2>/dev/null)
-  [ "$DIM" = "512,512" ] && ok "the avatar is normalised to 512x512" || no "avatar size" "got '$DIM'"
-fi
+# ffprobe does not surface EXIF for JPEG or WebP, so it reports "no tags" even
+# for a file that still carries them. Read the stored bytes directly instead.
+python3 - /tmp/avatar.webp <<'INNER'
+import sys
+from PIL import Image
+path = sys.argv[1]
+raw = open(path, "rb").read()
+chunks = b"EXIF" in raw or b"XMP " in raw
+strings = b"SASA-TEST-CAMERA" in raw or b"SASA-TEST-MODEL" in raw or b"2020:01:01" in raw
+try:
+    exif = len(Image.open(path).getexif())
+except Exception:
+    exif = -1
+sys.exit(0 if not chunks and not strings and exif <= 0 else 1)
+INNER
+[ $? -eq 0 ] && ok "the processed avatar carries no EXIF or GPS metadata" || no "avatar metadata" "EXIF/XMP survived conversion"
+DIM=$(python3 -c "
+from PIL import Image
+try:
+    im = Image.open('/tmp/avatar.webp'); print('%d,%d' % im.size)
+except Exception: print('0,0')")
+[ "$DIM" = "512,512" ] && ok "the avatar is normalised to 512x512" || no "avatar size" "got '$DIM'"
+FMT=$(python3 -c "
+from PIL import Image
+try: print(Image.open('/tmp/avatar.webp').format)
+except Exception: print('none')")
+[ "$FMT" = "WEBP" ] && ok "the avatar is stored as WebP regardless of the uploaded format" || no "avatar format" "got '$FMT'"
 
 # A rejected replacement must leave the existing avatar in place.
 S=$(code -X POST -H "Authorization: Bearer $PTOK" -F "file=@${TESTSVG};type=image/png" "$API/profiles/$CHILD/avatar")

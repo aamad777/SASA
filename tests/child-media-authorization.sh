@@ -19,6 +19,19 @@ for k in sys.argv[1].split('.'):
     cur = cur.get(k) if isinstance(cur,dict) else None
 print(cur if cur is not None else '')" "$1"; }
 code(){ curl -s -o /tmp/cm.json -w "%{http_code}" -m 30 "$@"; }
+
+# Granting the admin role is a server-side act that registration must never be
+# able to perform, so the suite sets it directly in the database. Export
+# SASA_TEST_PSQL (e.g. "docker exec -i sasa-test-pg psql -U saratube -d saratube -q")
+# to run this suite against an isolated database instead of production.
+promote_admin(){
+  if [ -n "$SASA_TEST_PSQL" ]; then
+    $SASA_TEST_PSQL -c "UPDATE users SET role='admin' WHERE email='$1'" >/dev/null 2>&1
+  else
+    kubectl exec -n saratube pod/saratube-postgres-74cffd5dc5-8rc49 -- \
+      psql -U saratube -d saratube -q -c "UPDATE users SET role='admin' WHERE email='$1'" >/dev/null 2>&1
+  fi
+}
 mkpw(){ echo "$(head -c 18 /dev/urandom | base64 | tr -d '/+=')Aa1!"; }
 STAMP=$(date +%s)
 
@@ -46,8 +59,7 @@ BCTOK=$(curl -s -m 30 -X POST -H "Content-Type: application/json" -d "$(J childL
 # Admin, granted server-side.
 DE="sasa-cma-admin-${STAMP}@example.invalid"; DP=$(mkpw)
 curl -s -m 30 -X POST -H "Content-Type: application/json" -d "$(J displayName 'CMA Admin' email "$DE" password "$DP")" "$API/auth/register" >/dev/null
-kubectl exec -n saratube pod/saratube-postgres-74cffd5dc5-8rc49 -- \
-  psql -U saratube -d saratube -q -c "UPDATE users SET role='admin' WHERE email='$DE'" >/dev/null 2>&1
+promote_admin "$DE"
 DTOK=$(curl -s -m 30 -X POST -H "Content-Type: application/json" -d "$(J email "$DE" password "$DP")" "$API/auth/login" | field token)
 
 # Give child A one assigned item so a success is distinguishable from an empty list.
