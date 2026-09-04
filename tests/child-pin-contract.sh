@@ -111,7 +111,11 @@ S=$(curl -s -o /dev/null -w "%{http_code}" -m 30 -X POST -H "Content-Type: appli
 
 # 12 child-token holder cannot reach parent endpoints (child login returns no token at all)
 R=$(curl -s -m 30 -X POST -H "Content-Type: application/json" -d "$(J childLoginId "$LOGINID" pin 4321)" "$API/child/login")
-echo "$R" | grep -q '"token"' && no "child session scope" "child login issued a bearer token" || ok "child login issues no parent-capable token"
+# A child session now exists (see tests/child-media-authorization.sh); what
+# matters is that it grants nothing a parent can do.
+CTOK=$(echo "$R" | jq_ token)
+S=$(curl -s -o /dev/null -w "%{http_code}" -m 30 -H "Authorization: Bearer $CTOK" "$API/parent/children")
+[ "$S" = "403" ] && ok "the child session is not parent-capable (403 on /parent/children)" || no "child session scope" "got $S"
 S=$(curl -s -o /dev/null -w "%{http_code}" -m 30 -H "Authorization: Bearer $TOKEN" "$API/parent/children")
 [ "$S" = "200" ] && ok "parent endpoints still reachable by a parent (200)" || no "parent endpoint" "got $S"
 
