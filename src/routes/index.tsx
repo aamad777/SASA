@@ -1,6 +1,6 @@
 import IntroSplash from "@/components/IntroSplash";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 import AddProfile, { type CreatedProfile } from "@/components/AddProfile";
 import DeviceLocked from "@/components/DeviceLocked";
@@ -9,6 +9,7 @@ import DatabaseProfileSelection, {
   getDatabaseProfileEmoji,
 } from "@/components/DatabaseProfileSelection";
 import KidsVideoHome, { type KidsHomeTab, type KidsVideoItem } from "@/components/KidsVideoHome";
+import { mediaThumbnailFallback } from "@/components/KidsVideoHome";
 import KidsVideoPlayer from "@/components/KidsVideoPlayer";
 import ParentalGate from "@/components/ParentalGate";
 import ParentLogin from "@/components/ParentLogin";
@@ -24,6 +25,9 @@ import {
   getApiAssetUrl,
   getApiHealth,
   getChildAssignedMedia,
+  getCurrentUser,
+  getPublicMedia,
+  profileAvatarUrl,
   getChildren,
   type AssignedChildMedia,
   type DatabaseChild,
@@ -60,6 +64,11 @@ type Profile = {
  * carried alongside as `mediaId` for anything that needs the real key.
  */
 const ASSIGNED_ID_BASE = 1_000_000;
+
+/** Same stable hash, offset into its own range for library items. */
+function publicMediaId(rawId: string): number {
+  return assignedMediaId(rawId) - ASSIGNED_ID_BASE;
+}
 
 function assignedMediaId(rawId: string | number): number {
   const value = String(rawId);
@@ -196,7 +205,94 @@ function SasaApp() {
   const [assignedMediaLoading, setAssignedMediaLoading] = useState(false);
   const [assignedMediaRetryToken, setAssignedMediaRetryToken] = useState(0);
 
+  /* SASA_PUBLIC_LIBRARY_V25 — published SASA library media, shown to everyone
+   * including guests. It comes from the public endpoint, never from a child
+   * profile, so nothing here can be a draft or another family's upload. */
+  const [publicMedia, setPublicMedia] = useState<KidsVideoItem[]>([]);
+  const [publicMediaError, setPublicMediaError] = useState("");
+  const [publicMediaLoading, setPublicMediaLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setPublicMediaLoading(true);
+    setPublicMediaError("");
+
+    getPublicMedia(undefined, 40)
+      .then((items) => {
+        if (cancelled) return;
+
+        setPublicMedia(
+          items.map((item) => {
+            const isPhoto = item.media_type === "photo";
+            const asset = getApiAssetUrl(item.public_url);
+            const thumb = getApiAssetUrl(item.thumbnail_url);
+
+            return {
+              // Kept clear of both the built-in ids and the assigned-media
+              // range so a library item can never collide with either.
+              id: 2000000 + publicMediaId(item.id),
+              title: item.title,
+              duration: isPhoto ? "Photo" : "Video",
+              category: item.category?.trim() || "",
+              // A real generated frame when the backend made one; the shared
+              // placeholder only when it genuinely could not.
+              image: isPhoto ? asset : thumb || mediaThumbnailFallback,
+              sourceType: isPhoto ? "photo" : "upload",
+              sourceUrl: asset,
+              createdAt: item.published_at || item.created_at,
+              sourceLabel: "SASA library",
+              description: item.description || undefined,
+              mediaId: item.id,
+            } satisfies KidsVideoItem;
+          }),
+        );
+      })
+      .catch((error: Error) => {
+        if (!cancelled) setPublicMediaError(error.message);
+      })
+      .finally(() => {
+        if (!cancelled) setPublicMediaLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assignedMediaRetryToken]);
+
   const [homeTab, setHomeTab] = useState<KidsHomeTab>(getSectionFromUrl);
+
+  /* The family's own assigned media first, then the published SASA library.
+   * A guest has no assigned media, so they simply see the library. */
+  /* SASA_ADMIN_UI_V25 — whether to show the Admin entry comes from the
+   * server's own answer about this session, never from a stored flag. */
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!parentToken) {
+      setIsAdmin(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    getCurrentUser(parentToken)
+      .then((account) => {
+        if (!cancelled) setIsAdmin(account?.role === "admin");
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [parentToken]);
+
+  const feedMedia = useMemo(
+    () => [...assignedVideos, ...publicMedia],
+    [assignedVideos, publicMedia],
+  );
 
   useEffect(() => {
     if (!parentToken || !profile) {
@@ -704,7 +800,7 @@ function SasaApp() {
         profileName={profile?.name}
         profileEmoji={profile?.emoji}
         customProfiles={customProfiles}
-        playlist={assignedVideos}
+        playlist={feedMedia}
         onBack={() => {
           setHomeTab("home");
           setSelectedKidsVideo(null);
@@ -725,14 +821,39 @@ function SasaApp() {
     // min-height wrapper here used to leave stray scrollable whitespace
     // below the fold on mobile browsers.
     <KidsVideoHome
-      assignedVideos={assignedVideos}
-      assignedVideosLoading={assignedMediaLoading}
+      assignedVideos={feedMedia}
+      assignedVideosLoading={assignedMediaLoading || publicMediaLoading}
       assignedMediaError={assignedMediaError}
       onRetryAssignedMedia={() => setAssignedMediaRetryToken((value) => value + 1)}
       profileName={profile.name}
       profileEmoji={profile.emoji}
       profileId={profile.id}
       profileImage={profile.image}
+      isAdmin={isAdmin}
+      {...(typeof profile.id === "string" && parentToken
+        ? {
+            avatarToken: parentToken,
+            databaseProfileId: profile.id,
+            onAvatarSaved: (avatarUrl: string) => {
+              /* Update the profile that is on screen as well as re-reading the
+               * family list. Without the first part the chooser saved
+               * correctly but the header kept showing the old picture until a
+               * reload, which reads as the save not having worked. */
+              setProfile((current) =>
+                current
+                  ? {
+                      ...current,
+                      ...(avatarUrl.startsWith("emoji:")
+                        ? { emoji: avatarUrl.slice("emoji:".length), image: undefined }
+                        : { image: profileAvatarUrl(String(current.id)) }),
+                    }
+                  : current,
+              );
+
+              if (parentToken) loadDatabaseChildren(parentToken);
+            },
+          }
+        : {})}
       activeTab={homeTab}
       onTabChange={setHomeTab}
       onOpenVideo={openKidsVideo}

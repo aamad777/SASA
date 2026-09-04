@@ -1,4 +1,4 @@
-import { ArrowLeft, Menu, Search, X } from "lucide-react";
+import { ArrowLeft, Menu, Search, ShieldCheck, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { BrandMark } from "./BrandMark";
 import { MobileTabBar } from "./MobileTabBar";
@@ -39,6 +39,13 @@ type Props = {
   /** True only when a parent account is signed in — gates the create action. */
   parentSignedIn?: boolean;
 
+  /**
+   * SASA_ADMIN_UI_V25 — shows the Admin link. Presentation only: /admin is
+   * reachable by typing it, and every admin API call it makes is refused
+   * server-side for a non-admin, so this is tidiness rather than a control.
+   */
+  isAdmin?: boolean;
+
   /** Set false to let a page manage its own horizontal padding. */
   contained?: boolean;
   children: ReactNode;
@@ -63,6 +70,7 @@ export function AppShell({
   profileEmoji,
   profileImage,
   parentSignedIn = false,
+  isAdmin = false,
   contained = true,
   children,
 }: Props) {
@@ -193,6 +201,17 @@ export function AppShell({
             >
               <Search size={22} />
             </button>
+          )}
+
+          {isAdmin && (
+            <a
+              className="sasa-iconbtn sasa-admin-link"
+              href="/admin"
+              aria-label="Open the admin portal"
+              title="Admin portal"
+            >
+              <ShieldCheck size={20} />
+            </a>
           )}
 
           {headerActions}

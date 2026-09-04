@@ -6,6 +6,7 @@
 @import "./styles/app-shell.css";
 @import "./styles/app-pages.css";
 @import "./styles/pin.css";
+@import "./styles/admin.css";
 
 @custom-variant dark (&:is(.dark *)); /*
  * Design system for Little Explorers — a toddler-friendly video, photo,

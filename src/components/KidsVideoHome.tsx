@@ -42,6 +42,7 @@ import AccountMenu, { type AccountMenuItem } from "./layout/AccountMenu";
 import { KIDS_SECTIONS, type KidsSectionId } from "./layout/nav-sections";
 import MediaCard from "./media/MediaCard";
 import MediaCardSkeleton from "./media/MediaCardSkeleton";
+import AvatarChooser from "./AvatarChooser";
 import EmptyState from "./media/EmptyState";
 import KidsDrawingStudio from "./KidsDrawingStudio";
 import KidsGamesStudio from "./KidsGamesStudio";
@@ -85,6 +86,12 @@ type KidsVideoHomeProps = {
   profileName: string;
   profileEmoji: string;
   profileId?: number | string;
+  /* SASA_AVATAR_UI_V25 — a session and the backend profile uuid, present only
+     for a database child. Without both, the avatar picker stays the local
+     emoji list it has always been. */
+  avatarToken?: string | null;
+  databaseProfileId?: string | null;
+  onAvatarSaved?: (avatarUrl: string) => void;
   profileImage?: string;
   assignedVideos?: KidsVideoItem[];
   assignedVideosLoading?: boolean;
@@ -98,6 +105,8 @@ type KidsVideoHomeProps = {
   onChangeProfile: () => void;
   onOpenFreeAccount?: () => void;
   accountActionLabel: "Login" | "Sign Out";
+  /** Passed through to AppShell to show the admin entry. */
+  isAdmin?: boolean;
   onAccountAction: () => void;
 };
 
@@ -332,6 +341,9 @@ export default function KidsVideoHome({
   profileName,
   profileEmoji,
   profileId,
+  avatarToken,
+  databaseProfileId,
+  onAvatarSaved,
   profileImage,
   assignedVideos = [],
   assignedVideosLoading = false,
@@ -345,6 +357,7 @@ export default function KidsVideoHome({
   onChangeProfile,
   onOpenFreeAccount,
   accountActionLabel,
+  isAdmin = false,
   onAccountAction,
 }: KidsVideoHomeProps) {
   const isGuestAccount = typeof onOpenFreeAccount === "function";
@@ -409,6 +422,17 @@ export default function KidsVideoHome({
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
   const [tempName, setTempName] = useState<string>(activeName);
   const [showAvatarPicker, setShowAvatarPicker] = useState<boolean>(false);
+
+  /* SASA_AVATAR_UI_V25 — activeEmoji is seeded once from the prop, so a saved
+     avatar did not show until a reload. Follow the prop when the owner
+     changes it. */
+  useEffect(() => {
+    setActiveEmoji(profileEmoji);
+  }, [profileEmoji]);
+
+  useEffect(() => {
+    setActiveImage(profileImage);
+  }, [profileImage]);
   const [badgeToast, setBadgeToast] = useState<string | null>(null);
 
   const savedArtworksCount = useMemo(() => {
@@ -827,7 +851,26 @@ export default function KidsVideoHome({
         </div>
       </section>
 
-      {showAvatarPicker && (
+      {/* SASA_AVATAR_UI_V25 — a database child gets the real chooser, which
+          persists through the backend and can upload a cropped photo. A local
+          profile has no server-side profile to save to, so it keeps the
+          emoji list below. */}
+      {showAvatarPicker && avatarToken && databaseProfileId && (
+        <AvatarChooser
+          token={avatarToken}
+          profileId={databaseProfileId}
+          profileName={profileName}
+          presets={KID_AVATARS}
+          currentEmoji={activeEmoji}
+          onClose={() => setShowAvatarPicker(false)}
+          onSaved={(avatarUrl) => {
+            onAvatarSaved?.(avatarUrl);
+            setShowAvatarPicker(false);
+          }}
+        />
+      )}
+
+      {showAvatarPicker && !(avatarToken && databaseProfileId) && (
         <section
           style={{
             display: "grid",
@@ -1091,6 +1134,7 @@ export default function KidsVideoHome({
       }}
       searchPlaceholder="Search videos and photos"
       parentSignedIn={accountActionLabel === "Sign Out"}
+      isAdmin={isAdmin}
       profileLabel="You"
       profileEmoji={activeEmoji}
       profileImage={activeImage}

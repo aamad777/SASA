@@ -471,3 +471,79 @@
   color: var(--sasa-ink-3, #79808a);
   font-size: 11.5px;
 }
+
+/* SASA_AVATAR_UI_V25 — avatar chooser */
+
+.sasa-avatar-upload {
+  position: relative;
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed var(--sasa-line, #dfe1e6);
+  border-radius: 14px;
+  background: var(--sasa-surface-2, #f0f1f4);
+  color: var(--sasa-ink-2, #545a63);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+/* The input covers the label so the whole block is the tap target, and the
+   system file picker is all that opens - no permission prompt of our own. */
+.sasa-avatar-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.sasa-avatar-hint {
+  margin: 0;
+  color: var(--sasa-ink-3, #79808a);
+  font-size: 12px;
+  text-align: center;
+}
+
+.sasa-avatar-stage {
+  position: relative;
+  overflow: hidden;
+  margin-inline: auto;
+  border-radius: 999px;
+  background: #12131a;
+  touch-action: none;
+  cursor: grab;
+}
+
+.sasa-avatar-stage img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  min-width: 100%;
+  min-height: 100%;
+  transform-origin: center;
+  translate: -50% -50%;
+  user-select: none;
+}
+
+.sasa-avatar-zoom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sasa-avatar-zoom button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--sasa-line, #dfe1e6);
+  border-radius: 999px;
+  background: var(--sasa-surface, #fff);
+  color: inherit;
+}
+
+.sasa-avatar-zoom input[type="range"] {
+  width: 100%;
+  height: 24px;
+}
