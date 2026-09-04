@@ -681,8 +681,11 @@ app.post("/api/parent/children/:profileId/select", ...requireSession, async (req
       });
     }
 
+    const token = createToken({ id: child.user_id, email: null, role: "child" });
+
     res.json({
       status: "ok",
+      token,
       child: {
         id: child.id,
         userId: child.user_id,
@@ -1296,26 +1299,46 @@ const avatarLimiter = rateLimit({
  * A parent may manage any child they created. A child may change only their
  * own profile. Nobody else, including another family's parent.
  */
-async function canManageAvatar(req, profileId) {
+/* SASA_CHILD_MEDIA_AUTH_V25 — one place that answers "may this session act on
+ * this child profile?".
+ *
+ * A child may act only on their own profile, a parent only on children they
+ * created, an administrator on any. Everyone else gets the same answer as a
+ * profile that does not exist, so an unauthorised caller cannot tell a real
+ * child id from a made-up one by probing.
+ */
+async function resolveChildAccess(req, profileId) {
+  // A malformed id must not reach Postgres as a uuid cast error, which would
+  // answer 500 and thereby distinguish "bad id" from "not yours".
+  if (!/^[0-9a-fA-F-]{36}$/.test(String(profileId || ""))) {
+    return { allowed: false };
+  }
+
   const result = await pool.query(
-    `SELECT id, user_id, created_by_parent, avatar_url FROM profiles
-      WHERE id = $1 AND is_parent = false LIMIT 1`,
+    `SELECT id, user_id, created_by_parent, avatar_url, display_name
+       FROM profiles WHERE id = $1 AND is_parent = false LIMIT 1`,
     [profileId]
   );
 
   const profile = result.rows[0];
 
-  if (!profile) return { allowed: false, reason: "not_found" };
+  if (!profile) return { allowed: false };
 
-  if (req.account.role === "admin") return { allowed: true, profile };
-  if (req.account.role === "parent" && profile.created_by_parent === req.account.id) {
+  const role = req.account?.role;
+
+  if (role === "admin") return { allowed: true, profile };
+  if (role === "parent" && profile.created_by_parent === req.account.id) {
     return { allowed: true, profile };
   }
-  if (req.account.role === "child" && profile.user_id === req.account.id) {
+  if (role === "child" && profile.user_id === req.account.id) {
     return { allowed: true, profile };
   }
 
-  return { allowed: false, reason: "forbidden", profile };
+  return { allowed: false, profile };
+}
+
+async function canManageAvatar(req, profileId) {
+  return resolveChildAccess(req, profileId);
 }
 
 app.post(
@@ -1514,8 +1537,16 @@ app.post("/api/child/login", authLimiter, async (req, res) => {
       });
     }
 
+    /* SASA_CHILD_MEDIA_AUTH_V25 — children had no session at all, so
+     * "a child may read only their own media" could not be enforced or even
+     * expressed. This issues a child-scoped token: role 'child', so every
+     * parent and admin guard rejects it, and resolveChildAccess matches it
+     * only against the child's own profile. */
+    const token = createToken({ id: child.user_id, email: null, role: "child" });
+
     res.json({
       status: "ok",
+      token,
       child: {
         id: child.id,
         userId: child.user_id,
@@ -1802,9 +1833,18 @@ app.patch("/api/child/:profileId/theme", async (req, res) => {
   }
 });
 
-app.get("/api/child/:profileId/media", async (req, res) => {
+app.get("/api/child/:profileId/media", ...requireSession, async (req, res) => {
   try {
     const { profileId } = req.params;
+
+    /* This used to take the profile id from the URL and return that child's
+     * whole assigned library to anyone who asked - no session at all. Knowing
+     * or guessing a uuid was enough to read another family's media. */
+    const access = await resolveChildAccess(req, profileId);
+
+    if (!access.allowed) {
+      return res.status(404).json({ status: "error", message: "Profile not found" });
+    }
 
     const result = await pool.query(
       `SELECT
