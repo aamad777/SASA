@@ -1551,6 +1551,18 @@
   font-size: 12.5px;
 }
 
+/* SASA_PUBLIC_LIBRARY_V26 — shown when the library request fails, so an empty
+   grid is never mistaken for "there is nothing published". */
+.sasa-standalone-note {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--sasa-line);
+  border-radius: 12px;
+  background: var(--sasa-surface-2, rgba(0, 0, 0, 0.04));
+  color: var(--sasa-ink-2);
+  font-size: 13px;
+}
+
 .sasa-linklist {
   display: grid;
   gap: 10px;

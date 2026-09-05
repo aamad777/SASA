@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
+import { usePublicLibrary } from "@/lib/use-public-library";
 import puppyImg from "@/assets/photo-puppy.jpg";
 import flowerImg from "@/assets/photo-flower.jpg";
 import carImg from "@/assets/photo-car.jpg";
@@ -34,22 +35,41 @@ const photos = [
 function PhotosPage() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
+  /* SASA_PUBLIC_LIBRARY_V26 — published library photos, from the public
+   * endpoint, which needs no session and can only return published public
+   * rows. They join the bundled set so the viewer, the arrow keys and
+   * previous/next all cover them too. */
+  const library = usePublicLibrary("photo");
+
+  const allPhotos = useMemo(
+    () => [
+      ...library.items.map((item) => ({
+        id: item.id,
+        label: item.title,
+        image: item.image,
+      })),
+      ...photos,
+    ],
+    [library.items],
+  );
+
   useEffect(() => {
     if (openIndex === null) return;
 
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpenIndex(null);
-      if (event.key === "ArrowRight") setOpenIndex((index) => ((index ?? 0) + 1) % photos.length);
+      if (event.key === "ArrowRight")
+        setOpenIndex((index) => ((index ?? 0) + 1) % allPhotos.length);
       if (event.key === "ArrowLeft")
-        setOpenIndex((index) => ((index ?? 0) - 1 + photos.length) % photos.length);
+        setOpenIndex((index) => ((index ?? 0) - 1 + allPhotos.length) % allPhotos.length);
     };
 
     window.addEventListener("keydown", handleKey);
 
     return () => window.removeEventListener("keydown", handleKey);
-  }, [openIndex]);
+  }, [openIndex, allPhotos.length]);
 
-  const active = openIndex === null ? null : photos[openIndex];
+  const active = openIndex === null ? null : allPhotos[openIndex];
 
   return (
     <div className="sasa-standalone">
@@ -64,8 +84,14 @@ function PhotosPage() {
       </header>
 
       <main className="sasa-container">
+        {library.error && (
+          <p className="sasa-standalone-note" role="status">
+            The SASA library could not be loaded. {library.error}
+          </p>
+        )}
+
         <div className="sasa-tilegrid">
-          {photos.map((photo, index) => (
+          {allPhotos.map((photo, index) => (
             <button
               key={photo.id}
               type="button"
@@ -105,7 +131,7 @@ function PhotosPage() {
               type="button"
               className="sasa-btn"
               onClick={() =>
-                setOpenIndex((index) => ((index ?? 0) - 1 + photos.length) % photos.length)
+                setOpenIndex((index) => ((index ?? 0) - 1 + allPhotos.length) % allPhotos.length)
               }
             >
               <ChevronLeft size={18} />
@@ -114,7 +140,7 @@ function PhotosPage() {
             <button
               type="button"
               className="sasa-btn"
-              onClick={() => setOpenIndex((index) => ((index ?? 0) + 1) % photos.length)}
+              onClick={() => setOpenIndex((index) => ((index ?? 0) + 1) % allPhotos.length)}
             >
               Next
               <ChevronRight size={18} />

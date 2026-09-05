@@ -3,6 +3,7 @@ import { ArrowLeft, Play } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { kidsVideos } from "@/components/KidsVideoHome";
 import { mediaThumbnailFallback } from "@/components/KidsVideoHome";
+import { usePublicLibrary } from "@/lib/use-public-library";
 
 export const Route = createFileRoute("/videos")({
   component: VideosPage,
@@ -14,6 +15,11 @@ export const Route = createFileRoute("/videos")({
  * opens the app on the Home section rather than pretending to play here.
  */
 function VideosPage() {
+  /* SASA_PUBLIC_LIBRARY_V26 — published library videos, from the public
+   * endpoint. Guests included: the endpoint needs no session, and it can only
+   * return published public rows. */
+  const library = usePublicLibrary("video");
+
   return (
     <div className="sasa-standalone">
       <header className="sasa-auth-topbar">
@@ -30,7 +36,49 @@ function VideosPage() {
       </header>
 
       <main className="sasa-container">
+        {library.error && (
+          <p className="sasa-standalone-note" role="status">
+            The SASA library could not be loaded. {library.error}
+          </p>
+        )}
+
         <div className="sasa-grid">
+          {library.items.map((item) => (
+            <article className="sasa-card" key={item.id}>
+              <Link
+                to="/"
+                search={{ section: "home" }}
+                className="sasa-card-link"
+                aria-label={`Open ${item.title} in SARA`}
+              >
+                <span className="sasa-card-thumb">
+                  <img
+                    src={item.image || mediaThumbnailFallback}
+                    alt=""
+                    loading="lazy"
+                    onError={(event) => {
+                      event.currentTarget.onerror = null;
+                      event.currentTarget.src = mediaThumbnailFallback;
+                    }}
+                  />
+                  <span className="sasa-card-play" aria-hidden="true">
+                    <Play size={30} fill="currentColor" />
+                  </span>
+                </span>
+              </Link>
+
+              <div className="sasa-card-body">
+                <div className="sasa-card-text">
+                  <h2 className="sasa-card-title">{item.title}</h2>
+                  <p className="sasa-card-channel">SASA library</p>
+                  <p className="sasa-card-meta">
+                    Video{item.category ? ` · ${item.category}` : ""}
+                  </p>
+                </div>
+              </div>
+            </article>
+          ))}
+
           {kidsVideos.map((video) => (
             <article className="sasa-card" key={video.id}>
               <Link
