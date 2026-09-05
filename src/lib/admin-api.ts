@@ -244,9 +244,14 @@ export function uploadPublicMedia(
 export type UploadSession = {
   id: string;
   status?: string;
+  /* These are byte counts bounded by the 500MB upload limit, normalised to
+   * JSON numbers at the API boundary (see backend/api-numbers.js). They are
+   * genuinely numbers on the wire, not numeric strings, so arithmetic and
+   * comparison here behave. */
   chunkSize: number;
   totalChunks: number;
   totalBytes: number;
+  uploadedBytes?: number;
   receivedChunks: number[];
   mediaId?: string | null;
 };

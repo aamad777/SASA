@@ -8,6 +8,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { removeThumbnailFile } from "./thumbnails.js";
 import { startThumbnailWorker } from "./thumbnail-worker.js";
+import { normaliseMediaRow, normaliseMediaRows, toBoundedByteNumber } from "./api-numbers.js";
 import {
   CHUNK_SIZE,
   MAX_UPLOAD_BYTES,
@@ -1066,7 +1067,7 @@ app.get("/api/public/media", async (req, res) => {
       params
     );
 
-    res.json({ status: "ok", media: rows.rows });
+    res.json({ status: "ok", media: normaliseMediaRows(rows.rows) });
   } catch (error) {
     console.error("Public media error:", error);
     res.status(500).json({ error: "Unable to load public media" });
@@ -1095,7 +1096,13 @@ app.get("/api/admin/public-media", ...requireAdmin, async (req, res) => {
       [limit, offset]
     );
 
-    res.json({ status: "ok", total: total.rows[0].n, media: rows.rows, limit, offset });
+    res.json({
+      status: "ok",
+      total: total.rows[0].n,
+      media: normaliseMediaRows(rows.rows),
+      limit,
+      offset
+    });
   } catch (error) {
     console.error("Admin public media error:", error);
     res.status(500).json({ error: "Unable to list public media" });
@@ -1195,7 +1202,7 @@ app.post(
         media_type: isVideo ? "video" : "photo"
       });
 
-      res.status(201).json({ status: "ok", media: result.rows[0] });
+      res.status(201).json({ status: "ok", media: normaliseMediaRow(result.rows[0]) });
     } catch (error) {
       console.error("Public media upload error:", error);
       await cleanup();
@@ -1304,9 +1311,10 @@ app.post("/api/admin/uploads/session", adminWriteLimiter, ...requireAdmin, async
       status: "ok",
       session: {
         id: session.id,
-        chunkSize: session.chunk_size,
+        chunkSize: toBoundedByteNumber(session.chunk_size, "session.chunk_size"),
         totalChunks: session.total_chunks,
-        totalBytes: Number(session.total_bytes),
+        totalBytes: toBoundedByteNumber(session.total_bytes, "session.total_bytes"),
+        uploadedBytes: 0,
         receivedChunks: [],
         expiresAt: session.expires_at
       }
@@ -1326,7 +1334,14 @@ app.get("/api/admin/uploads/session/:id", ...requireAdmin, async (req, res) => {
     if (!session) return;
 
     const { rows } = await pool.query(
-      `SELECT chunk_index FROM upload_session_chunks WHERE session_id = $1 ORDER BY chunk_index`,
+      `SELECT chunk_index, size_bytes FROM upload_session_chunks
+        WHERE session_id = $1 ORDER BY chunk_index`,
+      [session.id]
+    );
+
+    const { rows: totals } = await pool.query(
+      `SELECT coalesce(sum(size_bytes), 0)::bigint AS uploaded
+         FROM upload_session_chunks WHERE session_id = $1`,
       [session.id]
     );
 
@@ -1335,9 +1350,10 @@ app.get("/api/admin/uploads/session/:id", ...requireAdmin, async (req, res) => {
       session: {
         id: session.id,
         status: session.status,
-        chunkSize: session.chunk_size,
+        chunkSize: toBoundedByteNumber(session.chunk_size, "session.chunk_size"),
         totalChunks: session.total_chunks,
-        totalBytes: Number(session.total_bytes),
+        totalBytes: toBoundedByteNumber(session.total_bytes, "session.total_bytes"),
+        uploadedBytes: toBoundedByteNumber(totals[0].uploaded, "session.uploaded_bytes"),
         receivedChunks: rows.map((r) => r.chunk_index),
         mediaId: session.media_id
       }
@@ -1397,7 +1413,10 @@ app.put(
 
       const { rows } = await pool.query(
         `UPDATE upload_sessions SET updated_at = now() WHERE id = $1
-         RETURNING (SELECT count(*)::int FROM upload_session_chunks WHERE session_id = $1) AS received`,
+         RETURNING
+           (SELECT count(*)::int FROM upload_session_chunks WHERE session_id = $1) AS received,
+           (SELECT coalesce(sum(size_bytes), 0)::bigint FROM upload_session_chunks
+             WHERE session_id = $1) AS uploaded`,
         [session.id]
       );
 
@@ -1405,7 +1424,9 @@ app.put(
         status: "ok",
         chunkIndex: index,
         received: rows[0].received,
-        totalChunks: session.total_chunks
+        totalChunks: session.total_chunks,
+        uploadedBytes: toBoundedByteNumber(rows[0].uploaded, "session.uploaded_bytes"),
+        totalBytes: toBoundedByteNumber(session.total_bytes, "session.total_bytes")
       });
     } catch (error) {
       console.error("Upload chunk error:", error);
@@ -1475,7 +1496,7 @@ app.post(
         session_id: session.id
       });
 
-      res.status(201).json({ status: "ok", media: media.rows[0] });
+      res.status(201).json({ status: "ok", media: normaliseMediaRow(media.rows[0]) });
     } catch (error) {
       // An incomplete or corrupt upload stays open so the admin can send the
       // missing chunks and finish, rather than losing what already arrived.
