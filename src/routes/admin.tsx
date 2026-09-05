@@ -13,9 +13,11 @@ import {
   getAuditLog,
   revokeParentSessions,
   setParentStatus,
+  abortUploadSession,
   retryThumbnail,
   updatePublicMedia,
   uploadPublicMedia,
+  uploadVideoResumable,
   type AdminOverview,
   type AdminParent,
   type AdminParentDetail,
@@ -24,6 +26,10 @@ import {
 } from "@/lib/admin-api";
 
 export const Route = createFileRoute("/admin")({ component: AdminPortal });
+
+/** Above this a video is uploaded in chunks. Matches the server's chunk size,
+ *  so anything needing more than one chunk takes the resumable path. */
+const CHUNKED_UPLOAD_THRESHOLD = 12 * 1024 * 1024;
 
 function readToken(): string {
   if (typeof window === "undefined") return "";
@@ -530,6 +536,10 @@ function PublicMediaScreen({ token }: { token: string }) {
   const [uploadError, setUploadError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<PublicMediaItem | null>(null);
   const uploadingRef = useRef(false);
+  /* SASA_RESUMABLE_UPLOADS_V28 — held so a failed large upload can continue
+   * from the chunks the server already has instead of starting over. */
+  const [resumeSessionId, setResumeSessionId] = useState<string | null>(null);
+  const [chunked, setChunked] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -579,13 +589,34 @@ function PublicMediaScreen({ token }: { token: string }) {
     setUploading(true);
     setUploadError("");
 
+    /* A single request cannot carry more than Cloudflare's 100MB proxy limit,
+     * so anything at or above one chunk goes through the resumable path. Small
+     * files keep the simpler single-request upload. */
+    const useChunked = file.type.startsWith("video/") && file.size > CHUNKED_UPLOAD_THRESHOLD;
+    setChunked(useChunked);
+
     try {
-      await uploadPublicMedia(token, file, { title: title.trim() || file.name }, setProgress);
+      if (useChunked) {
+        await uploadVideoResumable(
+          token,
+          file,
+          { title: title.trim() || file.name },
+          {
+            onProgress: setProgress,
+            onSession: (session) => setResumeSessionId(session.id),
+            resumeSessionId: resumeSessionId || undefined,
+          },
+        );
+      } else {
+        await uploadPublicMedia(token, file, { title: title.trim() || file.name }, setProgress);
+      }
       setFile(null);
       setTitle("");
+      setResumeSessionId(null);
       load();
     } catch (err) {
-      // Only a real 2xx clears this; a failure is never shown as success.
+      // Only a real 2xx clears this; a failure is never shown as success. The
+      // session id is kept so "Resume upload" can continue where this stopped.
       setUploadError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
       uploadingRef.current = false;
@@ -666,24 +697,51 @@ function PublicMediaScreen({ token }: { token: string }) {
             <span style={{ width: `${progress}%` }} />
             {/* The thumbnail is no longer extracted inside this request, so
                 claiming "processing" here would overstate what is happening. */}
-            <em>Uploading… {progress}%</em>
+            <em>
+              {chunked ? "Uploading in chunks… " : "Uploading… "}
+              {progress}%
+            </em>
           </div>
         ) : null}
 
         {uploadError ? (
           <p className="sasa-formsheet-error" role="alert">
             {uploadError}
+            {resumeSessionId
+              ? " The chunks already sent are kept — Resume continues from there."
+              : ""}
           </p>
         ) : null}
 
-        <button
-          type="button"
-          className="sasa-pin-btn is-primary"
-          onClick={doUpload}
-          disabled={uploading || !file}
-        >
-          <Upload size={16} /> Upload as draft
-        </button>
+        <div className="sasa-admin-uploadactions">
+          <button
+            type="button"
+            className="sasa-pin-btn is-primary"
+            onClick={doUpload}
+            disabled={uploading || !file}
+          >
+            <Upload size={16} /> {resumeSessionId ? "Resume upload" : "Upload as draft"}
+          </button>
+
+          {resumeSessionId && !uploading ? (
+            <button
+              type="button"
+              className="sasa-pin-btn"
+              onClick={async () => {
+                try {
+                  await abortUploadSession(token, resumeSessionId);
+                } catch {
+                  /* Already gone or expired; clearing locally is still right. */
+                }
+                setResumeSessionId(null);
+                setUploadError("");
+                setProgress(0);
+              }}
+            >
+              Cancel upload
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <State

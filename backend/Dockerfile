@@ -1,14 +1,14 @@
 # SASA_ASYNC_THUMBNAILS_V27 (was SASA_CHILD_PIN_V20 / SASA_RATE_LIMIT_V20)
 #
-# Rebased FROM v13, the tag actually running when this was built, so the diff
-# under review stays the source diff. thumbnail-worker.js is the added file.
+# Rebased FROM v14, the tag actually running when this was built, so the diff
+# under review stays the source diff. resumable-uploads.js is the added file.
 #
 # Built FROM the image that was already running, so the Node runtime and the
 # existing node_modules stay byte-identical and the reviewable change is the
 # source diff plus one added dependency. express-rate-limit is installed on top
 # because the API previously had no rate limiting at all — see the comment above
 # authLimiter in server.js for why that mattered for a four-digit child PIN.
-FROM 192.168.0.101:5050/saratube-backend:v13
+FROM 192.168.0.101:5050/saratube-backend:v14
 
 WORKDIR /app
 
@@ -24,6 +24,8 @@ COPY package.json /app/package.json
 COPY server.js /app/server.js
 COPY thumbnails.js /app/thumbnails.js
 COPY thumbnail-worker.js /app/thumbnail-worker.js
+COPY resumable-uploads.js /app/resumable-uploads.js
+COPY api-numbers.js /app/api-numbers.js
 COPY images.js /app/images.js
 COPY migrations /app/migrations
 COPY backfill-thumbnails.js /app/backfill-thumbnails.js

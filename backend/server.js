@@ -8,6 +8,18 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { removeThumbnailFile } from "./thumbnails.js";
 import { startThumbnailWorker } from "./thumbnail-worker.js";
+import { normaliseMediaRow, normaliseMediaRows, toBoundedByteNumber } from "./api-numbers.js";
+import {
+  CHUNK_SIZE,
+  MAX_UPLOAD_BYTES,
+  SESSION_TTL_MS,
+  assembleSession,
+  chunkCountFor,
+  chunkPath,
+  discardSessionFiles,
+  sessionDir,
+  startUploadSweeper
+} from "./resumable-uploads.js";
 import {
   AVATAR_SIZE,
   MAX_AVATAR_BYTES,
@@ -1055,7 +1067,7 @@ app.get("/api/public/media", async (req, res) => {
       params
     );
 
-    res.json({ status: "ok", media: rows.rows });
+    res.json({ status: "ok", media: normaliseMediaRows(rows.rows) });
   } catch (error) {
     console.error("Public media error:", error);
     res.status(500).json({ error: "Unable to load public media" });
@@ -1084,7 +1096,13 @@ app.get("/api/admin/public-media", ...requireAdmin, async (req, res) => {
       [limit, offset]
     );
 
-    res.json({ status: "ok", total: total.rows[0].n, media: rows.rows, limit, offset });
+    res.json({
+      status: "ok",
+      total: total.rows[0].n,
+      media: normaliseMediaRows(rows.rows),
+      limit,
+      offset
+    });
   } catch (error) {
     console.error("Admin public media error:", error);
     res.status(500).json({ error: "Unable to list public media" });
@@ -1184,7 +1202,7 @@ app.post(
         media_type: isVideo ? "video" : "photo"
       });
 
-      res.status(201).json({ status: "ok", media: result.rows[0] });
+      res.status(201).json({ status: "ok", media: normaliseMediaRow(result.rows[0]) });
     } catch (error) {
       console.error("Public media upload error:", error);
       await cleanup();
@@ -1192,6 +1210,324 @@ app.post(
     }
   }
 );
+
+/* SASA_RESUMABLE_UPLOADS_V28 — chunked upload endpoints.
+ *
+ * Every one is behind requireAdmin (which re-reads role and status from the
+ * database on each call, so a suspended or demoted admin loses access
+ * mid-upload) and every one re-checks that the session belongs to the caller.
+ * Ownership is not established once at session creation and then trusted. */
+
+/** Raw-body parser for one chunk. Bounded so a lying Content-Length cannot
+ *  make the pod allocate without limit. */
+const chunkBody = express.raw({
+  type: "application/octet-stream",
+  limit: CHUNK_SIZE + 1024,
+});
+
+/** Loads the caller's own open session, or answers and returns null. */
+async function loadOwnSession(req, res, { allowStatuses = ["open"] } = {}) {
+  const id = String(req.params.id || "");
+
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    res.status(400).json({ status: "error", message: "Invalid session id" });
+    return null;
+  }
+
+  const { rows } = await pool.query(`SELECT * FROM upload_sessions WHERE id = $1`, [id]);
+  const session = rows[0];
+
+  // Same answer for "not yours" and "does not exist", so one admin cannot
+  // probe for another's session ids.
+  if (!session || session.owner_user_id !== req.account.id) {
+    res.status(404).json({ status: "error", message: "Upload session not found" });
+    return null;
+  }
+
+  if (!allowStatuses.includes(session.status)) {
+    res.status(409).json({ status: "error", message: `Session is ${session.status}` });
+    return null;
+  }
+
+  return session;
+}
+
+/** Opens a session. The client declares size and type; both are enforced. */
+app.post("/api/admin/uploads/session", adminWriteLimiter, ...requireAdmin, async (req, res) => {
+  try {
+    const totalBytes = Number(req.body?.totalBytes);
+    const mimeType = String(req.body?.mimeType || "");
+    const originalFilename = String(req.body?.filename || "video.mp4").slice(0, 255);
+
+    if (!Number.isFinite(totalBytes) || totalBytes <= 0) {
+      return res.status(400).json({ status: "error", message: "A positive totalBytes is required" });
+    }
+
+    if (totalBytes > MAX_UPLOAD_BYTES) {
+      return res.status(413).json({
+        status: "error",
+        message: `That video is larger than the ${Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))}MB limit.`
+      });
+    }
+
+    // Resumable upload exists for video. A photo is small enough for the
+    // simple path and is validated by magic bytes there.
+    if (!mimeType.startsWith("video/")) {
+      return res.status(400).json({ status: "error", message: "Only videos use resumable upload" });
+    }
+
+    const totalChunks = chunkCountFor(totalBytes);
+    const { rows } = await pool.query(
+      `INSERT INTO upload_sessions
+         (owner_user_id, original_filename, mime_type, total_bytes, chunk_size, total_chunks,
+          title, category, temp_dir, expires_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now() + ($10::bigint * interval '1 millisecond'))
+       RETURNING id, chunk_size, total_chunks, total_bytes, expires_at`,
+      [
+        req.account.id,
+        originalFilename,
+        mimeType,
+        totalBytes,
+        CHUNK_SIZE,
+        totalChunks,
+        String(req.body?.title || "").slice(0, 200) || null,
+        String(req.body?.category || "general").slice(0, 80),
+        "", // filled below; the directory name derives from the generated id
+        SESSION_TTL_MS
+      ]
+    );
+
+    const session = rows[0];
+    const dir = sessionDir(UPLOAD_DIR, session.id);
+    await fs.promises.mkdir(dir, { recursive: true });
+    await pool.query(`UPDATE upload_sessions SET temp_dir = $2 WHERE id = $1`, [session.id, dir]);
+
+    await recordAudit(req, "upload_session.open", "upload_session", session.id, {
+      filename: originalFilename,
+      total_bytes: totalBytes
+    });
+
+    res.status(201).json({
+      status: "ok",
+      session: {
+        id: session.id,
+        chunkSize: toBoundedByteNumber(session.chunk_size, "session.chunk_size"),
+        totalChunks: session.total_chunks,
+        totalBytes: toBoundedByteNumber(session.total_bytes, "session.total_bytes"),
+        uploadedBytes: 0,
+        receivedChunks: [],
+        expiresAt: session.expires_at
+      }
+    });
+  } catch (error) {
+    console.error("Upload session create error:", error);
+    res.status(500).json({ status: "error", message: "Could not start the upload" });
+  }
+});
+
+/** Which chunks the server already holds — the basis for resuming. */
+app.get("/api/admin/uploads/session/:id", ...requireAdmin, async (req, res) => {
+  try {
+    const session = await loadOwnSession(req, res, {
+      allowStatuses: ["open", "assembling", "completed"]
+    });
+    if (!session) return;
+
+    const { rows } = await pool.query(
+      `SELECT chunk_index, size_bytes FROM upload_session_chunks
+        WHERE session_id = $1 ORDER BY chunk_index`,
+      [session.id]
+    );
+
+    const { rows: totals } = await pool.query(
+      `SELECT coalesce(sum(size_bytes), 0)::bigint AS uploaded
+         FROM upload_session_chunks WHERE session_id = $1`,
+      [session.id]
+    );
+
+    res.json({
+      status: "ok",
+      session: {
+        id: session.id,
+        status: session.status,
+        chunkSize: toBoundedByteNumber(session.chunk_size, "session.chunk_size"),
+        totalChunks: session.total_chunks,
+        totalBytes: toBoundedByteNumber(session.total_bytes, "session.total_bytes"),
+        uploadedBytes: toBoundedByteNumber(totals[0].uploaded, "session.uploaded_bytes"),
+        receivedChunks: rows.map((r) => r.chunk_index),
+        mediaId: session.media_id
+      }
+    });
+  } catch (error) {
+    console.error("Upload session read error:", error);
+    res.status(500).json({ status: "error", message: "Could not read the upload" });
+  }
+});
+
+/** Stores one chunk. Idempotent: re-sending an index overwrites it. */
+app.put(
+  "/api/admin/uploads/session/:id/chunk/:index",
+  ...requireAdmin,
+  chunkBody,
+  async (req, res) => {
+    try {
+      const session = await loadOwnSession(req, res);
+      if (!session) return;
+
+      const index = Number(req.params.index);
+      if (!Number.isInteger(index) || index < 0 || index >= session.total_chunks) {
+        return res.status(400).json({ status: "error", message: "Chunk index out of range" });
+      }
+
+      const body = Buffer.isBuffer(req.body) ? req.body : null;
+      if (!body || body.length === 0) {
+        return res.status(400).json({ status: "error", message: "Empty chunk" });
+      }
+
+      // Every chunk but the last must be exactly chunk_size; the last is
+      // whatever remains. Anything else means the client is not sending the
+      // file it declared.
+      const isLast = index === session.total_chunks - 1;
+      const expected = isLast
+        ? Number(session.total_bytes) - index * session.chunk_size
+        : session.chunk_size;
+
+      if (body.length !== expected) {
+        return res.status(400).json({
+          status: "error",
+          message: `Chunk ${index} should be ${expected} bytes, received ${body.length}`
+        });
+      }
+
+      // Path is built from the session UUID and the integer index only.
+      const target = chunkPath(UPLOAD_DIR, session.id, index);
+      await fs.promises.writeFile(target, body);
+
+      await pool.query(
+        `INSERT INTO upload_session_chunks (session_id, chunk_index, size_bytes)
+         VALUES ($1,$2,$3)
+         ON CONFLICT (session_id, chunk_index)
+         DO UPDATE SET size_bytes = EXCLUDED.size_bytes, received_at = now()`,
+        [session.id, index, body.length]
+      );
+
+      const { rows } = await pool.query(
+        `UPDATE upload_sessions SET updated_at = now() WHERE id = $1
+         RETURNING
+           (SELECT count(*)::int FROM upload_session_chunks WHERE session_id = $1) AS received,
+           (SELECT coalesce(sum(size_bytes), 0)::bigint FROM upload_session_chunks
+             WHERE session_id = $1) AS uploaded`,
+        [session.id]
+      );
+
+      res.json({
+        status: "ok",
+        chunkIndex: index,
+        received: rows[0].received,
+        totalChunks: session.total_chunks,
+        uploadedBytes: toBoundedByteNumber(rows[0].uploaded, "session.uploaded_bytes"),
+        totalBytes: toBoundedByteNumber(session.total_bytes, "session.total_bytes")
+      });
+    } catch (error) {
+      console.error("Upload chunk error:", error);
+      res.status(500).json({ status: "error", message: "Could not store the chunk" });
+    }
+  }
+);
+
+/** Assembles, validates and creates the draft media row. */
+app.post(
+  "/api/admin/uploads/session/:id/complete",
+  adminWriteLimiter,
+  ...requireAdmin,
+  async (req, res) => {
+    let session = await loadOwnSession(req, res);
+    if (!session) return;
+
+    // Claim the session so a duplicate complete cannot assemble twice.
+    const claim = await pool.query(
+      `UPDATE upload_sessions SET status = 'assembling', updated_at = now()
+        WHERE id = $1 AND status = 'open' RETURNING id`,
+      [session.id]
+    );
+
+    if (!claim.rows[0]) {
+      return res.status(409).json({ status: "error", message: "Upload is already being finished" });
+    }
+
+    try {
+      const assembled = await assembleSession(pool, UPLOAD_DIR, session);
+
+      const title = String(req.body?.title || session.title || session.original_filename).slice(0, 200);
+      const category = String(req.body?.category || session.category || "general").slice(0, 80);
+
+      /* Draft and private-by-default like every other upload, and the
+       * thumbnail is queued rather than extracted here. Nothing is published
+       * by assembling a file. */
+      const media = await pool.query(
+        `INSERT INTO media_files
+           (owner_user_id, media_type, title, description, category, file_path, public_url,
+            thumbnail_url, original_filename, mime_type, size_bytes, visibility,
+            publication_status, thumbnail_status)
+         VALUES ($1,'video',$2,$3,$4,$5,$6,NULL,$7,$8,$9,'public','draft','pending')
+         RETURNING *`,
+        [
+          req.account.id,
+          title,
+          String(req.body?.description || "").slice(0, 2000) || null,
+          category,
+          assembled.filePath,
+          `/uploads/${assembled.storedName}`,
+          session.original_filename,
+          session.mime_type,
+          assembled.sizeBytes
+        ]
+      );
+
+      await pool.query(
+        `UPDATE upload_sessions SET status = 'completed', media_id = $2, updated_at = now()
+          WHERE id = $1`,
+        [session.id, media.rows[0].id]
+      );
+
+      await recordAudit(req, "upload_session.complete", "media", media.rows[0].id, {
+        title,
+        size_bytes: assembled.sizeBytes,
+        session_id: session.id
+      });
+
+      res.status(201).json({ status: "ok", media: normaliseMediaRow(media.rows[0]) });
+    } catch (error) {
+      // An incomplete or corrupt upload stays open so the admin can send the
+      // missing chunks and finish, rather than losing what already arrived.
+      await pool.query(
+        `UPDATE upload_sessions SET status = 'open', error = $2, updated_at = now() WHERE id = $1`,
+        [session.id, String(error.message).slice(0, 500)]
+      );
+      console.error("Upload assemble error:", error.message);
+      res.status(400).json({ status: "error", message: error.message });
+    }
+  }
+);
+
+/** Abandons a session and removes its chunks immediately. */
+app.delete("/api/admin/uploads/session/:id", adminWriteLimiter, ...requireAdmin, async (req, res) => {
+  try {
+    const session = await loadOwnSession(req, res, { allowStatuses: ["open", "assembling"] });
+    if (!session) return;
+
+    await pool.query(`UPDATE upload_sessions SET status = 'aborted', updated_at = now() WHERE id = $1`, [
+      session.id
+    ]);
+    await discardSessionFiles(UPLOAD_DIR, session.id);
+    await recordAudit(req, "upload_session.abort", "upload_session", session.id, {});
+
+    res.json({ status: "ok" });
+  } catch (error) {
+    console.error("Upload session abort error:", error);
+    res.status(500).json({ status: "error", message: "Could not cancel the upload" });
+  }
+});
 
 /* SASA_ASYNC_THUMBNAILS_V27 — retry a thumbnail an admin can see has failed.
  * Re-queues rather than generating inline, so the retry answers immediately
@@ -2441,4 +2777,8 @@ app.listen(PORT, "0.0.0.0", () => {
    * 'processing' by a pod that died are reclaimed by the same stale-claim
    * branch the worker always uses. */
   startThumbnailWorker(pool, UPLOAD_DIR);
+
+  /* SASA_RESUMABLE_UPLOADS_V28 — an abandoned session holds NAS space until
+   * something removes it: a 500MB video dropped at 90% costs 450MB. */
+  startUploadSweeper(pool, UPLOAD_DIR);
 });

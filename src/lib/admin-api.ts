@@ -232,6 +232,168 @@ export function uploadPublicMedia(
   });
 }
 
+/* SASA_RESUMABLE_UPLOADS_V28 — chunked upload for large videos.
+ *
+ * Cloudflare refuses a proxied body over 100MB outright, so a single-request
+ * upload could never reach the 500MB application limit through the real
+ * portal. Each chunk is well under the cap, and because the server records
+ * which chunks it holds, an interrupted upload continues instead of starting
+ * again. The simple single-request path above stays in use for small files.
+ */
+
+export type UploadSession = {
+  id: string;
+  status?: string;
+  /* These are byte counts bounded by the 500MB upload limit, normalised to
+   * JSON numbers at the API boundary (see backend/api-numbers.js). They are
+   * genuinely numbers on the wire, not numeric strings, so arithmetic and
+   * comparison here behave. */
+  chunkSize: number;
+  totalChunks: number;
+  totalBytes: number;
+  uploadedBytes?: number;
+  receivedChunks: number[];
+  mediaId?: string | null;
+};
+
+export async function createUploadSession(
+  token: string,
+  input: {
+    filename: string;
+    mimeType: string;
+    totalBytes: number;
+    title?: string;
+    category?: string;
+  },
+): Promise<UploadSession> {
+  const data = await adminFetch<{ session: UploadSession }>(token, "/admin/uploads/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return data.session;
+}
+
+export async function getUploadSession(token: string, id: string): Promise<UploadSession> {
+  const data = await adminFetch<{ session: UploadSession }>(token, `/admin/uploads/session/${id}`);
+  return data.session;
+}
+
+export function abortUploadSession(token: string, id: string) {
+  return adminFetch<{ status: string }>(token, `/admin/uploads/session/${id}`, {
+    method: "DELETE",
+  });
+}
+
+/** Sends one chunk as a raw body. Rejects on anything but a 2xx. */
+async function putChunk(token: string, id: string, index: number, blob: Blob) {
+  const response = await fetch(`${API_BASE_URL}/admin/uploads/session/${id}/chunk/${index}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/octet-stream",
+    },
+    body: blob,
+  });
+
+  if (!response.ok) {
+    let message = `Chunk ${index} failed (HTTP ${response.status}).`;
+    try {
+      const body = await response.json();
+      if (body?.message) message = body.message;
+    } catch {
+      /* Non-JSON error page; the status line is all we have. */
+    }
+    throw new Error(message);
+  }
+}
+
+/**
+ * Uploads a video in chunks, resuming an existing session when one is given.
+ *
+ * Each chunk is retried a few times before the whole upload gives up, because
+ * a single dropped connection should not cost the chunks already stored. The
+ * session id is handed back through onSession so the caller can resume later
+ * even after the page is closed.
+ */
+export async function uploadVideoResumable(
+  token: string,
+  file: File,
+  input: { title: string; description?: string; category?: string },
+  options: {
+    onProgress?: (percent: number) => void;
+    onSession?: (session: UploadSession) => void;
+    resumeSessionId?: string;
+    signal?: AbortSignal;
+    retriesPerChunk?: number;
+  } = {},
+): Promise<{ media: PublicMediaItem }> {
+  const { onProgress, onSession, signal, retriesPerChunk = 3 } = options;
+
+  const session = options.resumeSessionId
+    ? await getUploadSession(token, options.resumeSessionId)
+    : await createUploadSession(token, {
+        filename: file.name,
+        mimeType: file.type || "video/mp4",
+        totalBytes: file.size,
+        title: input.title,
+        category: input.category,
+      });
+
+  onSession?.(session);
+
+  // The server is the authority on what it already holds; a resume never
+  // trusts the browser's memory of how far it got.
+  const held = new Set(session.receivedChunks || []);
+  const report = () =>
+    onProgress?.(Math.min(99, Math.round((held.size / session.totalChunks) * 100)));
+
+  report();
+
+  for (let index = 0; index < session.totalChunks; index += 1) {
+    if (signal?.aborted) throw new Error("Upload cancelled.");
+    if (held.has(index)) continue;
+
+    const start = index * session.chunkSize;
+    const blob = file.slice(start, Math.min(start + session.chunkSize, file.size));
+
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < retriesPerChunk; attempt += 1) {
+      try {
+        await putChunk(token, session.id, index, blob);
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("Chunk failed.");
+        // Linear backoff; a flaky connection usually recovers within seconds.
+        await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+      }
+    }
+
+    if (lastError) throw lastError;
+
+    held.add(index);
+    report();
+  }
+
+  const data = await adminFetch<{ media: PublicMediaItem }>(
+    token,
+    `/admin/uploads/session/${session.id}/complete`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: input.title,
+        description: input.description,
+        category: input.category,
+      }),
+    },
+  );
+
+  onProgress?.(100);
+  return data;
+}
+
 export function updatePublicMedia(
   token: string,
   id: string,
