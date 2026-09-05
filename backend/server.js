@@ -8,6 +8,17 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { removeThumbnailFile } from "./thumbnails.js";
 import { startThumbnailWorker } from "./thumbnail-worker.js";
+import {
+  FRIEND_ID_PATTERN,
+  activeShareForChild,
+  childProfileForAccount,
+  findFriendship,
+  friendshipStatusFrom,
+  normaliseFriendId,
+  parentSideOfFriendship,
+  safeChildShape,
+  shareStatusFrom
+} from "./friends.js";
 import { normaliseMediaRow, normaliseMediaRows, toBoundedByteNumber } from "./api-numbers.js";
 import {
   MEDIA_TOKEN_TTL_SECONDS,
@@ -79,6 +90,7 @@ app.use("/uploads", async (req, res, next) => {
   const name = decodeURIComponent(String(req.path || "").replace(/^\//, ""));
 
   if (!name || name.includes("/") || name.includes("..")) {
+    res.set("Cache-Control", "no-store");
     return res.status(404).json({ status: "error", message: "Not found" });
   }
 
@@ -94,6 +106,10 @@ app.use("/uploads", async (req, res, next) => {
     );
 
     if (!rows[0]) {
+      /* no-store, so an edge cache never holds this denial. Without it a
+       * newly published item could be shadowed by a cached 404, and a purge
+       * would be needed to make it visible. */
+      res.set("Cache-Control", "no-store");
       return res.status(404).json({ status: "error", message: "Not found" });
     }
 
@@ -101,6 +117,7 @@ app.use("/uploads", async (req, res, next) => {
   } catch (error) {
     console.error("Uploads guard error:", error);
     // Fail closed: an error must not turn into open access.
+    res.set("Cache-Control", "no-store");
     return res.status(404).json({ status: "error", message: "Not found" });
   }
 });
@@ -2378,6 +2395,17 @@ async function resolveMediaAccess(req, media) {
     );
 
     if (rows[0]) return { allowed: true, scope: "assigned-child" };
+
+    /* SASA_FRIENDS_V32 — or because a friend shared it, both parents approved,
+     * and all of that is still true right now. activeShareForChild re-checks
+     * the share, the friendship behind it and the sender's own assignment on
+     * every call, so revoking any one of them cuts this off at the next
+     * request rather than at token expiry. */
+    const childProfile = await childProfileForAccount(pool, account);
+    if (childProfile) {
+      const share = await activeShareForChild(pool, media.id, childProfile.id);
+      if (share) return { allowed: true, scope: "shared-with-child" };
+    }
   }
 
   return { allowed: false };
@@ -3075,6 +3103,705 @@ app.get("/api/media/:mediaId", optionalSession, async (req, res) => {
     res.status(500).json({ status: "error", message: "Unable to load media" });
   }
 });
+
+/* SASA_FRIENDS_V32 — friendship and sharing endpoints.
+ *
+ * Every route enforces its own rules. The frontend hides what a child may not
+ * do, but nothing here trusts that: the acting child is taken from the
+ * session, never from a path parameter, and a parent may only ever act on
+ * their own child's connections.
+ */
+
+/** Discovery and requests are the abuse-prone surfaces; both are throttled. */
+const friendLookupLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 30,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many lookups. Try again in a few minutes." }
+});
+
+const friendActionLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 40,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many requests. Try again in a few minutes." }
+});
+
+/** Identical answer for "does not exist" and "not yours". */
+function notFound(res) {
+  return res.status(404).json({ status: "error", message: "Not found" });
+}
+
+/** The signed-in child, or a 403 for anyone else. */
+async function requireChild(req, res) {
+  const profile = await childProfileForAccount(pool, req.account);
+  if (!profile) {
+    res.status(403).json({ status: "error", message: "Child session required" });
+    return null;
+  }
+  return profile;
+}
+
+/* ── The child's own Friend ID ─────────────────────────────────────────── */
+app.get("/api/friends/me", ...requireSession, async (req, res) => {
+  try {
+    const profile = await requireChild(req, res);
+    if (!profile) return;
+
+    res.set("Cache-Control", "private, no-store");
+    res.json({
+      status: "ok",
+      friend_id: profile.friend_id,
+      display_name: profile.display_name
+    });
+  } catch (error) {
+    console.error("Friend id error:", error);
+    res.status(500).json({ status: "error", message: "Unable to load your Friend ID" });
+  }
+});
+
+/* ── Exact-match lookup ────────────────────────────────────────────────── */
+app.post("/api/friends/lookup", friendLookupLimiter, ...requireSession, async (req, res) => {
+  try {
+    const me = await requireChild(req, res);
+    if (!me) return;
+
+    const friendId = normaliseFriendId(req.body?.friendId);
+
+    // Shape is checked before the database is touched, so a malformed value
+    // costs nothing and cannot be used to probe.
+    if (!FRIEND_ID_PATTERN.test(friendId)) return notFound(res);
+
+    // Exact match only. There is deliberately no LIKE, no prefix search and
+    // no listing anywhere in this file.
+    const { rows } = await pool.query(
+      `SELECT id, display_name, avatar_url, friend_id, created_by_parent
+         FROM profiles WHERE friend_id = $1 AND is_parent = false LIMIT 1`,
+      [friendId]
+    );
+
+    const other = rows[0];
+
+    // Finding yourself is answered exactly like finding nobody, so the
+    // response never confirms that an ID exists.
+    if (!other || other.id === me.id) return notFound(res);
+
+    const existing = await findFriendship(pool, me.id, other.id);
+
+    // A blocked pair looks like nothing at all.
+    if (existing && existing.status === "blocked") return notFound(res);
+
+    res.set("Cache-Control", "private, no-store");
+    res.json({
+      status: "ok",
+      child: safeChildShape(other),
+      friendship: existing
+        ? { id: existing.id, status: friendshipStatusFrom(existing) }
+        : null
+    });
+  } catch (error) {
+    console.error("Friend lookup error:", error);
+    res.status(500).json({ status: "error", message: "Lookup failed" });
+  }
+});
+
+/* ── Send a request ────────────────────────────────────────────────────── */
+app.post("/api/friends/request", friendActionLimiter, ...requireSession, async (req, res) => {
+  try {
+    const me = await requireChild(req, res);
+    if (!me) return;
+
+    const friendId = normaliseFriendId(req.body?.friendId);
+    if (!FRIEND_ID_PATTERN.test(friendId)) return notFound(res);
+
+    const { rows } = await pool.query(
+      `SELECT id, created_by_parent FROM profiles
+        WHERE friend_id = $1 AND is_parent = false LIMIT 1`,
+      [friendId]
+    );
+
+    const other = rows[0];
+    if (!other || other.id === me.id) return notFound(res);
+
+    const existing = await findFriendship(pool, me.id, other.id);
+
+    if (existing) {
+      if (existing.status === "blocked") return notFound(res);
+      if (existing.status === "active" || existing.status === "pending") {
+        return res.status(409).json({
+          status: "error",
+          message: "There is already a request or friendship with this Friend ID."
+        });
+      }
+
+      // A previously rejected or removed pair may try again: the row is reused
+      // so the unique pair index still holds, and both approvals reset.
+      const reopened = await pool.query(
+        `UPDATE friendships
+            SET status = 'pending',
+                requester_profile_id = $2,
+                addressee_profile_id = $3,
+                requester_parent_approved_at = NULL,
+                addressee_parent_approved_at = NULL,
+                rejected_at = NULL, removed_at = NULL, decided_by = NULL,
+                updated_at = now()
+          WHERE id = $1
+      RETURNING *`,
+        [existing.id, me.id, other.id]
+      );
+
+      await recordAudit(req, "friendship.request", "friendship", existing.id, { reopened: true });
+      return res.status(201).json({
+        status: "ok",
+        friendship: { id: reopened.rows[0].id, status: "pending" }
+      });
+    }
+
+    const created = await pool.query(
+      `INSERT INTO friendships (requester_profile_id, addressee_profile_id)
+       VALUES ($1, $2) RETURNING *`,
+      [me.id, other.id]
+    );
+
+    await recordAudit(req, "friendship.request", "friendship", created.rows[0].id, {});
+    res.status(201).json({
+      status: "ok",
+      friendship: { id: created.rows[0].id, status: "pending" }
+    });
+  } catch (error) {
+    console.error("Friend request error:", error);
+    res.status(500).json({ status: "error", message: "Could not send the request" });
+  }
+});
+
+/* ── The child's own friends list ──────────────────────────────────────── */
+app.get("/api/friends", ...requireSession, async (req, res) => {
+  try {
+    const me = await requireChild(req, res);
+    if (!me) return;
+
+    const { rows } = await pool.query(
+      `SELECT f.*,
+              p.id AS other_id, p.display_name, p.avatar_url, p.friend_id
+         FROM friendships f
+         JOIN profiles p
+           ON p.id = CASE WHEN f.requester_profile_id = $1
+                          THEN f.addressee_profile_id ELSE f.requester_profile_id END
+        WHERE (f.requester_profile_id = $1 OR f.addressee_profile_id = $1)
+          AND f.status <> 'removed'
+        ORDER BY f.created_at DESC`,
+      [me.id]
+    );
+
+    res.set("Cache-Control", "private, no-store");
+    res.json({
+      status: "ok",
+      friends: rows.map((r) => ({
+        id: r.id,
+        status: friendshipStatusFrom(r),
+        direction: r.requester_profile_id === me.id ? "outgoing" : "incoming",
+        child: safeChildShape({
+          id: r.other_id,
+          display_name: r.display_name,
+          avatar_url: r.avatar_url,
+          friend_id: r.friend_id
+        })
+      }))
+    });
+  } catch (error) {
+    console.error("Friends list error:", error);
+    res.status(500).json({ status: "error", message: "Unable to load friends" });
+  }
+});
+
+/** A child may withdraw their own request while it is still pending. */
+app.delete("/api/friends/:id", friendActionLimiter, ...requireSession, async (req, res) => {
+  try {
+    const me = await requireChild(req, res);
+    if (!me) return;
+
+    const { rows } = await pool.query(`SELECT * FROM friendships WHERE id = $1 LIMIT 1`, [
+      req.params.id
+    ]);
+    const f = rows[0];
+
+    if (!f || (f.requester_profile_id !== me.id && f.addressee_profile_id !== me.id)) {
+      return notFound(res);
+    }
+
+    // Only a parent may end an established friendship; a child may only cancel
+    // something that has not been approved yet.
+    if (friendshipStatusFrom(f) !== "pending") {
+      return res.status(403).json({
+        status: "error",
+        message: "Ask a grown-up to change this friendship."
+      });
+    }
+
+    await pool.query(
+      `UPDATE friendships SET status = 'removed', removed_at = now(), updated_at = now()
+        WHERE id = $1`,
+      [f.id]
+    );
+    await recordAudit(req, "friendship.cancelled_by_child", "friendship", f.id, {});
+    res.json({ status: "ok" });
+  } catch (error) {
+    console.error("Friend cancel error:", error);
+    res.status(500).json({ status: "error", message: "Could not cancel" });
+  }
+});
+
+/* ── Parent: pending work across their children ────────────────────────── */
+app.get("/api/parent/friends-overview", ...requireSession, async (req, res) => {
+  try {
+    if (req.account.role !== "parent" && req.account.role !== "admin") {
+      return res.status(403).json({ status: "error", message: "Parent session required" });
+    }
+
+    const isAdmin = req.account.role === "admin";
+
+    const friendships = await pool.query(
+      `SELECT f.*,
+              rp.display_name AS requester_name, rp.avatar_url AS requester_avatar,
+              rp.friend_id AS requester_friend_id, rp.created_by_parent AS requester_parent,
+              ap.display_name AS addressee_name, ap.avatar_url AS addressee_avatar,
+              ap.friend_id AS addressee_friend_id, ap.created_by_parent AS addressee_parent
+         FROM friendships f
+         JOIN profiles rp ON rp.id = f.requester_profile_id
+         JOIN profiles ap ON ap.id = f.addressee_profile_id
+        WHERE ($2 OR rp.created_by_parent = $1 OR ap.created_by_parent = $1)
+          AND f.status <> 'removed'
+        ORDER BY f.created_at DESC`,
+      [req.account.id, isAdmin]
+    );
+
+    const shares = await pool.query(
+      `SELECT s.*, m.title, m.media_type,
+              sp.display_name AS sender_name, sp.created_by_parent AS sender_parent,
+              rp.display_name AS recipient_name, rp.created_by_parent AS recipient_parent
+         FROM media_shares s
+         JOIN media_files m ON m.id = s.media_id
+         JOIN profiles sp ON sp.id = s.sender_profile_id
+         JOIN profiles rp ON rp.id = s.recipient_profile_id
+        WHERE ($2 OR sp.created_by_parent = $1 OR rp.created_by_parent = $1)
+          AND s.status <> 'revoked'
+        ORDER BY s.created_at DESC`,
+      [req.account.id, isAdmin]
+    );
+
+    /* "Mine to answer" is computed here rather than in the client, so the
+     * badge cannot disagree with what the approve endpoints will accept. */
+    const mapFriendship = (r) => {
+      const mySide =
+        r.requester_parent === req.account.id
+          ? "requester"
+          : r.addressee_parent === req.account.id
+            ? "addressee"
+            : null;
+      const myApproval =
+        mySide === "requester"
+          ? r.requester_parent_approved_at
+          : mySide === "addressee"
+            ? r.addressee_parent_approved_at
+            : null;
+      const status = friendshipStatusFrom(r);
+
+      return {
+        id: r.id,
+        status,
+        my_child: mySide === "requester" ? r.requester_name : r.addressee_name,
+        other_child: mySide === "requester" ? r.addressee_name : r.requester_name,
+        other_friend_id: mySide === "requester" ? r.addressee_friend_id : r.requester_friend_id,
+        direction: mySide === "requester" ? "outgoing" : "incoming",
+        awaiting_me: status === "pending" && mySide !== null && !myApproval,
+        awaiting_other:
+          status === "pending" &&
+          Boolean(myApproval) &&
+          !(mySide === "requester" ? r.addressee_parent_approved_at : r.requester_parent_approved_at)
+      };
+    };
+
+    const mapShare = (r) => {
+      const mySide =
+        r.sender_parent === req.account.id
+          ? "sender"
+          : r.recipient_parent === req.account.id
+            ? "recipient"
+            : null;
+      const myApproval =
+        mySide === "sender"
+          ? r.sender_parent_approved_at
+          : mySide === "recipient"
+            ? r.recipient_parent_approved_at
+            : null;
+      const status = shareStatusFrom(r);
+
+      return {
+        id: r.id,
+        status,
+        title: r.title,
+        media_type: r.media_type,
+        from_child: r.sender_name,
+        to_child: r.recipient_name,
+        direction: mySide === "sender" ? "outgoing" : "incoming",
+        awaiting_me: status === "pending" && mySide !== null && !myApproval
+      };
+    };
+
+    const f = friendships.rows.map(mapFriendship);
+    const s = shares.rows.map(mapShare);
+
+    res.set("Cache-Control", "private, no-store");
+    res.json({
+      status: "ok",
+      friendships: f,
+      shares: s,
+      pending_count: f.filter((x) => x.awaiting_me).length + s.filter((x) => x.awaiting_me).length
+    });
+  } catch (error) {
+    console.error("Friends overview error:", error);
+    res.status(500).json({ status: "error", message: "Unable to load friends and sharing" });
+  }
+});
+
+/* ── Parent decisions on a friendship ──────────────────────────────────── */
+app.post(
+  "/api/parent/friendships/:id/:action",
+  friendActionLimiter,
+  ...requireSession,
+  async (req, res) => {
+    try {
+      if (req.account.role !== "parent" && req.account.role !== "admin") {
+        return res.status(403).json({ status: "error", message: "Parent session required" });
+      }
+
+      const action = String(req.params.action);
+      if (!["approve", "reject", "block", "remove"].includes(action)) return notFound(res);
+
+      const { rows } = await pool.query(`SELECT * FROM friendships WHERE id = $1 LIMIT 1`, [
+        req.params.id
+      ]);
+      const f = rows[0];
+      if (!f) return notFound(res);
+
+      // A parent may only act on a friendship one of their own children is in.
+      const side = await parentSideOfFriendship(pool, req.account, f);
+      if (!side) return notFound(res);
+
+      let updated;
+
+      if (action === "approve") {
+        // Writes only this parent's own column. Approving for the other family
+        // is not expressible.
+        const column =
+          side === "addressee" ? "addressee_parent_approved_at" : "requester_parent_approved_at";
+
+        if (side === "admin") {
+          return res.status(403).json({
+            status: "error",
+            message: "An administrator cannot approve on a family's behalf."
+          });
+        }
+
+        updated = await pool.query(
+          `UPDATE friendships
+              SET ${column} = now(), decided_by = $2, updated_at = now(),
+                  status = CASE
+                    WHEN status IN ('blocked','rejected') THEN status
+                    ELSE 'pending' END
+            WHERE id = $1
+        RETURNING *`,
+          [f.id, req.account.id]
+        );
+
+        // Promote to active only when both columns are now set.
+        const row = updated.rows[0];
+        const nextStatus = friendshipStatusFrom(row);
+        if (nextStatus !== row.status) {
+          updated = await pool.query(
+            `UPDATE friendships SET status = $2, updated_at = now() WHERE id = $1 RETURNING *`,
+            [f.id, nextStatus]
+          );
+        }
+      } else {
+        const map = {
+          reject: ["rejected", "rejected_at"],
+          block: ["blocked", "blocked_at"],
+          remove: ["removed", "removed_at"]
+        };
+        const [status, stamp] = map[action];
+
+        updated = await pool.query(
+          `UPDATE friendships
+              SET status = $2, ${stamp} = now(), decided_by = $3, updated_at = now()
+            WHERE id = $1
+        RETURNING *`,
+          [f.id, status, req.account.id]
+        );
+
+        /* Ending a friendship must end what it carried. Leaving shares active
+         * would let media outlive the relationship that justified it. */
+        await pool.query(
+          `UPDATE media_shares
+              SET status = 'revoked', revoked_at = now(), decided_by = $2, updated_at = now()
+            WHERE friendship_id = $1 AND status <> 'revoked'`,
+          [f.id, req.account.id]
+        );
+      }
+
+      await recordAudit(req, `friendship.${action}`, "friendship", f.id, {
+        side,
+        resulting_status: friendshipStatusFrom(updated.rows[0])
+      });
+
+      res.json({
+        status: "ok",
+        friendship: { id: f.id, status: friendshipStatusFrom(updated.rows[0]) }
+      });
+    } catch (error) {
+      console.error("Friendship decision error:", error);
+      res.status(500).json({ status: "error", message: "Could not update the friendship" });
+    }
+  }
+);
+
+/* ── Child shares one item with one approved friend ────────────────────── */
+app.post("/api/shares", friendActionLimiter, ...requireSession, async (req, res) => {
+  try {
+    const me = await requireChild(req, res);
+    if (!me) return;
+
+    const mediaId = String(req.body?.mediaId || "");
+    const friendshipId = String(req.body?.friendshipId || "");
+
+    if (!/^[0-9a-fA-F-]{36}$/.test(mediaId) || !/^[0-9a-fA-F-]{36}$/.test(friendshipId)) {
+      return notFound(res);
+    }
+
+    /* The child may only share something already assigned to them. This is the
+     * check that stops a child sharing another family's media by pasting an
+     * id: assignment is verified against their own profile. */
+    const assigned = await pool.query(
+      `SELECT m.id, m.title, m.visibility
+         FROM media_files m
+         JOIN media_child_access mca ON mca.media_id = m.id
+        WHERE m.id = $1 AND mca.child_profile_id = $2
+        LIMIT 1`,
+      [mediaId, me.id]
+    );
+
+    const media = assigned.rows[0];
+    if (!media) return notFound(res);
+
+    const fr = await pool.query(`SELECT * FROM friendships WHERE id = $1 LIMIT 1`, [friendshipId]);
+    const friendship = fr.rows[0];
+
+    if (
+      !friendship ||
+      (friendship.requester_profile_id !== me.id && friendship.addressee_profile_id !== me.id)
+    ) {
+      return notFound(res);
+    }
+
+    // Only an active friendship may carry a share.
+    if (friendshipStatusFrom(friendship) !== "active") {
+      return res.status(403).json({
+        status: "error",
+        message: "You can only share with an approved friend."
+      });
+    }
+
+    const recipientId =
+      friendship.requester_profile_id === me.id
+        ? friendship.addressee_profile_id
+        : friendship.requester_profile_id;
+
+    const existing = await pool.query(
+      `SELECT id, status FROM media_shares WHERE media_id = $1 AND recipient_profile_id = $2 LIMIT 1`,
+      [mediaId, recipientId]
+    );
+
+    if (existing.rows[0] && ["pending", "active"].includes(existing.rows[0].status)) {
+      return res.status(409).json({
+        status: "error",
+        message: "You have already shared this with that friend."
+      });
+    }
+
+    const upserted = await pool.query(
+      `INSERT INTO media_shares
+         (media_id, friendship_id, sender_profile_id, recipient_profile_id)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (media_id, recipient_profile_id) DO UPDATE
+         SET status = 'pending',
+             friendship_id = EXCLUDED.friendship_id,
+             sender_profile_id = EXCLUDED.sender_profile_id,
+             sender_parent_approved_at = NULL,
+             recipient_parent_approved_at = NULL,
+             rejected_at = NULL, revoked_at = NULL, decided_by = NULL,
+             updated_at = now()
+    RETURNING *`,
+      [mediaId, friendshipId, me.id, recipientId]
+    );
+
+    await recordAudit(req, "share.requested", "media_share", upserted.rows[0].id, {
+      media_title: media.title
+    });
+
+    // Nothing is visible to the recipient yet; both parents must approve.
+    res.status(201).json({ status: "ok", share: { id: upserted.rows[0].id, status: "pending" } });
+  } catch (error) {
+    console.error("Share create error:", error);
+    res.status(500).json({ status: "error", message: "Could not share" });
+  }
+});
+
+/* ── Parent decisions on a share ───────────────────────────────────────── */
+app.post(
+  "/api/parent/shares/:id/:action",
+  friendActionLimiter,
+  ...requireSession,
+  async (req, res) => {
+    try {
+      if (req.account.role !== "parent" && req.account.role !== "admin") {
+        return res.status(403).json({ status: "error", message: "Parent session required" });
+      }
+
+      const action = String(req.params.action);
+      if (!["approve", "reject", "revoke"].includes(action)) return notFound(res);
+
+      const { rows } = await pool.query(
+        `SELECT s.*, sp.created_by_parent AS sender_parent, rp.created_by_parent AS recipient_parent
+           FROM media_shares s
+           JOIN profiles sp ON sp.id = s.sender_profile_id
+           JOIN profiles rp ON rp.id = s.recipient_profile_id
+          WHERE s.id = $1 LIMIT 1`,
+        [req.params.id]
+      );
+
+      const share = rows[0];
+      if (!share) return notFound(res);
+
+      const isSenderParent = share.sender_parent === req.account.id;
+      const isRecipientParent = share.recipient_parent === req.account.id;
+
+      if (!isSenderParent && !isRecipientParent && req.account.role !== "admin") {
+        return notFound(res);
+      }
+
+      let updated;
+
+      if (action === "approve") {
+        if (req.account.role === "admin" && !isSenderParent && !isRecipientParent) {
+          return res.status(403).json({
+            status: "error",
+            message: "An administrator cannot approve on a family's behalf."
+          });
+        }
+
+        // Each parent signs only their own side: the owning family agrees to
+        // it leaving, the receiving family agrees to it arriving.
+        const column = isSenderParent
+          ? "sender_parent_approved_at"
+          : "recipient_parent_approved_at";
+
+        updated = await pool.query(
+          `UPDATE media_shares SET ${column} = now(), decided_by = $2, updated_at = now()
+            WHERE id = $1 AND status = 'pending' RETURNING *`,
+          [share.id, req.account.id]
+        );
+
+        if (!updated.rows[0]) {
+          return res.status(409).json({ status: "error", message: "This share is not pending." });
+        }
+
+        const next = shareStatusFrom(updated.rows[0]);
+        if (next !== updated.rows[0].status) {
+          updated = await pool.query(
+            `UPDATE media_shares SET status = $2, updated_at = now() WHERE id = $1 RETURNING *`,
+            [share.id, next]
+          );
+        }
+      } else {
+        const [status, stamp] =
+          action === "reject" ? ["rejected", "rejected_at"] : ["revoked", "revoked_at"];
+
+        updated = await pool.query(
+          `UPDATE media_shares
+              SET status = $2, ${stamp} = now(), decided_by = $3, updated_at = now()
+            WHERE id = $1 RETURNING *`,
+          [share.id, status, req.account.id]
+        );
+      }
+
+      await recordAudit(req, `share.${action}`, "media_share", share.id, {
+        resulting_status: shareStatusFrom(updated.rows[0])
+      });
+
+      res.json({ status: "ok", share: { id: share.id, status: shareStatusFrom(updated.rows[0]) } });
+    } catch (error) {
+      console.error("Share decision error:", error);
+      res.status(500).json({ status: "error", message: "Could not update the share" });
+    }
+  }
+);
+
+/* ── What has been shared with this child ──────────────────────────────── */
+app.get("/api/shares/received", ...requireSession, async (req, res) => {
+  try {
+    const me = await requireChild(req, res);
+    if (!me) return;
+
+    /* Only fully approved shares on still-active friendships, and only while
+     * the sender still holds the item. The same conditions the media route
+     * re-checks, so a listing can never show something that would then refuse
+     * to play. */
+    const { rows } = await pool.query(
+      `SELECT m.id, m.media_type, m.title, m.description, m.category,
+              m.public_url, m.thumbnail_url, m.file_path, m.mime_type, m.size_bytes,
+              m.visibility, m.publication_status, m.created_at,
+              sp.display_name AS shared_by_name, sp.avatar_url AS shared_by_avatar,
+              sp.friend_id AS shared_by_friend_id, sp.id AS shared_by_id,
+              s.id AS share_id
+         FROM media_shares s
+         JOIN friendships f ON f.id = s.friendship_id
+         JOIN media_files m ON m.id = s.media_id
+         JOIN profiles sp ON sp.id = s.sender_profile_id
+        WHERE s.recipient_profile_id = $1
+          AND s.status = 'active'
+          AND s.sender_parent_approved_at IS NOT NULL
+          AND s.recipient_parent_approved_at IS NOT NULL
+          AND f.status = 'active'
+          AND EXISTS (
+            SELECT 1 FROM media_child_access mca
+             WHERE mca.media_id = s.media_id AND mca.child_profile_id = s.sender_profile_id
+          )
+        ORDER BY s.updated_at DESC`,
+      [me.id]
+    );
+
+    res.set("Cache-Control", "private, no-store");
+    res.json({
+      status: "ok",
+      media: rows.map((row) => ({
+        ...withAccessUrls(req.account, row),
+        share_id: row.share_id,
+        shared_by: safeChildShape({
+          id: row.shared_by_id,
+          display_name: row.shared_by_name,
+          avatar_url: row.shared_by_avatar,
+          friend_id: row.shared_by_friend_id
+        })
+      }))
+    });
+  } catch (error) {
+    console.error("Shared-with-me error:", error);
+    res.status(500).json({ status: "error", message: "Unable to load shared media" });
+  }
+});
+
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`SaraTube backend API running on port ${PORT}`);
