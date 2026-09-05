@@ -33,6 +33,9 @@ type Props = {
   railMode?: "inline" | "drawer";
 
   profileLabel: string;
+  /** The signed-in child's name. Replaces "SARA" in the wordmark so the app
+   *  carries the name of whoever is watching. Falls back to "SARA". */
+  brandName?: string;
   profileEmoji?: string;
   profileImage?: string;
 
@@ -67,6 +70,7 @@ export function AppShell({
   backLabel = "Back",
   railMode = "inline",
   profileLabel,
+  brandName,
   profileEmoji,
   profileImage,
   parentSignedIn = false,
@@ -158,11 +162,12 @@ export function AppShell({
             type="button"
             className="sasa-brand"
             onClick={() => onNavigate("home")}
-            aria-label="SARA home"
+            aria-label={`${brandName || "SARA"} home`}
           >
             <BrandMark />
             <span className="sasa-brand-word">
-              SARA<sup>kids</sup>
+              {brandName || "SARA"}
+              <sup>kids</sup>
             </span>
           </button>
         </div>

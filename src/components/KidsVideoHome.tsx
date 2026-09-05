@@ -409,6 +409,13 @@ export default function KidsVideoHome({
     }
   }, [profileId, profileImage, profileImageStorageKey]);
 
+  /* The browser tab carries the same name as the wordmark, so a parent with
+   * several tabs open can tell whose session is whose. */
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.title = activeName ? `${activeName}kids` : "SARAkids";
+  }, [activeName]);
+
   useEffect(() => {
     if (profileName) {
       setActiveName(profileName);
@@ -665,15 +672,21 @@ export default function KidsVideoHome({
         onChangeProfile();
       },
     },
-    {
-      id: "parent",
-      label: "Parent controls",
-      icon: ShieldCheck,
-      onSelect: () => {
-        playPopSound();
-        onOpenParentalControls();
-      },
-    },
+    // Parent controls belong to a signed-in parent. A guest has no account to
+    // hold them, so offering the entry would lead to a gate they cannot pass.
+    ...(isGuestAccount
+      ? []
+      : [
+          {
+            id: "parent",
+            label: "Parent controls",
+            icon: ShieldCheck,
+            onSelect: () => {
+              playPopSound();
+              onOpenParentalControls();
+            },
+          },
+        ]),
   ];
 
   if (isGuestAccount) {
@@ -998,17 +1011,19 @@ export default function KidsVideoHome({
           Switch profile
         </button>
 
-        <button
-          type="button"
-          className="sasa-btn"
-          onClick={() => {
-            playPopSound();
-            onOpenParentalControls();
-          }}
-        >
-          <ShieldCheck size={18} />
-          Parent controls
-        </button>
+        {!isGuestAccount && (
+          <button
+            type="button"
+            className="sasa-btn"
+            onClick={() => {
+              playPopSound();
+              onOpenParentalControls();
+            }}
+          >
+            <ShieldCheck size={18} />
+            Parent controls
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1119,12 +1134,17 @@ export default function KidsVideoHome({
   return (
     <AppShell
       tone={isNightTheme(currentTheme) ? "dark" : "light"}
+      brandName={activeName}
       activeSection={currentTab}
       onNavigate={(next) => goToSection(next)}
-      onOpenParentControls={() => {
-        playPopSound();
-        onOpenParentalControls();
-      }}
+      onOpenParentControls={
+        isGuestAccount
+          ? undefined
+          : () => {
+              playPopSound();
+              onOpenParentalControls();
+            }
+      }
       searchValue={searchText}
       onSearchChange={setSearchText}
       onSearchSubmit={() => {
@@ -1201,26 +1221,14 @@ export default function KidsVideoHome({
       )}
 
       {isGuestAccount && showFreeModal && (
-        <FreeAccountDialog
-          onClose={() => setShowFreeModal(false)}
-          onOpenParentControls={() => {
-            setShowFreeModal(false);
-            onOpenParentalControls();
-          }}
-        />
+        <FreeAccountDialog onClose={() => setShowFreeModal(false)} />
       )}
     </AppShell>
   );
 }
 
 /** Explains what the free guest experience includes. */
-function FreeAccountDialog({
-  onClose,
-  onOpenParentControls,
-}: {
-  onClose: () => void;
-  onOpenParentControls: () => void;
-}) {
+function FreeAccountDialog({ onClose }: { onClose: () => void }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   useDismiss(true, cardRef, onClose);
@@ -1289,7 +1297,7 @@ function FreeAccountDialog({
             {[
               "Built-in videos, songs and games",
               "Drawing studio with saved artwork",
-              "Parent controls with a grown-up gate",
+              "Sign in to add parent controls, bedtime and screen limits",
             ].map((line) => (
               <li key={line} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                 <Check
@@ -1302,11 +1310,7 @@ function FreeAccountDialog({
           </ul>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button type="button" className="sasa-btn is-primary" onClick={onOpenParentControls}>
-              <ShieldCheck size={18} />
-              Parent controls
-            </button>
-            <button type="button" className="sasa-btn" onClick={onClose}>
+            <button type="button" className="sasa-btn is-primary" onClick={onClose}>
               Close
             </button>
           </div>

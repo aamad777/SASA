@@ -1,5 +1,5 @@
 import { useState, type MouseEvent } from "react";
-import { BookOpen, Camera, LogIn, Plus, Settings, Video } from "lucide-react";
+import { BookOpen, Camera, LogIn, Plus, Video } from "lucide-react";
 import { motion } from "motion/react";
 import confetti from "canvas-confetti";
 import { playPopSound, playSuccessSound } from "../lib/sound";
@@ -19,7 +19,6 @@ type CustomProfile = {
 type ProfileSelectionProps = {
   customProfiles: CustomProfile[];
   onSelectProfile: (name: string, emoji: string, color: string, id: number, image?: string) => void;
-  onOpenParentalControls: () => void;
   onAddProfile: () => void;
   /** Called just before navigating to the Parent Login screen — lets the
    * caller clear guest/kid session state so it doesn't linger once a parent
@@ -64,7 +63,6 @@ const GUEST_LINKS = [
 export default function ProfileSelection({
   customProfiles,
   onSelectProfile,
-  onOpenParentalControls,
   onAddProfile,
   onLogin,
 }: ProfileSelectionProps) {
@@ -123,19 +121,6 @@ export default function ProfileSelection({
             <LogIn size={18} />
             Parent login
           </a>
-
-          <button
-            type="button"
-            className="sasa-btn"
-            onClick={() => {
-              if (selectingId !== null) return;
-              playPopSound();
-              onOpenParentalControls();
-            }}
-          >
-            <Settings size={18} />
-            Parent controls
-          </button>
         </div>
       </header>
 
