@@ -2369,3 +2369,10 @@
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+
+/* SASA_ADMIN_OVERRIDE_V33 — the override prompt is a decision, not a form
+   field: it reads as a warning so it is never dismissed on autopilot. */
+.sasa-override-prompt {
+  border-color: #f0c36d;
+  background: #fffbeb;
+}
