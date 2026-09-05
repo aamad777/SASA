@@ -117,10 +117,11 @@ export async function loginParent(email: string, password: string): Promise<Pare
 }
 
 export async function getCurrentUser(token: string): Promise<{
-  sub: number;
+  id: string;
+  email: string;
   role: string;
-  name: string;
-}> {
+  created_at: string;
+} | null> {
   const response = await fetch(`${API_BASE_URL}/auth/me`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -141,7 +142,14 @@ export async function getCurrentUser(token: string): Promise<{
     throw new Error("Saved login is no longer valid.");
   }
 
-  return parseJsonOrExplain(response, "Checking your login");
+  /* SASA_ADMIN_LINK_FIX — /api/auth/me answers `{ status, user }`, but this
+   * returned the whole envelope while claiming to return `{ sub, role, name }`.
+   * The one caller reads `account.role`, which was therefore always undefined,
+   * so `isAdmin` never became true and the admin entry never rendered. The
+   * mismatch was invisible until admins could reach the shell that draws it.
+   * Unwrap `user` here so the value matches the (now accurate) type. */
+  const body = await parseJsonOrExplain(response, "Checking your login");
+  return body?.user ?? null;
 }
 
 export type DatabaseChild = {

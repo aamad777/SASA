@@ -18,7 +18,6 @@ import ParentDashboard, {
   type ParentControlSettings,
 } from "@/components/ParentDashboard";
 import ProfileSelection from "@/components/ProfileSelection";
-import AdminDashboard from "@/components/AdminDashboard";
 import FreeAccountBanner from "@/components/FreeAccountBanner";
 import { recordActivity, removeActivityForProfile } from "@/lib/activity";
 import {
@@ -86,20 +85,6 @@ function assignedMediaId(rawId: string | number): number {
   }
 
   return ASSIGNED_ID_BASE + (hash % 1_000_000_000);
-}
-
-function getAccountRoleFromToken(token: string | null): "parent" | "admin" {
-  if (!token) return "parent";
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return "parent";
-    const normalizedPayload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const paddedPayload = normalizedPayload + "=".repeat((4 - (normalizedPayload.length % 4)) % 4);
-    const payload = JSON.parse(window.atob(paddedPayload));
-    return payload.role === "admin" ? "admin" : "parent";
-  } catch {
-    return "parent";
-  }
 }
 
 function getStorageItem(key: string): string | null {
@@ -665,24 +650,6 @@ function SasaApp() {
           setCustomProfiles(updated);
           localStorage.setItem("sasa-custom-profiles", JSON.stringify(updated));
           setShowAddProfile(false);
-        }}
-      />
-    );
-  }
-
-  if (parentToken && getAccountRoleFromToken(parentToken) === "admin") {
-    return (
-      <AdminDashboard
-        token={parentToken}
-        adminName={parentName}
-        onLogout={() => {
-          localStorage.removeItem("sasa-parent-token");
-          localStorage.removeItem("sasa-parent-name");
-          localStorage.removeItem("sasa-parent-role");
-          setParentToken(null);
-          setParentName("Parent");
-          setDatabaseChildren([]);
-          setProfile(null);
         }}
       />
     );
