@@ -3519,6 +3519,13 @@ app.post(
           // The override stands in for ONE missing side. With neither parent
           // approved there is nothing to stand in for, and an administrator
           // acting alone must never be able to connect two children.
+          if (f.admin_override_at) {
+            return res.status(409).json({
+              status: "error",
+              message: "This has already been overridden by an administrator."
+            });
+          }
+
           const approvals =
             (f.requester_parent_approved_at ? 1 : 0) + (f.addressee_parent_approved_at ? 1 : 0);
 
@@ -3753,6 +3760,13 @@ app.post(
             return res.status(400).json({
               status: "error",
               message: "An override needs a short reason."
+            });
+          }
+
+          if (share.admin_override_at) {
+            return res.status(409).json({
+              status: "error",
+              message: "This has already been overridden by an administrator."
             });
           }
 
