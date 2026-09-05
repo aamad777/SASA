@@ -37,6 +37,15 @@ export type SharedMediaItem = {
   shared_by: SafeChild;
 };
 
+/** Recorded when an administrator unblocked an approval instead of a parent. */
+export type AdminOverride = {
+  at: string;
+  reason: string | null;
+  /** True when THIS parent did approve their own side; the override covered
+   *  the other family. False means the override covered this parent's side. */
+  approved_by_me: boolean;
+};
+
 export type ParentFriendship = {
   id: string;
   status: FriendshipStatus;
@@ -46,6 +55,7 @@ export type ParentFriendship = {
   direction: "incoming" | "outgoing";
   awaiting_me: boolean;
   awaiting_other: boolean;
+  admin_override: AdminOverride | null;
 };
 
 export type ParentShare = {
@@ -57,6 +67,7 @@ export type ParentShare = {
   to_child: string;
   direction: "incoming" | "outgoing";
   awaiting_me: boolean;
+  admin_override: AdminOverride | null;
 };
 
 async function call<T>(token: string, path: string, init?: RequestInit): Promise<T> {
@@ -131,16 +142,24 @@ export function decideFriendship(
   token: string,
   id: string,
   action: "approve" | "reject" | "block" | "remove",
+  /** Required only for an administrator override; a parent never sends one. */
+  reason?: string,
 ) {
   return call<{ friendship: { id: string; status: FriendshipStatus } }>(
     token,
     `/parent/friendships/${id}/${action}`,
-    { method: "POST" },
+    { method: "POST", body: reason ? JSON.stringify({ reason }) : undefined },
   );
 }
 
-export function decideShare(token: string, id: string, action: "approve" | "reject" | "revoke") {
+export function decideShare(
+  token: string,
+  id: string,
+  action: "approve" | "reject" | "revoke",
+  reason?: string,
+) {
   return call<{ share: { id: string; status: string } }>(token, `/parent/shares/${id}/${action}`, {
     method: "POST",
+    body: reason ? JSON.stringify({ reason }) : undefined,
   });
 }

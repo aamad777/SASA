@@ -16,6 +16,21 @@ import {
   type ParentShare,
 } from "@/lib/friends-api";
 
+/* SASA_ADMIN_OVERRIDE_V33 — shown to both parents. The wording distinguishes
+ * "an administrator covered the OTHER family" from "an administrator approved
+ * on YOUR behalf", because only the second is something this parent did not
+ * personally agree to. */
+function OverrideNote({ override }: { override: NonNullable<ParentFriendship["admin_override"]> }) {
+  return (
+    <span className="sasa-override-note" role="note">
+      {override.approved_by_me
+        ? "Approved by an administrator for the other family"
+        : "Approved by an administrator, not by you"}
+      {override.reason ? ` — ${override.reason}` : ""}
+    </span>
+  );
+}
+
 export function useParentFriendsPending(token: string | null) {
   const [count, setCount] = useState(0);
 
@@ -182,6 +197,7 @@ export default function ParentFriendsPanel({ token }: { token: string }) {
                     {f.status}
                     {f.awaiting_other ? " · waiting for the other family" : ""}
                   </span>
+                  {f.admin_override && <OverrideNote override={f.admin_override} />}
                 </div>
                 <div className="sasa-pfriends-actions">
                   {f.status === "active" && (
@@ -224,6 +240,7 @@ export default function ParentFriendsPanel({ token }: { token: string }) {
                   <span>
                     {s.status} · {s.from_child} → {s.to_child}
                   </span>
+                  {s.admin_override && <OverrideNote override={s.admin_override} />}
                 </div>
                 <div className="sasa-pfriends-actions">
                   {s.status === "active" && (

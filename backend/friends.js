@@ -82,18 +82,43 @@ export async function findFriendship(pool, aProfileId, bProfileId) {
  * Kept in one place so "active" can only ever mean both parents approved —
  * there is no code path that can set it from a single approval.
  */
+/**
+ * Whether two approvals are satisfied, allowing for an administrator override.
+ *
+ * SASA_ADMIN_OVERRIDE_V33 — an override stands in for exactly ONE missing
+ * side. Requiring a real parent approval alongside it means an administrator
+ * acting alone can never connect two children or move a photo between
+ * families; the most they can do is unblock a family that is already willing.
+ */
+function bothSidesSatisfied(a, b, overrideAt) {
+  if (a && b) return true;
+  if (!overrideAt) return false;
+  // Exactly one genuine parent approval, plus the override for the other side.
+  return Boolean(a) !== Boolean(b);
+}
+
 export function friendshipStatusFrom(row) {
   if (row.status === "blocked" || row.status === "rejected" || row.status === "removed") {
     return row.status;
   }
-  return row.requester_parent_approved_at && row.addressee_parent_approved_at
+  return bothSidesSatisfied(
+    row.requester_parent_approved_at,
+    row.addressee_parent_approved_at,
+    row.admin_override_at,
+  )
     ? "active"
     : "pending";
 }
 
 export function shareStatusFrom(row) {
   if (row.status === "rejected" || row.status === "revoked") return row.status;
-  return row.sender_parent_approved_at && row.recipient_parent_approved_at ? "active" : "pending";
+  return bothSidesSatisfied(
+    row.sender_parent_approved_at,
+    row.recipient_parent_approved_at,
+    row.admin_override_at,
+  )
+    ? "active"
+    : "pending";
 }
 
 /**
@@ -112,11 +137,20 @@ export async function activeShareForChild(pool, mediaId, childProfileId) {
       WHERE s.media_id = $1
         AND s.recipient_profile_id = $2
         AND s.status = 'active'
-        AND s.sender_parent_approved_at IS NOT NULL
-        AND s.recipient_parent_approved_at IS NOT NULL
+        -- Both parents, or one parent plus an administrator override. Kept
+        -- identical to bothSidesSatisfied() above: if these two ever disagree,
+        -- an item could list but refuse to play, or worse.
+        AND (
+              (s.sender_parent_approved_at IS NOT NULL AND s.recipient_parent_approved_at IS NOT NULL)
+           OR (s.admin_override_at IS NOT NULL
+               AND (s.sender_parent_approved_at IS NOT NULL) <> (s.recipient_parent_approved_at IS NOT NULL))
+            )
         AND f.status = 'active'
-        AND f.requester_parent_approved_at IS NOT NULL
-        AND f.addressee_parent_approved_at IS NOT NULL
+        AND (
+              (f.requester_parent_approved_at IS NOT NULL AND f.addressee_parent_approved_at IS NOT NULL)
+           OR (f.admin_override_at IS NOT NULL
+               AND (f.requester_parent_approved_at IS NOT NULL) <> (f.addressee_parent_approved_at IS NOT NULL))
+            )
         -- The sender must still hold the item themselves. A share cannot
         -- outlive the assignment it was made from.
         AND EXISTS (
