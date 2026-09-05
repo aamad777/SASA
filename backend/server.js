@@ -10,6 +10,14 @@ import { removeThumbnailFile } from "./thumbnails.js";
 import { startThumbnailWorker } from "./thumbnail-worker.js";
 import { normaliseMediaRow, normaliseMediaRows, toBoundedByteNumber } from "./api-numbers.js";
 import {
+  MEDIA_TOKEN_TTL_SECONDS,
+  mimeForFile,
+  resolveMediaFile,
+  signMediaToken,
+  streamFile,
+  verifyMediaToken
+} from "./media-delivery.js";
+import {
   CHUNK_SIZE,
   MAX_UPLOAD_BYTES,
   SESSION_TTL_MS,
@@ -49,6 +57,52 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
  * matters here: express.static would otherwise happily serve the file. */
 app.use("/uploads/avatars", (_req, res) => {
   res.status(404).json({ error: "Not found" });
+});
+
+/* SASA_PRIVATE_MEDIA_V31 — the static mount is now allow-list only.
+ *
+ * express.static served every file under /uploads to anyone. Family photos and
+ * videos were readable by any visitor who knew a filename, which is obscurity,
+ * not authorisation.
+ *
+ * A filename is served statically only when it belongs to a row that is
+ * genuinely published public media. Everything else — private media, its
+ * generated thumbnail, an original a display image was derived from, and any
+ * name with no row at all — is a flat 404, identical in each case so the
+ * response cannot be used to test whether a file exists.
+ *
+ * Private media is reachable only through /api/media/:id/content|thumb, which
+ * re-authorises on every request.
+ */
+app.use("/uploads", async (req, res, next) => {
+  // Only ever a bare filename; anything with a separator is not a media file.
+  const name = decodeURIComponent(String(req.path || "").replace(/^\//, ""));
+
+  if (!name || name.includes("/") || name.includes("..")) {
+    return res.status(404).json({ status: "error", message: "Not found" });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT 1
+         FROM media_files
+        WHERE visibility = 'public'
+          AND publication_status = 'published'
+          AND (public_url = $1 OR thumbnail_url = $1)
+        LIMIT 1`,
+      [`/uploads/${name}`]
+    );
+
+    if (!rows[0]) {
+      return res.status(404).json({ status: "error", message: "Not found" });
+    }
+
+    return next();
+  } catch (error) {
+    console.error("Uploads guard error:", error);
+    // Fail closed: an error must not turn into open access.
+    return res.status(404).json({ status: "error", message: "Not found" });
+  }
 });
 
 app.use("/uploads", express.static(UPLOAD_DIR));
@@ -1096,10 +1150,14 @@ app.get("/api/admin/public-media", ...requireAdmin, async (req, res) => {
       [limit, offset]
     );
 
+    res.set("Cache-Control", "private, no-store");
     res.json({
       status: "ok",
       total: total.rows[0].n,
-      media: normaliseMediaRows(rows.rows),
+      /* Drafts are not published, so they are no longer served statically.
+       * The portal gets minted URLs instead, re-authorised on use like any
+       * other private read. */
+      media: rows.rows.map((row) => withAccessUrls(req.account, row)),
       limit,
       offset
     });
@@ -2252,9 +2310,10 @@ app.get("/api/child/:profileId/media", ...requireSession, async (req, res) => {
       [profileId]
     );
 
+    res.set("Cache-Control", "private, no-store");
     res.json({
       status: "ok",
-      media: result.rows,
+      media: result.rows.map((row) => withAccessUrls(req.account, row)),
     });
   } catch (error) {
     console.error("Child media error:", error);
@@ -2615,7 +2674,11 @@ app.get("/api/media/manage", ...requireSession, async (req, res) => {
       [req.user.id, req.user.role]
     );
 
-    res.json({ status: "ok", media: result.rows });
+    res.set("Cache-Control", "private, no-store");
+    res.json({
+      status: "ok",
+      media: result.rows.map((row) => withAccessUrls(req.account, row))
+    });
   } catch (error) {
     console.error("Media manage error:", error);
     res.status(500).json({ status: "error", message: "Failed to load media" });
@@ -2771,6 +2834,181 @@ app.delete("/api/media/:mediaId", ...requireSession, async (req, res) => {
   }
 });
 
+
+/* SASA_PRIVATE_MEDIA_V31 — a listing row the client can actually render.
+ *
+ * The stored /uploads path is replaced by URLs minted for THIS caller, so no
+ * frontend ever constructs a private filename and the physical name never
+ * leaves the server for private media. */
+function withAccessUrls(account, row) {
+  const urls = mediaAccessUrls(account, row);
+  const { public_url, thumbnail_url, file_path, ...rest } = row;
+  void public_url;
+  void thumbnail_url;
+  void file_path;
+
+  return {
+    ...rest,
+    size_bytes: toBoundedByteNumber(row.size_bytes, "media.size_bytes"),
+    content_url: urls.content,
+    thumbnail_url: urls.thumb,
+    signed_urls: urls.signed
+  };
+}
+
+/* SASA_PRIVATE_MEDIA_V31 — the URLs a given caller should use for one item.
+ *
+ * Published public media keeps its plain /uploads path so guest browsing stays
+ * on the fast static route. Private media gets short-lived signed URLs that
+ * are re-authorised on use. Callers never construct an /uploads path for
+ * private media themselves — they cannot, because the filename is not sent. */
+function mediaAccessUrls(account, media) {
+  const isPublished = media.visibility === "public" && media.publication_status === "published";
+
+  if (isPublished) {
+    return { content: media.public_url, thumb: media.thumbnail_url, signed: false };
+  }
+
+  const accountId = account?.id || null;
+
+  return {
+    content: `/api/media/${media.id}/content?t=${encodeURIComponent(
+      signMediaToken(JWT_SECRET, { mediaId: media.id, accountId, variant: "content" })
+    )}`,
+    thumb: media.thumbnail_url
+      ? `/api/media/${media.id}/thumb?t=${encodeURIComponent(
+          signMediaToken(JWT_SECRET, { mediaId: media.id, accountId, variant: "thumb" })
+        )}`
+      : null,
+    signed: true
+  };
+}
+
+/** Minting a media URL is cheap but must not be a free enumeration oracle. */
+const mediaUrlLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "Too many requests. Try again shortly." }
+});
+
+/* SASA_PRIVATE_MEDIA_V31 — authorised media delivery.
+ *
+ * The signed token names who is asking; it grants nothing by itself. Every
+ * request re-reads the account and re-runs the authorisation, so revocation,
+ * suspension, a withdrawn assignment or a deleted row takes effect on the very
+ * next byte requested rather than when the token expires.
+ */
+async function serveMediaVariant(req, res, variant) {
+  const { mediaId } = req.params;
+
+  const deny = () => res.status(404).json({ status: "error", message: "Not found" });
+
+  if (!/^[0-9a-fA-F-]{36}$/.test(String(mediaId || ""))) return deny();
+
+  const { rows } = await pool.query(
+    `SELECT id, owner_user_id, media_type, mime_type, file_path, public_url, thumbnail_url,
+            visibility, publication_status
+       FROM media_files WHERE id = $1 LIMIT 1`,
+    [mediaId]
+  );
+
+  const media = rows[0];
+  if (!media) return deny();
+
+  const isPublished = media.visibility === "public" && media.publication_status === "published";
+
+  if (!isPublished) {
+    // Private: a token is required, and it must still be honoured RIGHT NOW.
+    const token = verifyMediaToken(JWT_SECRET, req.query.t);
+    if (!token || token.mediaId !== media.id || token.variant !== variant) return deny();
+
+    const account = await pool.query(
+      `SELECT id, email, role, status, tokens_valid_after FROM users WHERE id = $1 LIMIT 1`,
+      [token.accountId]
+    );
+
+    const holder = account.rows[0];
+    if (!holder || holder.status === "suspended") return deny();
+
+    /* A revoked session must invalidate the URLs minted from it. The token
+     * carries a fixed TTL, so its issue time is exp - TTL; anything issued at
+     * or before the revocation watermark is refused. Combined with the short
+     * TTL this means revoking sessions cuts off in-flight media access
+     * immediately rather than up to five minutes later. */
+    if (holder.tokens_valid_after) {
+      const issuedAtMs = (token.exp - MEDIA_TOKEN_TTL_SECONDS) * 1000;
+      if (issuedAtMs <= new Date(holder.tokens_valid_after).getTime()) return deny();
+    }
+
+    // Re-authorise from the database, not from the token.
+    const access = await resolveMediaAccess({ account: holder }, media);
+    if (!access.allowed) return deny();
+
+    if (access.scope === "admin") {
+      await recordAudit(
+        { account: holder, user: { id: holder.id } },
+        "media.admin_stream",
+        "media",
+        media.id,
+        { variant }
+      );
+    }
+  }
+
+  const filePath = resolveMediaFile(UPLOAD_DIR, media, variant);
+  if (!filePath) return deny();
+
+  return streamFile(req, res, filePath, {
+    isPrivate: !isPublished,
+    mimeType: variant === "thumb" ? mimeForFile(filePath, "image/jpeg") : media.mime_type
+  });
+}
+
+app.get("/api/media/:mediaId/content", (req, res) => serveMediaVariant(req, res, "content"));
+app.head("/api/media/:mediaId/content", (req, res) => serveMediaVariant(req, res, "content"));
+app.get("/api/media/:mediaId/thumb", (req, res) => serveMediaVariant(req, res, "thumb"));
+app.head("/api/media/:mediaId/thumb", (req, res) => serveMediaVariant(req, res, "thumb"));
+
+/**
+ * Mints short-lived URLs for one media item.
+ *
+ * Published public media needs no token and gets its plain static path.
+ * Private media requires a session that is authorised right now; the URLs it
+ * returns are still re-checked on use.
+ */
+app.post("/api/media/:mediaId/access-url", mediaUrlLimiter, optionalSession, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const deny = () => res.status(404).json({ status: "error", message: "Not found" });
+
+    if (!/^[0-9a-fA-F-]{36}$/.test(String(mediaId || ""))) return deny();
+
+    const { rows } = await pool.query(
+      `SELECT id, owner_user_id, media_type, public_url, thumbnail_url,
+              visibility, publication_status
+         FROM media_files WHERE id = $1 LIMIT 1`,
+      [mediaId]
+    );
+
+    const media = rows[0];
+    if (!media) return deny();
+
+    const access = await resolveMediaAccess(req, media);
+    if (!access.allowed) return deny();
+
+    res.set("Cache-Control", "private, no-store");
+    return res.json({
+      status: "ok",
+      urls: mediaAccessUrls(req.account, media),
+      expiresInSeconds: access.scope === "public" ? null : MEDIA_TOKEN_TTL_SECONDS
+    });
+  } catch (error) {
+    console.error("Media access-url error:", error);
+    res.status(500).json({ status: "error", message: "Unable to issue media access" });
+  }
+});
 
 /* SASA_MEDIA_CONTAINMENT_V30 — was unauthenticated.
  *

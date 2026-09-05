@@ -303,7 +303,10 @@ function SasaApp() {
         // consume. Keep this the single source of truth for that mapping so
         // photo/video/YouTube detection stays consistent everywhere.
         const mapped: KidsVideoItem[] = media.map((item: AssignedChildMedia) => {
-          const publicUrl = item.public_url || item.storage_path || "";
+          /* Prefer the server-minted URL. Private media is no longer at a
+           * guessable /uploads path, and this is the only address that
+           * re-authorises on every request. */
+          const publicUrl = item.content_url || item.public_url || item.storage_path || "";
 
           const youtubeMatch = publicUrl.match(
             /(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{6,20})/,
