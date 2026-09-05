@@ -3419,7 +3419,13 @@ app.get("/api/parent/friends-overview", ...requireSession, async (req, res) => {
         awaiting_other:
           status === "pending" &&
           Boolean(myApproval) &&
-          !(mySide === "requester" ? r.addressee_parent_approved_at : r.requester_parent_approved_at)
+          !(mySide === "requester" ? r.addressee_parent_approved_at : r.requester_parent_approved_at),
+        /* SASA_ADMIN_OVERRIDE_V33 — shown to BOTH parents, including the one
+         * who never approved, so an override is never mistaken for their own
+         * consent. */
+        admin_override: r.admin_override_at
+          ? { at: r.admin_override_at, reason: r.admin_override_reason, approved_by_me: Boolean(myApproval) }
+          : null
       };
     };
 
@@ -3446,7 +3452,10 @@ app.get("/api/parent/friends-overview", ...requireSession, async (req, res) => {
         from_child: r.sender_name,
         to_child: r.recipient_name,
         direction: mySide === "sender" ? "outgoing" : "incoming",
-        awaiting_me: status === "pending" && mySide !== null && !myApproval
+        awaiting_me: status === "pending" && mySide !== null && !myApproval,
+        admin_override: r.admin_override_at
+          ? { at: r.admin_override_at, reason: r.admin_override_reason, approved_by_me: Boolean(myApproval) }
+          : null
       };
     };
 
@@ -3493,17 +3502,65 @@ app.post(
       let updated;
 
       if (action === "approve") {
+        /* SASA_ADMIN_OVERRIDE_V33 — an administrator never writes a parent's
+         * column. Their decision goes to its own columns, so the parent
+         * columns keep meaning "this family agreed" and both parents can be
+         * shown honestly who actually unblocked it. */
+        if (side === "admin") {
+          const reason = String(req.body?.reason || "").trim().slice(0, 500);
+
+          if (reason.length < 3) {
+            return res.status(400).json({
+              status: "error",
+              message: "An override needs a short reason."
+            });
+          }
+
+          // The override stands in for ONE missing side. With neither parent
+          // approved there is nothing to stand in for, and an administrator
+          // acting alone must never be able to connect two children.
+          if (f.admin_override_at) {
+            return res.status(409).json({
+              status: "error",
+              message: "This has already been overridden by an administrator."
+            });
+          }
+
+          const approvals =
+            (f.requester_parent_approved_at ? 1 : 0) + (f.addressee_parent_approved_at ? 1 : 0);
+
+          if (approvals !== 1) {
+            return res.status(409).json({
+              status: "error",
+              message:
+                approvals === 0
+                  ? "At least one parent must approve before an administrator can override the other."
+                  : "Both parents have already approved."
+            });
+          }
+
+          updated = await pool.query(
+            `UPDATE friendships
+                SET admin_override_by = $2, admin_override_at = now(),
+                    admin_override_reason = $3, decided_by = $2, updated_at = now(),
+                    status = 'active'
+              WHERE id = $1
+          RETURNING *`,
+            [f.id, req.account.id, reason]
+          );
+
+          await recordAudit(req, "friendship.admin_override", "friendship", f.id, { reason });
+
+          return res.json({
+            status: "ok",
+            friendship: { id: f.id, status: friendshipStatusFrom(updated.rows[0]) }
+          });
+        }
+
         // Writes only this parent's own column. Approving for the other family
         // is not expressible.
         const column =
           side === "addressee" ? "addressee_parent_approved_at" : "requester_parent_approved_at";
-
-        if (side === "admin") {
-          return res.status(403).json({
-            status: "error",
-            message: "An administrator cannot approve on a family's behalf."
-          });
-        }
 
         updated = await pool.query(
           `UPDATE friendships
@@ -3694,10 +3751,58 @@ app.post(
       let updated;
 
       if (action === "approve") {
+        /* Same rule as friendships: the override is recorded separately and
+         * only ever substitutes for one missing family. */
         if (req.account.role === "admin" && !isSenderParent && !isRecipientParent) {
-          return res.status(403).json({
-            status: "error",
-            message: "An administrator cannot approve on a family's behalf."
+          const reason = String(req.body?.reason || "").trim().slice(0, 500);
+
+          if (reason.length < 3) {
+            return res.status(400).json({
+              status: "error",
+              message: "An override needs a short reason."
+            });
+          }
+
+          if (share.admin_override_at) {
+            return res.status(409).json({
+              status: "error",
+              message: "This has already been overridden by an administrator."
+            });
+          }
+
+          const approvals =
+            (share.sender_parent_approved_at ? 1 : 0) +
+            (share.recipient_parent_approved_at ? 1 : 0);
+
+          if (approvals !== 1) {
+            return res.status(409).json({
+              status: "error",
+              message:
+                approvals === 0
+                  ? "At least one parent must approve before an administrator can override the other."
+                  : "Both parents have already approved."
+            });
+          }
+
+          const overridden = await pool.query(
+            `UPDATE media_shares
+                SET admin_override_by = $2, admin_override_at = now(),
+                    admin_override_reason = $3, decided_by = $2, updated_at = now(),
+                    status = 'active'
+              WHERE id = $1 AND status = 'pending'
+          RETURNING *`,
+            [share.id, req.account.id, reason]
+          );
+
+          if (!overridden.rows[0]) {
+            return res.status(409).json({ status: "error", message: "This share is not pending." });
+          }
+
+          await recordAudit(req, "share.admin_override", "media_share", share.id, { reason });
+
+          return res.json({
+            status: "ok",
+            share: { id: share.id, status: shareStatusFrom(overridden.rows[0]) }
           });
         }
 
@@ -3771,8 +3876,12 @@ app.get("/api/shares/received", ...requireSession, async (req, res) => {
          JOIN profiles sp ON sp.id = s.sender_profile_id
         WHERE s.recipient_profile_id = $1
           AND s.status = 'active'
-          AND s.sender_parent_approved_at IS NOT NULL
-          AND s.recipient_parent_approved_at IS NOT NULL
+          -- Same rule as activeShareForChild / bothSidesSatisfied.
+          AND (
+                (s.sender_parent_approved_at IS NOT NULL AND s.recipient_parent_approved_at IS NOT NULL)
+             OR (s.admin_override_at IS NOT NULL
+                 AND (s.sender_parent_approved_at IS NOT NULL) <> (s.recipient_parent_approved_at IS NOT NULL))
+              )
           AND f.status = 'active'
           AND EXISTS (
             SELECT 1 FROM media_child_access mca
