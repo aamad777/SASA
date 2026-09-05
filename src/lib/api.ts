@@ -913,6 +913,14 @@ export async function deleteChild(token: string, childId: string): Promise<void>
 
 export type AssignedChildMedia = {
   id: number;
+  /* SASA_PRIVATE_MEDIA_V31 — the URL to actually fetch this item from.
+   * Private media is no longer served from /uploads, so the server mints a
+   * short-lived signed URL per caller and sends it here. Clients must use this
+   * and never build an /uploads path themselves: for private media the
+   * physical filename is not sent at all. Optional so an older backend that
+   * still returns public_url keeps working. */
+  content_url?: string | null;
+  signed_urls?: boolean;
   filename: string | null;
   original_name: string | null;
   media_type: string;
@@ -963,6 +971,14 @@ export function getApiAssetUrl(value: string | null | undefined): string {
 
 export type ParentMediaItem = {
   id: string;
+  /* SASA_PRIVATE_MEDIA_V31 — the URL to actually fetch this item from.
+   * Private media is no longer served from /uploads, so the server mints a
+   * short-lived signed URL per caller and sends it here. Clients must use this
+   * and never build an /uploads path themselves: for private media the
+   * physical filename is not sent at all. Optional so an older backend that
+   * still returns public_url keeps working. */
+  content_url?: string | null;
+  signed_urls?: boolean;
   filename: string | null;
   original_name: string | null;
   media_type: "photo" | "video";

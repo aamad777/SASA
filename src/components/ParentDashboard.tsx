@@ -906,7 +906,7 @@ export default function ParentDashboard({
   };
 
   const uploadedContentFilterItems = parentMediaItems.map((item) => {
-    const sourceValue = item.public_url || item.storage_path || "";
+    const sourceValue = item.content_url || item.public_url || item.storage_path || "";
 
     const youtubeMatch = sourceValue.match(
       /(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{6,20})/,
@@ -2156,7 +2156,8 @@ export default function ParentDashboard({
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                     {parentMediaItems.map((item) => {
-                      const assetValue = item.public_url || item.storage_path || "";
+                      const assetValue =
+                        item.content_url || item.public_url || item.storage_path || "";
 
                       const assetUrl = getApiAssetUrl(assetValue);
 
