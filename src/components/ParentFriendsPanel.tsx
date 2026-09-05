@@ -62,6 +62,14 @@ export default function ParentFriendsPanel({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  /* SASA_ADMIN_OVERRIDE_V33 — an administrator approving something neither of
+   * their own children is in must give a reason. Only the server knows that,
+   * so rather than guessing the viewer's role we let it say so and then ask.
+   * A parent approving their own side never sees this. */
+  const [reasonFor, setReasonFor] = useState<{ kind: "friendship" | "share"; id: string } | null>(
+    null,
+  );
+  const [reason, setReason] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
@@ -77,16 +85,43 @@ export default function ParentFriendsPanel({ token }: { token: string }) {
 
   useEffect(load, [load]);
 
-  const act = async (fn: () => Promise<unknown>, key: string) => {
+  const act = async (
+    fn: () => Promise<unknown>,
+    key: string,
+    prompt?: { kind: "friendship" | "share"; id: string },
+  ) => {
     setBusy(key);
     setError("");
     try {
       await fn();
+      setReasonFor(null);
+      setReason("");
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "That action did not go through.");
+      const message = e instanceof Error ? e.message : "That action did not go through.";
+
+      // Turn the server's "needs a reason" into an actual way to give one,
+      // instead of a dead end the parent cannot get past.
+      if (prompt && /needs a short reason/i.test(message)) {
+        setReasonFor(prompt);
+        setError("");
+      } else {
+        setError(message);
+      }
     } finally {
       setBusy(null);
+    }
+  };
+
+  const submitReason = () => {
+    if (!reasonFor) return;
+    const text = reason.trim();
+    if (text.length < 3) return;
+
+    if (reasonFor.kind === "friendship") {
+      act(() => decideFriendship(token, reasonFor.id, "approve", text), reasonFor.id);
+    } else {
+      act(() => decideShare(token, reasonFor.id, "approve", text), reasonFor.id);
     }
   };
 
@@ -102,6 +137,51 @@ export default function ParentFriendsPanel({ token }: { token: string }) {
       )}
 
       {loading && <p className="sasa-friends-note">Loading…</p>}
+
+      {reasonFor && (
+        <section className="sasa-pfriends-card sasa-override-prompt">
+          <h3>Why are you overriding this?</h3>
+          <p className="sasa-friends-note">
+            Neither of your own children is in this one, so approving it is an administrator
+            override. Both families will see this reason.
+          </p>
+          <div className="sasa-friends-search">
+            <label className="sasa-sr-only" htmlFor="override-reason">
+              Reason for the override
+            </label>
+            <input
+              id="override-reason"
+              className="sasa-friends-input"
+              style={{ textTransform: "none" }}
+              placeholder="e.g. the other parent has lost account access"
+              value={reason}
+              autoFocus
+              onChange={(e) => setReason(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitReason();
+              }}
+            />
+            <button
+              type="button"
+              className="sasa-btn is-primary"
+              disabled={reason.trim().length < 3 || busy !== null}
+              onClick={submitReason}
+            >
+              Override
+            </button>
+            <button
+              type="button"
+              className="sasa-btn"
+              onClick={() => {
+                setReasonFor(null);
+                setReason("");
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="sasa-pfriends-card">
         <h3>Needs your approval ({pendingFriendships.length + pendingShares.length})</h3>
@@ -125,7 +205,12 @@ export default function ParentFriendsPanel({ token }: { token: string }) {
                     type="button"
                     className="sasa-btn is-primary"
                     disabled={busy === f.id}
-                    onClick={() => act(() => decideFriendship(token, f.id, "approve"), f.id)}
+                    onClick={() =>
+                      act(() => decideFriendship(token, f.id, "approve"), f.id, {
+                        kind: "friendship",
+                        id: f.id,
+                      })
+                    }
                   >
                     {busy === f.id ? <Loader2 size={15} /> : <Check size={15} />} Approve
                   </button>
@@ -162,7 +247,12 @@ export default function ParentFriendsPanel({ token }: { token: string }) {
                     type="button"
                     className="sasa-btn is-primary"
                     disabled={busy === s.id}
-                    onClick={() => act(() => decideShare(token, s.id, "approve"), s.id)}
+                    onClick={() =>
+                      act(() => decideShare(token, s.id, "approve"), s.id, {
+                        kind: "share",
+                        id: s.id,
+                      })
+                    }
                   >
                     {busy === s.id ? <Loader2 size={15} /> : <Check size={15} />} Approve
                   </button>
