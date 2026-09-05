@@ -2038,3 +2038,11 @@
   min-height: 46px;
   border-radius: 10px;
 }
+
+/* SASA_RESUMABLE_UPLOADS_V28 — Upload / Resume / Cancel sit together, and wrap
+   rather than overflow on a 360px-wide phone. */
+.sasa-admin-uploadactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
