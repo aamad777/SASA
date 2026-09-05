@@ -25,6 +25,7 @@ COPY server.js /app/server.js
 COPY thumbnails.js /app/thumbnails.js
 COPY thumbnail-worker.js /app/thumbnail-worker.js
 COPY resumable-uploads.js /app/resumable-uploads.js
+COPY api-numbers.js /app/api-numbers.js
 COPY images.js /app/images.js
 COPY migrations /app/migrations
 COPY backfill-thumbnails.js /app/backfill-thumbnails.js
