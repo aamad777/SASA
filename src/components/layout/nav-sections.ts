@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  Users,
   Gamepad2,
   Home,
   Music,
@@ -18,7 +19,8 @@ export type KidsSectionId =
   | "songs"
   | "games"
   | "studio"
-  | "profile";
+  | "profile"
+  | "friends";
 
 export type SectionDef = {
   id: KidsSectionId;
@@ -50,6 +52,13 @@ export const KIDS_SECTIONS: Record<KidsSectionId, SectionDef> = {
     icon: BookOpen,
     title: "Library",
     subtitle: "The videos you saved with the heart button",
+  },
+  friends: {
+    id: "friends",
+    label: "Friends",
+    icon: Users,
+    title: "Friends",
+    subtitle: "Add a friend with their Friend ID and share your videos and photos",
   },
   songs: {
     id: "songs",
@@ -88,7 +97,7 @@ export const RAIL_GROUPS: Array<{ title?: string; items: SectionDef[] }> = [
     title: "Play & create",
     items: [KIDS_SECTIONS.songs, KIDS_SECTIONS.games, KIDS_SECTIONS.studio],
   },
-  { title: "You", items: [KIDS_SECTIONS.profile] },
+  { title: "You", items: [KIDS_SECTIONS.friends, KIDS_SECTIONS.profile] },
 ];
 
 /** Sections that live behind the bottom bar's "Play" sheet on phones. */
@@ -103,6 +112,7 @@ export const TABBAR_SECTIONS: SectionDef[] = [
   KIDS_SECTIONS.home,
   KIDS_SECTIONS.search,
   KIDS_SECTIONS.library,
+  KIDS_SECTIONS.friends,
 ];
 
 export const PARENT_CONTROLS_ICON: LucideIcon = ShieldCheck;

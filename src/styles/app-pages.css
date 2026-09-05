@@ -2046,3 +2046,313 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* SASA_FRIENDS_V32 — Friends, sharing and the parent approval panel.
+   Everything below is fluid and wraps: the narrowest supported width is
+   360px, and no row may force a horizontal scrollbar there. */
+.sasa-friends,
+.sasa-pfriends {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.sasa-friends-card,
+.sasa-pfriends-card {
+  border: 1px solid var(--sasa-line);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--sasa-surface, #fff);
+  min-width: 0;
+}
+
+.sasa-friends-card h2,
+.sasa-pfriends-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.sasa-friends-hint,
+.sasa-friends-note {
+  margin: 6px 0 0;
+  color: var(--sasa-ink-2);
+  font-size: 13px;
+}
+
+.sasa-friends-note.is-error {
+  color: var(--sasa-danger, #b91c1c);
+}
+
+.sasa-friendid-row,
+.sasa-friends-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+/* The ID must stay readable at 360px, so it is allowed to break rather than
+   widen the page. */
+.sasa-friendid {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--sasa-surface-2, rgba(0, 0, 0, 0.05));
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.sasa-friends-input {
+  flex: 1 1 180px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--sasa-line);
+  border-radius: 10px;
+  font-size: 15px;
+  text-transform: uppercase;
+}
+
+.sasa-friend-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.sasa-friend-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--sasa-line);
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.sasa-friend-avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--sasa-surface-2, rgba(0, 0, 0, 0.06));
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.sasa-friend-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sasa-friend-name {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+.sasa-friend-name strong,
+.sasa-friend-name span {
+  overflow-wrap: anywhere;
+}
+
+.sasa-friend-name span {
+  font-size: 12px;
+  color: var(--sasa-ink-2);
+}
+
+.sasa-friend-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--sasa-surface-2, rgba(0, 0, 0, 0.06));
+  white-space: nowrap;
+}
+
+.sasa-friend-chip.is-active {
+  background: #dcfce7;
+  color: #157347;
+}
+.sasa-friend-chip.is-pending {
+  background: #fef3c7;
+  color: #92640c;
+}
+.sasa-friend-chip.is-blocked,
+.sasa-friend-chip.is-rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* Shared with me */
+.sasa-shared-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.sasa-shared-card {
+  border: 1px solid var(--sasa-line);
+  border-radius: 12px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.sasa-shared-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  padding: 0;
+  background: var(--sasa-surface-2, rgba(0, 0, 0, 0.06));
+  cursor: pointer;
+}
+
+.sasa-shared-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sasa-shared-placeholder {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--sasa-ink-2);
+}
+
+.sasa-shared-body {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px 10px;
+  min-width: 0;
+}
+
+.sasa-shared-body strong,
+.sasa-shared-body span {
+  overflow-wrap: anywhere;
+}
+
+.sasa-shared-body span {
+  font-size: 12px;
+  color: var(--sasa-ink-2);
+}
+
+/* Share sheet */
+.sasa-share-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: end center;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 12px;
+}
+
+.sasa-share-sheet {
+  width: min(520px, 100%);
+  max-height: 80vh;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--sasa-surface, #fff);
+}
+
+.sasa-share-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sasa-share-head h2 {
+  margin: 0;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+/* Parent approval rows: the action cluster wraps under the text on a phone
+   rather than pushing the row wider than the screen. */
+.sasa-pfriends-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.sasa-pfriends-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--sasa-line);
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.sasa-pfriends-text {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.sasa-pfriends-text strong,
+.sasa-pfriends-text span {
+  overflow-wrap: anywhere;
+}
+
+.sasa-pfriends-text span {
+  font-size: 12px;
+  color: var(--sasa-ink-2);
+}
+
+.sasa-pfriends-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Functional badge — hidden entirely at zero rather than showing "0". */
+.sasa-pending-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  margin-inline-start: 6px;
+  border-radius: 999px;
+  background: #b91c1c;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sasa-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
