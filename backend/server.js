@@ -2265,51 +2265,103 @@ app.get("/api/child/:profileId/media", ...requireSession, async (req, res) => {
   }
 });
 
-app.get("/api/media/files", async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT
-         m.id,
-         m.owner_user_id,
-         m.media_type,
-         m.title,
-         m.description,
-         m.category,
-         m.public_url,
-         m.thumbnail_url,
-         m.original_filename,
-         m.mime_type,
-         m.size_bytes,
-         m.created_at,
-         COALESCE(
-           json_agg(
-             json_build_object(
-               'child_profile_id', p.id,
-               'display_name', p.display_name,
-               'age', p.age
-             )
-           ) FILTER (WHERE p.id IS NOT NULL),
-           '[]'
-         ) AS child_access
-       FROM media_files m
-       LEFT JOIN media_child_access mca ON mca.media_id = m.id
-       LEFT JOIN profiles p ON p.id = mca.child_profile_id
-       GROUP BY m.id
-       ORDER BY m.created_at DESC
-       LIMIT 100`
+/* SASA_MEDIA_CONTAINMENT_V30 — optional session.
+ *
+ * Public published media is readable by a guest, so these routes cannot sit
+ * behind requireSession. But when a token IS presented it must be validated
+ * exactly as strictly as anywhere else — a suspended account or a revoked
+ * session must not gain private access here. This runs the same loadAccount
+ * checks and simply continues as an anonymous caller when no token is sent.
+ */
+async function optionalSession(req, res, next) {
+  const header = req.headers.authorization || "";
+
+  if (!header.startsWith("Bearer ")) {
+    req.account = null;
+    return next();
+  }
+
+  return requireAuth(req, res, () => loadAccount(req, res, next));
+}
+
+/**
+ * Whether this caller may see a specific media row.
+ *
+ * Published public media is open. Everything else is family content: only the
+ * owning parent, a child the media was explicitly assigned to, or an
+ * administrator may see it. Every other caller is told the same thing a
+ * nonexistent id would produce.
+ */
+async function resolveMediaAccess(req, media) {
+  if (media.visibility === "public" && media.publication_status === "published") {
+    return { allowed: true, scope: "public" };
+  }
+
+  const account = req.account;
+  if (!account) return { allowed: false };
+
+  if (account.role === "admin") return { allowed: true, scope: "admin" };
+
+  if (account.role === "parent" && media.owner_user_id === account.id) {
+    return { allowed: true, scope: "owner" };
+  }
+
+  if (account.role === "child") {
+    // Assignment is per child profile, and the profile must belong to this
+    // child's own account — not merely exist.
+    const { rows } = await pool.query(
+      `SELECT 1
+         FROM media_child_access mca
+         JOIN profiles p ON p.id = mca.child_profile_id
+        WHERE mca.media_id = $1 AND p.user_id = $2
+        LIMIT 1`,
+      [media.id, account.id]
     );
 
-    res.json({
-      status: "ok",
-      media: result.rows,
-    });
-  } catch (error) {
-    console.error("Media list error:", error);
-    res.status(500).json({
-      status: "error",
-      message: "Failed to load media files",
-    });
+    if (rows[0]) return { allowed: true, scope: "assigned-child" };
   }
+
+  return { allowed: false };
+}
+
+/**
+ * The public shape of a media row.
+ *
+ * owner_user_id, file_path and the stored filename are deliberately absent:
+ * they identify the uploading family and the physical location on the NAS, and
+ * a caller needs neither to display an item.
+ */
+function publicMediaShape(media, { includeAssetUrls }) {
+  return {
+    id: media.id,
+    media_type: media.media_type,
+    title: media.title,
+    description: media.description,
+    category: media.category,
+    size_bytes: toBoundedByteNumber(media.size_bytes, "media.size_bytes"),
+    created_at: media.created_at,
+    visibility: media.visibility,
+    publication_status: media.publication_status,
+    thumbnail_status: media.thumbnail_status,
+    // Only published public media gets a directly fetchable URL. Private
+    // media is served through an authorised route instead; handing out its
+    // /uploads path here would defeat the point of protecting it.
+    ...(includeAssetUrls
+      ? { public_url: media.public_url, thumbnail_url: media.thumbnail_url }
+      : {})
+  };
+}
+
+/* SASA_MEDIA_CONTAINMENT_V30 — was an unauthenticated listing of every row.
+ *
+ * This returned all media, public and private, to anyone who asked, including
+ * each item's /uploads path. Combined with the open static mount that was a
+ * complete index of every family's photos and videos. Nothing in the
+ * application calls it, so it is gone rather than repaired; a route that
+ * exists only to leak has no safe version.
+ */
+app.get("/api/media/files", (_req, res) => {
+  res.status(404).json({ status: "error", message: "Not found" });
 });
 
 app.post("/api/media/upload", ...requireSession, upload.single("file"), async (req, res) => {
@@ -2720,52 +2772,71 @@ app.delete("/api/media/:mediaId", ...requireSession, async (req, res) => {
 });
 
 
-app.get("/api/media/:mediaId", async (req, res) => {
+/* SASA_MEDIA_CONTAINMENT_V30 — was unauthenticated.
+ *
+ * This answered for ANY media id with no session at all, and the body carried
+ * owner_user_id and the internal file_path (/app/uploads/...). A guest could
+ * read every private family row and learn exactly where each file sat.
+ *
+ * It is now authorisation-aware: published public media stays open, and
+ * anything else requires the owning parent, a child the item was assigned to,
+ * or an administrator. Everyone else gets the same 404 a nonexistent id
+ * produces, so the endpoint cannot be used to discover which ids exist. The
+ * body is sanitised in every case.
+ */
+app.get("/api/media/:mediaId", optionalSession, async (req, res) => {
   try {
     const { mediaId } = req.params;
 
+    // A malformed id must not reach Postgres as a failed uuid cast, which
+    // would answer 500 and distinguish "bad id" from "not yours".
+    if (!/^[0-9a-fA-F-]{36}$/.test(String(mediaId || ""))) {
+      return res.status(404).json({ status: "error", message: "Media not found" });
+    }
+
     const result = await pool.query(
-      `SELECT
-         id,
-         owner_user_id,
-         media_type,
-         title,
-         description,
-         category,
-         file_path,
-         public_url,
-         thumbnail_url,
-         original_filename,
-         mime_type,
-         size_bytes,
-         created_at,
-         updated_at
-       FROM media_files
-       WHERE id = $1
-       LIMIT 1`,
+      `SELECT id, owner_user_id, media_type, title, description, category,
+              public_url, thumbnail_url, size_bytes, created_at,
+              visibility, publication_status, thumbnail_status
+         FROM media_files
+        WHERE id = $1
+        LIMIT 1`,
       [mediaId]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        status: "error",
-        message: "Media not found"
-      });
+    const media = result.rows[0];
+
+    // Identical answer whether the row is missing or simply not this
+    // caller's, so the response cannot confirm that an id exists.
+    if (!media) {
+      return res.status(404).json({ status: "error", message: "Media not found" });
     }
+
+    const access = await resolveMediaAccess(req, media);
+
+    if (!access.allowed) {
+      return res.status(404).json({ status: "error", message: "Media not found" });
+    }
+
+    if (access.scope === "admin") {
+      await recordAudit(req, "media.admin_read", "media", media.id, { title: media.title });
+    }
+
+    const isPublic = access.scope === "public";
+
+    // Private bodies must not be stored by a shared cache; a published item
+    // is world-readable anyway and may be cached normally.
+    res.set("Cache-Control", isPublic ? "public, max-age=300" : "private, no-store");
 
     res.json({
       status: "ok",
-      media: result.rows[0]
+      media: publicMediaShape(media, { includeAssetUrls: isPublic })
     });
   } catch (error) {
-    console.error("Get media error:", error);
-    res.status(500).json({
-      status: "error",
-      message: "Failed to load media"
-    });
+    console.error("Media read error:", error);
+    res.status(500).json({ status: "error", message: "Unable to load media" });
   }
 });
-
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`SaraTube backend API running on port ${PORT}`);
