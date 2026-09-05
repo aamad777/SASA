@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
 
 import AddProfile, { type CreatedProfile } from "@/components/AddProfile";
-import DeviceLocked from "@/components/DeviceLocked";
+import DeviceLocked, { type LockScreenReason } from "@/components/DeviceLocked";
 import DatabaseProfileSelection, {
   getDatabaseProfileColor,
   getDatabaseProfileEmoji,
@@ -416,6 +416,12 @@ function SasaApp() {
     }
   });
 
+  /* Guests get no parent controls at all, so nothing may lock them out: the
+   * defaults enable bedtime and a 90-minute screen limit, and with no
+   * dashboard to reach there would be no way back. Signed-in parents keep
+   * the full behaviour. */
+  const parentControlsAvailable = Boolean(parentToken);
+
   const updateParentControls = (settings: ParentControlSettings) => {
     if (profile) {
       const expiryKey = `sasa-screen-expiry-${profile.id}`;
@@ -430,12 +436,22 @@ function SasaApp() {
         localStorage.setItem(expiryKey, String(Date.now() + settings.screenMinutes * 60 * 1000));
       }
     }
-    setParentControls(settings);
-    localStorage.setItem("sasa-parent-controls", JSON.stringify(settings));
+    // A parent toggling the switch is a different reason from the screen-time
+    // timer tripping, and the lock screen has to tell them apart.
+    const next: ParentControlSettings = { ...settings };
+    if (settings.deviceLocked && !parentControls.deviceLocked) {
+      next.lockReason = "parent";
+    } else if (!settings.deviceLocked) {
+      next.lockReason = null;
+    }
+
+    setParentControls(next);
+    localStorage.setItem("sasa-parent-controls", JSON.stringify(next));
   };
 
   // Screen time enforcement
   useEffect(() => {
+    if (!parentControlsAvailable) return;
     if (!profile || !parentControls.screenLimitEnabled || parentControls.deviceLocked) return;
     const expiryKey = `sasa-screen-expiry-${profile.id}`;
     const createExpiry = () => {
@@ -449,7 +465,11 @@ function SasaApp() {
       let expiryTime = Number(localStorage.getItem(expiryKey));
       if (!expiryTime || Number.isNaN(expiryTime)) expiryTime = createExpiry();
       if (Date.now() >= expiryTime) {
-        const locked = { ...parentControls, deviceLocked: true };
+        const locked: ParentControlSettings = {
+          ...parentControls,
+          deviceLocked: true,
+          lockReason: "screenTime",
+        };
         setParentControls(locked);
         localStorage.setItem("sasa-parent-controls", JSON.stringify(locked));
       }
@@ -459,6 +479,7 @@ function SasaApp() {
     return () => window.clearInterval(interval);
   }, [
     profile,
+    parentControlsAvailable,
     parentControls.screenLimitEnabled,
     parentControls.screenMinutes,
     parentControls.deviceLocked,
@@ -471,7 +492,7 @@ function SasaApp() {
       return h * 60 + m;
     };
     const checkBedtime = () => {
-      if (!parentControls.bedtimeEnabled) {
+      if (!parentControlsAvailable || !parentControls.bedtimeEnabled) {
         setBedtimeActive(false);
         return;
       }
@@ -488,7 +509,12 @@ function SasaApp() {
     checkBedtime();
     const interval = window.setInterval(checkBedtime, 1000);
     return () => window.clearInterval(interval);
-  }, [parentControls.bedtimeEnabled, parentControls.bedtimeStart, parentControls.bedtimeEnd]);
+  }, [
+    parentControlsAvailable,
+    parentControls.bedtimeEnabled,
+    parentControls.bedtimeStart,
+    parentControls.bedtimeEnd,
+  ]);
 
   const openParentGate = () => {
     setShowParentDashboard(false);
@@ -637,8 +663,23 @@ function SasaApp() {
     );
   }
 
-  if ((parentControls.deviceLocked || bedtimeActive) && profile) {
-    return <DeviceLocked onParentUnlock={openParentGate} onChangeProfile={changeProfile} />;
+  if (parentControlsAvailable && (parentControls.deviceLocked || bedtimeActive) && profile) {
+    // An explicit lock outranks bedtime: bedtime clears itself in the morning,
+    // a stored lock needs a grown-up, so that is the more useful thing to say.
+    const lockReason: LockScreenReason = parentControls.deviceLocked
+      ? (parentControls.lockReason ?? "parent")
+      : "bedtime";
+
+    return (
+      <DeviceLocked
+        reason={lockReason}
+        bedtimeEnd={parentControls.bedtimeEnd}
+        screenMinutes={parentControls.screenMinutes}
+        childName={profile.name}
+        onParentUnlock={openParentGate}
+        onChangeProfile={changeProfile}
+      />
+    );
   }
 
   if (!profile && showAddProfile) {
@@ -738,7 +779,6 @@ function SasaApp() {
             }
             setSelectedKidsVideo(null);
           }}
-          onOpenParentalControls={openParentGate}
           onAddProfile={() => setShowAddProfile(true)}
           onLogin={() => {
             localStorage.removeItem("sasa-account-mode");

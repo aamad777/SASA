@@ -61,6 +61,14 @@ export type BlockedChannel = {
   image: string;
 };
 
+/**
+ * Why the device is locked. `deviceLocked` alone cannot say: a parent
+ * flipping the switch and the screen-time timer running out both set it, and
+ * the child is owed the real reason rather than one generic message.
+ * Bedtime is not listed here because it is derived from the clock, not stored.
+ */
+export type DeviceLockReason = "parent" | "screenTime";
+
 export type ParentControlSettings = {
   screenLimitEnabled: boolean;
   screenMinutes: number;
@@ -68,6 +76,8 @@ export type ParentControlSettings = {
   bedtimeStart: string;
   bedtimeEnd: string;
   deviceLocked: boolean;
+  /** Set whenever deviceLocked turns on; null while unlocked. */
+  lockReason: DeviceLockReason | null;
   blockedChannels: BlockedChannel[];
   blockedVideoIds: number[];
   parentPin: string;
@@ -155,6 +165,7 @@ export const defaultParentControlSettings: ParentControlSettings = {
   bedtimeStart: "20:00",
   bedtimeEnd: "07:00",
   deviceLocked: false,
+  lockReason: null,
   blockedChannels: initialBlockedChannels,
   blockedVideoIds: [],
   parentPin: "1234",
