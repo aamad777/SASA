@@ -121,7 +121,6 @@ export default function ProfileSelection({
             <LogIn size={18} />
             Parent login
           </a>
-
         </div>
       </header>
 
