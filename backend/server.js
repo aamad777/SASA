@@ -6,7 +6,8 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { generateVideoThumbnail, removeThumbnailFile } from "./thumbnails.js";
+import { removeThumbnailFile } from "./thumbnails.js";
+import { startThumbnailWorker } from "./thumbnail-worker.js";
 import {
   AVATAR_SIZE,
   MAX_AVATAR_BYTES,
@@ -1074,7 +1075,8 @@ app.get("/api/admin/public-media", ...requireAdmin, async (req, res) => {
     const rows = await pool.query(
       `SELECT id, media_type, title, description, category, public_url, thumbnail_url,
               publication_status, is_featured, sort_order, size_bytes, mime_type,
-              owner_user_id, published_at, created_at, updated_at
+              owner_user_id, published_at, created_at, updated_at,
+              thumbnail_status, thumbnail_attempts, thumbnail_error
          FROM media_files
         WHERE visibility = 'public'
         ORDER BY created_at DESC
@@ -1132,18 +1134,17 @@ app.post(
       let publicUrl = `/uploads/${req.file.filename}`;
       let thumbnailUrl = null;
 
-      if (isVideo) {
-        try {
-          const thumb = await generateVideoThumbnail({
-            videoPath: req.file.path,
-            uploadDir: UPLOAD_DIR,
-            videoFilename: req.file.filename
-          });
-          thumbnailUrl = thumb.publicUrl;
-        } catch (thumbError) {
-          console.error("Public video thumbnail failed:", thumbError.message);
-        }
-      } else {
+      /* SASA_ASYNC_THUMBNAILS_V27 — a video's thumbnail is NOT generated here.
+       * ffmpeg can take ~165s worst case (see thumbnails.js) and Cloudflare
+       * cuts a proxied request at ~100s, so awaiting it answered the admin
+       * HTTP 520 for exactly the large videos most worth uploading. The row is
+       * committed as 'pending' and thumbnail-worker.js picks it up: the queue
+       * is the table, so it survives a pod restart and two replicas cannot
+       * claim the same row. A photo's display image is bounded and quick, so
+       * it stays inline. */
+      const thumbnailStatus = isVideo ? "pending" : "ready";
+
+      if (!isVideo) {
         // Re-encoded, bounded and stripped of EXIF/GPS before it is ever served.
         const displayName = `${path.parse(req.file.filename).name}.display.webp`;
         const display = await makeDisplayImage({
@@ -1158,8 +1159,9 @@ app.post(
       const result = await pool.query(
         `INSERT INTO media_files
            (owner_user_id, media_type, title, description, category, file_path, public_url,
-            thumbnail_url, original_filename, mime_type, size_bytes, visibility, publication_status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'public','draft')
+            thumbnail_url, original_filename, mime_type, size_bytes, visibility, publication_status,
+            thumbnail_status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'public','draft',$12)
          RETURNING *`,
         [
           req.account.id,
@@ -1172,7 +1174,8 @@ app.post(
           thumbnailUrl,
           req.file.originalname,
           req.file.mimetype,
-          req.file.size
+          req.file.size,
+          thumbnailStatus
         ]
       );
 
@@ -1186,6 +1189,46 @@ app.post(
       console.error("Public media upload error:", error);
       await cleanup();
       res.status(500).json({ status: "error", message: "Upload failed" });
+    }
+  }
+);
+
+/* SASA_ASYNC_THUMBNAILS_V27 — retry a thumbnail an admin can see has failed.
+ * Re-queues rather than generating inline, so the retry answers immediately
+ * and goes through the same single-claim worker path as a fresh upload. */
+app.post(
+  "/api/admin/public-media/:id/thumbnail/retry",
+  adminWriteLimiter,
+  ...requireAdmin,
+  async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `UPDATE media_files
+            SET thumbnail_status = 'pending',
+                thumbnail_attempts = 0,
+                thumbnail_error = NULL,
+                thumbnail_locked_at = NULL,
+                thumbnail_locked_by = NULL,
+                thumbnail_next_attempt_at = NULL,
+                updated_at = now()
+          WHERE id = $1
+            AND media_type = 'video'
+      RETURNING id, title, thumbnail_status`,
+        [req.params.id]
+      );
+
+      if (!rows[0]) {
+        return res.status(404).json({ status: "error", message: "Video not found" });
+      }
+
+      await recordAudit(req, "public_media.thumbnail_retry", "media", rows[0].id, {
+        title: rows[0].title
+      });
+
+      res.json({ status: "ok", media: rows[0] });
+    } catch (error) {
+      console.error("Thumbnail retry error:", error);
+      res.status(500).json({ status: "error", message: "Unable to retry" });
     }
   }
 );
@@ -1982,31 +2025,26 @@ app.post("/api/media/upload", ...requireSession, upload.single("file"), async (r
 
     let media = result.rows[0];
 
-    /* SASA_VIDEO_THUMBNAILS_V21 — uploaded videos showed only the generic
-     * placeholder because thumbnail_url was never populated. The frame is
-     * extracted after the row exists, so a thumbnail failure can never lose a
-     * video that is already safely stored: the upload still succeeds and the
-     * record simply keeps thumbnail_url = null, which the client renders as
-     * the fallback icon. */
+    /* SASA_ASYNC_THUMBNAILS_V27 — queued, not extracted inline.
+     *
+     * SASA_VIDEO_THUMBNAILS_V21 extracted the frame here, after the row
+     * existed, so a thumbnail failure could not lose an already-stored video.
+     * That property is kept, but the wait is not: ffmpeg can take ~165s worst
+     * case and Cloudflare cuts a proxied request at ~100s, so a family
+     * uploading a long video got HTTP 520 despite the file arriving intact.
+     *
+     * The row is marked 'pending' and thumbnail-worker.js does the work. The
+     * queue is this table, so it survives a pod restart and two replicas
+     * cannot claim the same row. */
     if (mediaType === "video") {
-      try {
-        const thumb = await generateVideoThumbnail({
-          videoPath: req.file.path,
-          uploadDir: UPLOAD_DIR,
-          videoFilename: req.file.filename,
-        });
+      const queued = await pool.query(
+        `UPDATE media_files SET thumbnail_status = 'pending', updated_at = now()
+          WHERE id = $1
+      RETURNING *`,
+        [media.id]
+      );
 
-        const updated = await pool.query(
-          `UPDATE media_files SET thumbnail_url = $2, updated_at = now()
-            WHERE id = $1
-        RETURNING *`,
-          [media.id, thumb.publicUrl]
-        );
-
-        if (updated.rows[0]) media = updated.rows[0];
-      } catch (thumbError) {
-        console.error("Thumbnail generation failed for", media.id, thumbError.message);
-      }
+      if (queued.rows[0]) media = queued.rows[0];
     }
 
     let childProfileIds = [];
@@ -2397,4 +2435,10 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`SaraTube backend API running on port ${PORT}`);
   console.log(`Using Ollama at ${OLLAMA_URL}`);
   console.log(`Using model ${OLLAMA_MODEL}`);
+
+  /* SASA_ASYNC_THUMBNAILS_V27 — starts after the port is open so a slow first
+   * claim cannot delay readiness. Recovery needs no special path: rows left
+   * 'processing' by a pod that died are reclaimed by the same stale-claim
+   * branch the worker always uses. */
+  startThumbnailWorker(pool, UPLOAD_DIR);
 });
