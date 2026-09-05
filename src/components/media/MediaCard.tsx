@@ -1,4 +1,13 @@
-import { Check, Heart, Image as ImageIcon, Link2, MoreVertical, Share2, Video } from "lucide-react";
+import {
+  Users,
+  Check,
+  Heart,
+  Image as ImageIcon,
+  Link2,
+  MoreVertical,
+  Share2,
+  Video,
+} from "lucide-react";
 import { useRef, useState, type MouseEvent } from "react";
 import { useDismiss } from "@/hooks/use-dismiss";
 import { shareMedia } from "@/lib/share";
@@ -7,6 +16,9 @@ import { mediaThumbnailFallback } from "../KidsVideoHome";
 import { getMediaByline, getMediaMetaLine, isClockDuration } from "./media-meta";
 
 type Props = {
+  /* SASA_FRIENDS_V32 — offered only when a child session exists and the item
+   * has a backend id, so the entry never appears where sharing cannot work. */
+  onShareToFriend?: (mediaId: string, title: string) => void;
   item: KidsVideoItem;
   saved: boolean;
   onOpen: (item: KidsVideoItem) => void;
@@ -29,7 +41,7 @@ function SourceIcon({ item }: { item: KidsVideoItem }) {
  * every line comes from media-meta.ts, which omits whatever the backend
  * did not send.
  */
-export function MediaCard({ item, saved, onOpen, onToggleSave }: Props) {
+export function MediaCard({ item, saved, onOpen, onToggleSave, onShareToFriend }: Props) {
   const isPhoto = item.sourceType === "photo";
   const duration = isClockDuration(item.duration) ? item.duration : null;
   const meta = getMediaMetaLine(item);
@@ -112,6 +124,20 @@ export function MediaCard({ item, saved, onOpen, onToggleSave }: Props) {
                 <Heart size={17} fill={saved ? "currentColor" : "none"} />
                 {saved ? "Remove from library" : "Save to library"}
               </button>
+
+              {onShareToFriend && item.mediaId && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    onShareToFriend(item.mediaId as string, item.title);
+                    setMenuOpen(false);
+                  }}
+                >
+                  <Users size={17} />
+                  Share with a friend
+                </button>
+              )}
 
               <button type="button" role="menuitem" onClick={handleShare}>
                 <Share2 size={17} />

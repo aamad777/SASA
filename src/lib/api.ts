@@ -431,6 +431,10 @@ export async function createChild(token: string, input: CreateChildInput): Promi
 
 export type ChildLoginResponse = {
   status: string;
+  /* SASA_FRIENDS_V32 — the child-scoped session the server issues on a
+   * successful PIN or profile select. Friends and sharing act as the child, so
+   * this is the token those calls must use. */
+  token?: string;
   child: {
     id: number;
     userId: number;

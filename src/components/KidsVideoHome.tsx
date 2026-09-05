@@ -38,6 +38,9 @@ import {
 } from "../lib/theme";
 import { useDismiss } from "../hooks/use-dismiss";
 import AppShell from "./layout/AppShell";
+import KidsFriends from "./KidsFriends";
+import KidsSharedWithMe from "./KidsSharedWithMe";
+import ShareToFriend from "./ShareToFriend";
 import AccountMenu, { type AccountMenuItem } from "./layout/AccountMenu";
 import { KIDS_SECTIONS, type KidsSectionId } from "./layout/nav-sections";
 import MediaCard from "./media/MediaCard";
@@ -361,6 +364,15 @@ export default function KidsVideoHome({
   onAccountAction,
 }: KidsVideoHomeProps) {
   const isGuestAccount = typeof onOpenFreeAccount === "function";
+
+  /* SASA_FRIENDS_V32 — friends and sharing act AS the child, so they run on
+   * the child-scoped token the server issued at PIN/profile-select, never on
+   * the parent's. A guest has no session at all and simply gets no Friends. */
+  const childToken =
+    typeof window !== "undefined" ? localStorage.getItem("sasa-child-token") : null;
+
+  /* The item a child chose to share, held while the sheet is open. */
+  const [sharing, setSharing] = useState<{ id: string; title: string } | null>(null);
 
   const [currentTab, setCurrentTab] = useState<KidsHomeTab>(activeTabProp || initialTab);
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -799,6 +811,7 @@ export default function KidsVideoHome({
             saved={libraryIds.includes(video.id)}
             onOpen={openVideo}
             onToggleSave={toggleLibrary}
+            onShareToFriend={childToken ? (id, title) => setSharing({ id, title }) : undefined}
           />
         ))}
       </div>
@@ -868,6 +881,17 @@ export default function KidsVideoHome({
           persists through the backend and can upload a cropped photo. A local
           profile has no server-side profile to save to, so it keeps the
           emoji list below. */}
+      {/* SASA_FRIENDS_V32 — the share sheet. Submitting creates a PENDING
+          share; nothing reaches the friend until both grown-ups approve. */}
+      {sharing && childToken && (
+        <ShareToFriend
+          token={childToken}
+          mediaId={sharing.id}
+          mediaTitle={sharing.title}
+          onClose={() => setSharing(null)}
+        />
+      )}
+
       {showAvatarPicker && avatarToken && databaseProfileId && (
         <AvatarChooser
           token={avatarToken}
@@ -1032,7 +1056,27 @@ export default function KidsVideoHome({
     if (currentTab === "games") return <KidsGamesStudio />;
     if (currentTab === "studio") return <KidsDrawingStudio />;
     if (currentTab === "songs") return <KidsSongsStudio />;
+    if (currentTab === "library" && childToken) {
+      return (
+        <>
+          <h3 className="sasa-section-heading">Shared with me</h3>
+          <KidsSharedWithMe token={childToken} kind="video" />
+          <KidsSharedWithMe token={childToken} kind="photo" />
+          <h3 className="sasa-section-heading">Saved by me</h3>
+          {renderGrid()}
+        </>
+      );
+    }
     if (currentTab === "profile") return renderProfile();
+    if (currentTab === "friends") {
+      return childToken ? (
+        <KidsFriends token={childToken} />
+      ) : (
+        <p className="sasa-friends-note">
+          Ask a grown-up to open your profile so you can use Friends.
+        </p>
+      );
+    }
 
     return (
       <>

@@ -54,6 +54,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import ParentFriendsPanel, { useParentFriendsPending } from "./ParentFriendsPanel";
 
 export type BlockedChannel = {
   id: number;
@@ -97,6 +98,7 @@ type ManagedCustomProfile = {
 
 type ParentSection =
   | "screen-time"
+  | "friends-sharing"
   | "content-filters"
   | "kids-media"
   | "activity-history"
@@ -244,6 +246,9 @@ export default function ParentDashboard({
   onToggleProfileProtection,
   onSettingsChange,
 }: ParentDashboardProps) {
+  /* SASA_FRIENDS_V32 — live pending count for the sidebar badge. */
+  const friendsPending = useParentFriendsPending(parentToken);
+
   const [activeSection, setActiveSection] = useState<ParentSection>("screen-time");
 
   const [mediaMode, setMediaMode] = useState<"upload" | "youtube">("upload");
@@ -1023,6 +1028,27 @@ export default function ParentDashboard({
           >
             <span className="parent-nav-emoji">👨‍👩‍👧</span>
             Profiles
+          </button>
+
+          <button
+            type="button"
+            className={
+              activeSection === "friends-sharing" ? "parent-nav-item active" : "parent-nav-item"
+            }
+            onClick={() => {
+              playPopSound();
+              setActiveSection("friends-sharing");
+            }}
+          >
+            <Users size={26} />
+            Friends &amp; Sharing
+            {/* Real count from the server's own awaiting_me flag; hidden at
+                zero rather than rendering a "0". */}
+            {friendsPending > 0 && (
+              <span className="sasa-pending-badge" aria-label={`${friendsPending} awaiting you`}>
+                {friendsPending}
+              </span>
+            )}
           </button>
 
           <button
@@ -2799,6 +2825,17 @@ export default function ParentDashboard({
             </section>
           )}
 
+          {activeSection === "friends-sharing" && parentToken && (
+            <section className="parent-section">
+              <h2 className="parent-section-title">Friends &amp; Sharing</h2>
+              <p className="parent-section-sub">
+                Both families must approve a friendship, and both must approve every shared photo or
+                video before it appears.
+              </p>
+              <ParentFriendsPanel token={parentToken} />
+            </section>
+          )}
+
           {activeSection === "settings" && (
             <section className="parent-settings-page">
               <article className="parent-settings-card">
@@ -3032,6 +3069,7 @@ function MobileBottomNavigation({
     { id: "content-filters", label: "Filters", icon: Shield },
     { id: "kids-media", label: "Media", icon: Film },
     { id: "profiles", label: "Profiles", icon: Users },
+    { id: "friends-sharing", label: "Friends", icon: Users },
     { id: "activity-history", label: "Activity", icon: BarChart3 },
     { id: "settings", label: "Settings", icon: Settings },
   ] satisfies Array<{

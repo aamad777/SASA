@@ -165,9 +165,14 @@ export default function DatabaseProfileSelection({
       setChildPinError("");
 
       try {
-        await selectChildProfile(token, child.id);
+        const opened = await selectChildProfile(token, child.id);
 
-        localStorage.removeItem("sasa-child-token");
+        /* SASA_FRIENDS_V32 — keep the child-scoped token the server issues.
+         * Friends and sharing act AS the child, so they must run on the
+         * child's own session; using the parent's token would let a child
+         * act with parent privileges. */
+        if (opened?.token) localStorage.setItem("sasa-child-token", opened.token);
+        else localStorage.removeItem("sasa-child-token");
 
         onSelectChild(child);
       } catch (error) {
@@ -214,9 +219,11 @@ export default function DatabaseProfileSelection({
     setChildPinError("");
 
     try {
-      await loginChild(pendingChild.login_name, childPin);
+      const session = await loginChild(pendingChild.login_name, childPin);
 
-      localStorage.removeItem("sasa-child-token");
+      // Same reasoning as the PIN-less path above.
+      if (session?.token) localStorage.setItem("sasa-child-token", session.token);
+      else localStorage.removeItem("sasa-child-token");
 
       const verifiedChild = pendingChild;
 
