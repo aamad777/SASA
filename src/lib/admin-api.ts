@@ -77,6 +77,12 @@ export type PublicMediaItem = {
   is_featured: boolean;
   size_bytes: number | null;
   created_at: string;
+  /* SASA_ASYNC_THUMBNAILS_V27 — a video's frame is extracted by a worker after
+   * the upload responds, so the admin needs the job state, not just the URL.
+   * Optional: an older backend answers without these fields. */
+  thumbnail_status?: "pending" | "processing" | "ready" | "failed";
+  thumbnail_attempts?: number;
+  thumbnail_error?: string | null;
 };
 
 export type AuditEntry = {
@@ -241,4 +247,15 @@ export function updatePublicMedia(
 
 export function deletePublicMedia(token: string, id: string) {
   return adminFetch<{ status: string }>(token, `/admin/public-media/${id}`, { method: "DELETE" });
+}
+
+/* SASA_ASYNC_THUMBNAILS_V27 — re-queues a failed thumbnail. Returns as soon as
+ * the row is marked pending; the worker does the extraction, so the admin sees
+ * "Processing" rather than a request that hangs on ffmpeg. */
+export function retryThumbnail(token: string, id: string) {
+  return adminFetch<{ media: PublicMediaItem }>(
+    token,
+    `/admin/public-media/${id}/thumbnail/retry`,
+    { method: "POST" },
+  );
 }

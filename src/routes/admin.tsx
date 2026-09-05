@@ -13,6 +13,7 @@ import {
   getAuditLog,
   revokeParentSessions,
   setParentStatus,
+  retryThumbnail,
   updatePublicMedia,
   uploadPublicMedia,
   type AdminOverview,
@@ -541,6 +542,37 @@ function PublicMediaScreen({ token }: { token: string }) {
 
   useEffect(load, [load]);
 
+  /* SASA_ASYNC_THUMBNAILS_V27 — an upload now answers before its frame is
+   * extracted, so the list has to catch up on its own rather than leaving
+   * "Processing" on screen until someone reloads. Polling stops as soon as
+   * nothing is outstanding, so an idle admin screen makes no requests. */
+  const awaitingThumbnail = items.some(
+    (item) => item.thumbnail_status === "pending" || item.thumbnail_status === "processing",
+  );
+
+  useEffect(() => {
+    if (!awaitingThumbnail) return;
+
+    const id = window.setInterval(() => {
+      getAdminPublicMedia(token, { limit: 50 })
+        .then((data) => setItems(data.media))
+        .catch(() => {
+          /* A blip must not clear the list or stop the next poll. */
+        });
+    }, 4000);
+
+    return () => window.clearInterval(id);
+  }, [awaitingThumbnail, token]);
+
+  const doRetryThumbnail = async (item: PublicMediaItem) => {
+    try {
+      await retryThumbnail(token, item.id);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not retry the thumbnail.");
+    }
+  };
+
   const doUpload = async () => {
     if (uploadingRef.current || !file) return;
     uploadingRef.current = true;
@@ -632,7 +664,9 @@ function PublicMediaScreen({ token }: { token: string }) {
             aria-valuemax={100}
           >
             <span style={{ width: `${progress}%` }} />
-            <em>Uploading and processing… {progress}%</em>
+            {/* The thumbnail is no longer extracted inside this request, so
+                claiming "processing" here would overstate what is happening. */}
+            <em>Uploading… {progress}%</em>
           </div>
         ) : null}
 
@@ -666,6 +700,13 @@ function PublicMediaScreen({ token }: { token: string }) {
               <span className="sasa-admin-thumb">
                 {item.thumbnail_url ? (
                   <img src={getApiAssetUrl(item.thumbnail_url)} alt="" loading="lazy" />
+                ) : item.thumbnail_status === "pending" ||
+                  item.thumbnail_status === "processing" ? (
+                  /* Not "No preview": the frame is on its way, and saying
+                   * otherwise reads as a permanent failure. */
+                  <em>Processing thumbnail…</em>
+                ) : item.thumbnail_status === "failed" ? (
+                  <em>Thumbnail failed</em>
                 ) : (
                   <em>No preview</em>
                 )}
@@ -684,6 +725,22 @@ function PublicMediaScreen({ token }: { token: string }) {
                   >
                     {item.publication_status}
                   </span>
+                  {item.media_type === "video" &&
+                  item.thumbnail_status &&
+                  item.thumbnail_status !== "ready" ? (
+                    <>
+                      {" · "}
+                      <span className="sasa-admin-badge is-draft" role="status">
+                        {item.thumbnail_status === "failed"
+                          ? `thumbnail failed${
+                              item.thumbnail_attempts
+                                ? ` after ${item.thumbnail_attempts} tries`
+                                : ""
+                            }`
+                          : "processing thumbnail"}
+                      </span>
+                    </>
+                  ) : null}
                 </span>
               </span>
 
@@ -691,6 +748,11 @@ function PublicMediaScreen({ token }: { token: string }) {
                 <button type="button" onClick={() => togglePublish(item)}>
                   {item.publication_status === "published" ? "Unpublish" : "Publish"}
                 </button>
+                {item.media_type === "video" && item.thumbnail_status === "failed" ? (
+                  <button type="button" onClick={() => doRetryThumbnail(item)}>
+                    Retry thumbnail
+                  </button>
+                ) : null}
                 <button type="button" onClick={() => setConfirmDelete(item)}>
                   Delete
                 </button>

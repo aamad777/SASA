@@ -24,8 +24,21 @@ const execFileAsync = promisify(execFile);
 export const THUMB_WIDTH = 1280;
 export const THUMB_HEIGHT = 720;
 
-const PROBE_TIMEOUT_MS = 15_000;
-const FRAME_TIMEOUT_MS = 30_000;
+/* SASA_ASYNC_THUMBNAILS_V27 — tightened from 15s/30s.
+ *
+ * The old budget was 15s probe + 4 candidates x 30s + 30s write = ~165s worst
+ * case, which is what pushed an upload past Cloudflare's ~100s proxy limit
+ * back when this ran inside the request. Generation is off the request now,
+ * but an unbounded job still ties up the single worker and delays every video
+ * queued behind it, so the ceiling still matters.
+ *
+ * Seeking to a timestamp and decoding one frame is fast even for large files;
+ * anything past these limits means a damaged or pathological stream that a
+ * longer wait will not rescue. The candidate ladder below drops from four
+ * entries to three, keeping the spread across the opening quarter that avoids
+ * black frames. New worst case: 10 + 3x12 + 12 = 58s. */
+const PROBE_TIMEOUT_MS = 10_000;
+const FRAME_TIMEOUT_MS = 12_000;
 const MAX_BUFFER = 8 * 1024 * 1024;
 
 // A frame this dark is treated as the opening fade rather than content.
@@ -156,10 +169,10 @@ export async function generateVideoThumbnail({ videoPath, uploadDir, videoFilena
   // 10-25% in, past the opening frames. A duration-less stream (some webm
   // variants) still gets a sensible fixed ladder.
   const candidates = durationSeconds
-    ? [0.1, 0.15, 0.2, 0.25].map((fraction) =>
+    ? [0.1, 0.18, 0.25].map((fraction) =>
         Math.max(0.3, Math.min(durationSeconds - 0.1, durationSeconds * fraction)),
       )
-    : [1, 2, 3, 5];
+    : [1, 3, 5];
 
   let best = { seconds: candidates[0], luma: -1 };
 
