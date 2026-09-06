@@ -185,9 +185,26 @@ export async function friendshipParents(pool, friendship) {
  */
 export async function parentSideOfFriendship(pool, account, friendship) {
   if (!account) return null;
+
   const { requesterParent, addresseeParent } = await friendshipParents(pool, friendship);
+
+  /* Parenthood is tested BEFORE the role. An administrator who is also the
+   * parent of one of these children is acting as that parent, not as an
+   * administrator — checking the role first made every approval by such an
+   * account look like an override, which is not what it is. */
+  const ownsRequester = account.id === requesterParent;
+  const ownsAddressee = account.id === addresseeParent;
+
+  /* One parent owning both children is one family on both sides, so a single
+   * approval genuinely is both families agreeing. Requiring two clicks would
+   * be theatre, and leaving it unrepresentable meant such a friendship could
+   * never become active at all. */
+  if (ownsRequester && ownsAddressee) return "both";
+  if (ownsRequester) return "requester";
+  if (ownsAddressee) return "addressee";
+
+  // Only now, with no parental relationship at all, is this an override.
   if (account.role === "admin") return "admin";
-  if (account.id === requesterParent) return "requester";
-  if (account.id === addresseeParent) return "addressee";
+
   return null;
 }
