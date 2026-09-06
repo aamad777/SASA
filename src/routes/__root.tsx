@@ -132,10 +132,16 @@ function RootShell({ children }: { children: ReactNode }) {
             start flashed the default theme first. Inline and synchronous so
             the attribute is on <html> before any pixel is drawn; wrapped in
             try/catch because storage can be unavailable, and silent because a
-            missing theme is not an error. */}
+            missing theme is not an error.
+
+            SASA_KID_THEMES_V35 — when a child IS known, only that child's key
+            is read. Falling through to the shared key painted the previous
+            child's theme for a sibling who had never chosen one, which then
+            snapped back to the default on mount: the flash this script
+            exists to prevent. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var p=localStorage.getItem('sasa-active-kid-id');var t=(p&&localStorage.getItem('sasa-app-theme:'+p))||localStorage.getItem('sasa-app-theme');if(t&&/^[a-z]+$/.test(t)){document.documentElement.setAttribute('data-theme',t);document.documentElement.setAttribute('data-app-theme',t);}}catch(e){}`,
+            __html: `try{var p=localStorage.getItem('sasa-active-kid-id');var t=p?localStorage.getItem('sasa-app-theme:'+p):localStorage.getItem('sasa-app-theme');if(t&&/^[a-z]+$/.test(t)){document.documentElement.setAttribute('data-theme',t);document.documentElement.setAttribute('data-app-theme',t);}}catch(e){}`,
           }}
         />
       </head>

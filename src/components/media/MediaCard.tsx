@@ -88,8 +88,10 @@ export function MediaCard({ item, saved, onOpen, onToggleSave, onShareToFriend }
       {/* SASA_KID_SHARE_V34 — was hidden in the overflow menu next to a
           different "Share" (the OS sheet), so children never found it. It is
           now a visible control on the card, and only on items that really can
-          be shared. */}
-      {onShareToFriend && item.mediaId && (
+          be shared: SASA_KID_SHARE_V35 adds `shareable`, because the button
+          also appeared on public-library cards, where the server refuses the
+          share with a "Not found" a child can do nothing about. */}
+      {onShareToFriend && item.mediaId && item.shareable && (
         <button
           type="button"
           className="sasa-card-share"

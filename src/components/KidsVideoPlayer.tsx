@@ -39,6 +39,7 @@ import {
   getMediaKindLabel,
   getMediaMetaLine,
 } from "./media/media-meta";
+import ShareToFriend from "./ShareToFriend";
 import WatchPartyModal, { type WatchPartyBuddy } from "./WatchPartyModal";
 import NumbersLearningVideo from "./NumbersLearningVideo";
 
@@ -336,6 +337,12 @@ export default function KidsVideoPlayer({
     return stored === null ? true : stored === "true";
   });
   const [theaterMode, setTheaterMode] = useState(false);
+  /* SASA_KID_SHARE_V35 — "Send to a friend" was only ever on a feed card, so
+   * a child watching something had no way to share it. Same sheet, same
+   * child-scoped token, same server-side approval. */
+  const [showShareToFriend, setShowShareToFriend] = useState(false);
+  const childToken =
+    typeof window !== "undefined" ? localStorage.getItem("sasa-child-token") : null;
   // SASA_WATCH_INFO_V19 — the description/metadata panel under the title is
   // collapsed by default and expands on tap, the way a phone watch page works.
   const [infoExpanded, setInfoExpanded] = useState(false);
@@ -1006,6 +1013,21 @@ export default function KidsVideoPlayer({
                 <span className="sasa-watch-actionlabel">Share</span>
               </button>
 
+              {childToken && (
+                <button
+                  type="button"
+                  className="sasa-btn"
+                  onClick={() => {
+                    playPopSound();
+                    setShowShareToFriend(true);
+                  }}
+                  aria-label={`Send ${video.title} to a friend`}
+                >
+                  <Users size={18} />
+                  <span className="sasa-watch-actionlabel">Friend</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 className="sasa-btn"
@@ -1182,6 +1204,17 @@ export default function KidsVideoPlayer({
         onTogglePlay={handleTogglePlay}
         videoTitle={video.title}
       />
+
+      {showShareToFriend && childToken && (
+        <ShareToFriend
+          token={childToken}
+          /* Only media assigned to this child can be shared; the sheet says
+             so for anything else rather than failing on Send. */
+          mediaId={video.shareable && video.mediaId ? video.mediaId : null}
+          mediaTitle={video.title}
+          onClose={() => setShowShareToFriend(false)}
+        />
+      )}
     </AppShell>
   );
 }

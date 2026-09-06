@@ -31,6 +31,7 @@ import {
   type AssignedChildMedia,
   type DatabaseChild,
 } from "@/lib/api";
+import { assignedMediaId, publicMediaId } from "@/lib/media-id";
 
 export const Route = createFileRoute("/")({ component: SasaEntry });
 
@@ -44,48 +45,6 @@ type Profile = {
   color: string;
   image?: string;
 };
-
-/* SASA_FEED_ID_V19 — assigned-media ids used to be `1000000 + Number(item.id)`.
- * `media_files.id` is a `uuid`, so `Number()` returned NaN and EVERY assigned
- * item ended up with `id: NaN`. That is not cosmetic:
- *   - `key={video.id}` was NaN for every card;
- *   - `[NaN].includes(NaN)` is `true`, so saving one item showed all of them
- *     as saved, and blocking one blocked the whole assigned library;
- *   - reactions and watch progress keyed on `sasa-video-reaction-${id}`
- *     collapsed onto a single shared NaN key;
- *   - activity entries recorded `videoId: 0` for everything.
- *
- * The rest of the app is built around numeric ids (built-in videos use small
- * integers), so rather than widen the type everywhere this derives a stable,
- * collision-resistant positive integer from the uuid with an FNV-1a hash and
- * keeps it far above the built-in range. The same uuid always maps to the same
- * id, so saved/blocked/reaction state survives reloads. The untouched uuid is
- * carried alongside as `mediaId` for anything that needs the real key.
- */
-const ASSIGNED_ID_BASE = 1_000_000;
-
-/** Same stable hash, offset into its own range for library items. */
-function publicMediaId(rawId: string): number {
-  return assignedMediaId(rawId) - ASSIGNED_ID_BASE;
-}
-
-function assignedMediaId(rawId: string | number): number {
-  const value = String(rawId);
-
-  // A backend that really does return a number keeps its original id.
-  if (/^\d+$/.test(value)) {
-    return ASSIGNED_ID_BASE + Number(value);
-  }
-
-  let hash = 0x811c9dc5;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-
-  return ASSIGNED_ID_BASE + (hash % 1_000_000_000);
-}
 
 function getStorageItem(key: string): string | null {
   if (typeof window !== "undefined" && typeof window.localStorage?.getItem === "function") {
@@ -229,6 +188,11 @@ function SasaApp() {
               sourceLabel: "SASA library",
               description: item.description || undefined,
               mediaId: item.id,
+              /* SASA_KID_SHARE_V35 — library media is not assigned to this
+               * child, and /api/shares only accepts an item the child is
+               * assigned. Marking it plainly keeps the Share control off a
+               * card where the server would refuse. */
+              shareable: false,
             } satisfies KidsVideoItem;
           }),
         );
@@ -365,6 +329,8 @@ function SasaApp() {
             // entirely when it is empty.
             description: item.description?.trim() || undefined,
             mediaId: String(item.id),
+            // Assigned to this child, so the server will accept a share.
+            shareable: true,
           };
         });
 
