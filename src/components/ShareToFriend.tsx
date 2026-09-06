@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, Clock, Loader2, Send, X } from "lucide-react";
-import { listFriends, shareMedia, type Friend } from "@/lib/friends-api";
+import { listFriends, listSentShares, shareMedia, type Friend } from "@/lib/friends-api";
 import FriendAvatar from "./FriendAvatar";
 
 type Outcome = { friend: string; ok: boolean; note: string };
@@ -34,6 +34,9 @@ export default function ShareToFriend({
 }) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [pendingWith, setPendingWith] = useState<Set<string>>(new Set());
+  /** friendshipId -> the server's status for THIS item, so the sheet can say
+   *  "waiting" and "already there" differently rather than lumping them. */
+  const [settled, setSettled] = useState<Record<string, string>>({});
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -43,14 +46,40 @@ export default function ShareToFriend({
   useEffect(() => {
     let cancelled = false;
 
-    /* "Already shared" has to come from somewhere the child can see before
-     * they tap, otherwise the only feedback is a duplicate error afterwards.
-     * The received list is the recipient's view, so it cannot tell us what we
-     * sent; the duplicate check on the server remains the real guard and its
-     * message is surfaced verbatim below. */
-    listFriends(token)
-      .then((d) => {
-        if (!cancelled) setFriends(d.friends.filter((f) => f.status === "active"));
+    /* "Already shared" has to be visible BEFORE the child taps, otherwise the
+     * only feedback is a duplicate error afterwards — and it has to survive a
+     * refresh, which a session-local record does not.
+     *
+     * /shares/sent is the child's own outgoing list, so it answers both. It is
+     * a display aid only: the duplicate check on the server remains the real
+     * guard, and its message is surfaced verbatim below. A failure to load it
+     * must not block sharing, so it degrades to the old behaviour rather than
+     * becoming an error. */
+    Promise.all([listFriends(token), listSentShares(token).catch(() => ({ shares: [] }))])
+      .then(([friendList, sent]) => {
+        if (cancelled) return;
+        setFriends(friendList.friends.filter((f) => f.status === "active"));
+
+        // Only this item, and only where a grown-up has yet to decide or has
+        // already said yes. A rejected or revoked share may be sent again.
+        setPendingWith(
+          new Set(
+            sent.shares
+              .filter(
+                (share) =>
+                  share.media_id === mediaId &&
+                  (share.status === "pending" || share.status === "active"),
+              )
+              .map((share) => share.friendship_id),
+          ),
+        );
+        setSettled(
+          Object.fromEntries(
+            sent.shares
+              .filter((share) => share.media_id === mediaId)
+              .map((share) => [share.friendship_id, share.status]),
+          ),
+        );
       })
       .catch((e: Error) => {
         if (!cancelled) setLoadError(e.message);
@@ -62,7 +91,7 @@ export default function ShareToFriend({
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, mediaId]);
 
   /* Escape closes the sheet, and Android's Back button reaches the WebView as
    * the same key. Without this the only way out on a phone was the small X. */
@@ -95,6 +124,7 @@ export default function ShareToFriend({
         await shareMedia(token, mediaId, friendshipId);
         results.push({ friend: name, ok: true, note: "Sent to your parents for approval." });
         setPendingWith((p) => new Set(p).add(friendshipId));
+        setSettled((current) => ({ ...current, [friendshipId]: "pending" }));
       } catch (e) {
         // The server's own words — "already shared", "not an approved friend"
         // — are more accurate than anything guessed here.
@@ -112,7 +142,8 @@ export default function ShareToFriend({
   };
 
   const pickable = friends.filter((f) => !pendingWith.has(f.id));
-  const alreadySent = friends.filter((f) => pendingWith.has(f.id));
+  const waiting = friends.filter((f) => settled[f.id] === "pending");
+  const delivered = friends.filter((f) => settled[f.id] === "active");
 
   return (
     <div
@@ -159,7 +190,8 @@ export default function ShareToFriend({
 
         {mediaId && !loading && !loadError && friends.length > 0 && pickable.length === 0 && (
           <p className="sasa-friends-note">
-            You&apos;ve already sent this to all of your friends. A grown-up is checking it.
+            You&apos;ve already sent this to all of your friends. The lines below say where each one
+            got to.
           </p>
         )}
 
@@ -205,14 +237,20 @@ export default function ShareToFriend({
           </>
         )}
 
-        {/* What this child has already asked for, so a second tap is never
-            needed to find out. Only this session's sends are known: the API
-            has no "shares I sent" listing, so nothing is claimed about
-            earlier ones — the server's duplicate check answers those. */}
-        {alreadySent.length > 0 && (
+        {/* What this child has already asked for. Read from /shares/sent, so it
+            is still right after a refresh rather than only for as long as the
+            sheet has been open. */}
+        {waiting.length > 0 && (
           <p className="sasa-friends-note">
             <Clock size={14} aria-hidden="true" /> Waiting for a grown-up:{" "}
-            {alreadySent.map((f) => f.child.display_name.split(" ")[0]).join(", ")}
+            {waiting.map((f) => f.child.display_name.split(" ")[0]).join(", ")}
+          </p>
+        )}
+
+        {delivered.length > 0 && (
+          <p className="sasa-friends-note is-ok">
+            <Check size={14} aria-hidden="true" /> Already sent to{" "}
+            {delivered.map((f) => f.child.display_name.split(" ")[0]).join(", ")}
           </p>
         )}
 

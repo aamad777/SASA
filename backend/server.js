@@ -3908,6 +3908,71 @@ app.post(
   }
 );
 
+/* ── What THIS child has sent ──────────────────────────────────────────── */
+/*
+ * SASA_KID_SHARE_V35 — the counterpart to /shares/received.
+ *
+ * Without this a child could only learn they had already sent something by
+ * tapping Send again and reading the duplicate error, and any sense of
+ * "waiting for a grown-up" vanished on refresh. The share sheet had to either
+ * stay silent or invent a local record of the child's own requests, and a
+ * local record drifts the moment a parent decides something.
+ *
+ * Deliberately narrow. It answers only for the acting child's OWN outgoing
+ * shares, taken from the session rather than any parameter, and it carries no
+ * content URL: this is a list of requests and their state, not a second way to
+ * reach media. The recipient is described with safeChildShape, which is the
+ * same name and picture the child already sees on their Friends page — no
+ * account, no parent, no storage path.
+ */
+app.get("/api/shares/sent", ...requireSession, async (req, res) => {
+  try {
+    const me = await requireChild(req, res);
+    if (!me) return;
+
+    const { rows } = await pool.query(
+      `SELECT s.id AS share_id, s.status, s.friendship_id, s.created_at, s.updated_at,
+              s.sender_parent_approved_at, s.recipient_parent_approved_at,
+              s.admin_override_at, s.rejected_at, s.revoked_at,
+              m.id AS media_id, m.media_type, m.title,
+              rp.id AS recipient_id, rp.display_name AS recipient_name,
+              rp.avatar_url AS recipient_avatar, rp.friend_id AS recipient_friend_id
+         FROM media_shares s
+         JOIN media_files m ON m.id = s.media_id
+         JOIN profiles rp ON rp.id = s.recipient_profile_id
+        WHERE s.sender_profile_id = $1
+        ORDER BY s.updated_at DESC`,
+      [me.id]
+    );
+
+    res.set("Cache-Control", "private, no-store");
+    res.json({
+      status: "ok",
+      shares: rows.map((row) => ({
+        share_id: row.share_id,
+        media_id: row.media_id,
+        media_type: row.media_type,
+        title: row.title,
+        friendship_id: row.friendship_id,
+        /* Derived exactly like every other status in this file, so a share
+         * cannot read "waiting" here and "approved" on the parent's screen. */
+        status: shareStatusFrom(row),
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        shared_with: safeChildShape({
+          id: row.recipient_id,
+          display_name: row.recipient_name,
+          avatar_url: row.recipient_avatar,
+          friend_id: row.recipient_friend_id
+        })
+      }))
+    });
+  } catch (error) {
+    console.error("Shares-sent error:", error);
+    res.status(500).json({ status: "error", message: "Unable to load what you sent" });
+  }
+});
+
 /* ── What has been shared with this child ──────────────────────────────── */
 app.get("/api/shares/received", ...requireSession, async (req, res) => {
   try {

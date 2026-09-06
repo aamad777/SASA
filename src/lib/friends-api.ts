@@ -131,6 +131,28 @@ export function listSharedWithMe(token: string) {
   return call<{ media: SharedMediaItem[] }>(token, "/shares/received");
 }
 
+/* SASA_KID_SHARE_V35 — what this child has sent, and what became of it.
+ *
+ * Carries no content URL by design: it answers "did I already send this, and
+ * is a grown-up still deciding?", which is all the share sheet needs. Without
+ * it the sheet could only report the current session's sends, so a refresh
+ * made a pending request look like it had never happened. */
+export type SentShare = {
+  share_id: string;
+  media_id: string;
+  media_type: "video" | "photo";
+  title: string;
+  friendship_id: string;
+  status: "pending" | "active" | "rejected" | "revoked";
+  created_at: string;
+  updated_at: string;
+  shared_with: SafeChild;
+};
+
+export function listSentShares(token: string) {
+  return call<{ shares: SentShare[] }>(token, "/shares/sent");
+}
+
 export function getParentFriendsOverview(token: string) {
   return call<{ friendships: ParentFriendship[]; shares: ParentShare[]; pending_count: number }>(
     token,
