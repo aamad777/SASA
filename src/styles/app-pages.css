@@ -2087,6 +2087,31 @@
   color: var(--sasa-danger, #b91c1c);
 }
 
+.sasa-friends-note.is-ok {
+  color: var(--sasa-ok, #15803d);
+  font-weight: 600;
+}
+
+/* SASA_KID_FRIENDS_V35 — "My friends" and its one Add button share a row and
+   wrap on a narrow phone rather than pushing the card sideways. */
+.sasa-friends-cardhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sasa-friends-cardhead h2 {
+  margin: 0;
+}
+
+.sasa-friends-subhead {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .sasa-friendid-row,
 .sasa-friends-search {
   display: flex;
@@ -2448,6 +2473,14 @@
 .sasa-friendpick-btn.is-picked .sasa-friendpick-avatar {
   outline: 3px solid var(--sasa-brand, #5b3ce0);
   outline-offset: 2px;
+}
+
+/* SASA_KID_FRIENDS_V35 — the tick now sits on a wrapper rather than inside
+   the circle, which has overflow:hidden and was clipping it. */
+.sasa-friendpick-avatarwrap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
 }
 
 .sasa-friendpick-tick {

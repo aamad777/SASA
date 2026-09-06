@@ -900,8 +900,15 @@
    ------------------------------------------------------------------- */
 
 html[data-app-theme="jungle"] .sasa-shell:not(.is-dark) {
-  --sasa-page: #e6f4ea;
-  --sasa-surface: #ffffff;
+  --sasa-page: #dbeee3;
+  /* SASA_KID_THEMES_V35 — the three light themes left --sasa-surface at pure
+     white, and the header, the bottom bar, the rail and every card read that
+     token. Measured in the browser, the top bar and tab bar were rgb(255,255,
+     255) under jungle and magic — pixel-identical to the default theme — so
+     only the page behind the content moved. They now carry the theme's own
+     tint, which is what "the whole app changed" has to mean. Kept light
+     enough that the dark --sasa-ink below stays far above 4.5:1. */
+  --sasa-surface: #eef9f2;
   --sasa-surface-2: #d6ebdd;
   --sasa-surface-3: #c3e0cd;
   --sasa-line: #a9d3b8;
@@ -914,8 +921,8 @@ html[data-app-theme="jungle"] .sasa-shell:not(.is-dark) {
 }
 
 html[data-app-theme="magic"] .sasa-shell:not(.is-dark) {
-  --sasa-page: #f3e9fb;
-  --sasa-surface: #ffffff;
+  --sasa-page: #eadff7;
+  --sasa-surface: #f9f1ff;
   --sasa-surface-2: #eadcf5;
   --sasa-surface-3: #dfc9ef;
   --sasa-line: #cfaee5;
@@ -928,8 +935,8 @@ html[data-app-theme="magic"] .sasa-shell:not(.is-dark) {
 }
 
 html[data-app-theme="dino"] .sasa-shell:not(.is-dark) {
-  --sasa-page: #fbf0dd;
-  --sasa-surface: #fffdf8;
+  --sasa-page: #f8ebd5;
+  --sasa-surface: #fff7e8;
   --sasa-surface-2: #f5e6cd;
   --sasa-surface-3: #eed9b6;
   --sasa-line: #ddc296;

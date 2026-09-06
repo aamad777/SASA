@@ -12,8 +12,9 @@
  */
 
 import { useEffect, useState } from "react";
-import { Check, Loader2, Send, X } from "lucide-react";
+import { Check, Clock, Loader2, Send, X } from "lucide-react";
 import { listFriends, shareMedia, type Friend } from "@/lib/friends-api";
+import FriendAvatar from "./FriendAvatar";
 
 type Outcome = { friend: string; ok: boolean; note: string };
 
@@ -24,7 +25,10 @@ export default function ShareToFriend({
   onClose,
 }: {
   token: string;
-  mediaId: string;
+  /* SASA_KID_SHARE_V35 — null for an item the server would refuse (anything
+   * not assigned to this child). The sheet still opens and says so; a control
+   * that silently does nothing is the thing being fixed. */
+  mediaId: string | null;
   mediaTitle: string;
   onClose: () => void;
 }) {
@@ -60,6 +64,16 @@ export default function ShareToFriend({
     };
   }, [token]);
 
+  /* Escape closes the sheet, and Android's Back button reaches the WebView as
+   * the same key. Without this the only way out on a phone was the small X. */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   const toggle = (id: string) => {
     setChosen((current) => {
       const next = new Set(current);
@@ -70,7 +84,7 @@ export default function ShareToFriend({
   };
 
   const send = async () => {
-    if (chosen.size === 0) return;
+    if (chosen.size === 0 || !mediaId) return;
     setSending(true);
     const results: Outcome[] = [];
 
@@ -98,6 +112,7 @@ export default function ShareToFriend({
   };
 
   const pickable = friends.filter((f) => !pendingWith.has(f.id));
+  const alreadySent = friends.filter((f) => pendingWith.has(f.id));
 
   return (
     <div
@@ -119,29 +134,36 @@ export default function ShareToFriend({
 
         <p className="sasa-sharesheet-item">{mediaTitle}</p>
 
-        {loading && <p className="sasa-friends-note">Loading your friends…</p>}
+        {loading && mediaId && <p className="sasa-friends-note">Loading your friends…</p>}
 
         {/* Each of these is a real explanation, never a dead button. */}
-        {!loading && loadError && (
+        {!mediaId && (
+          <p className="sasa-friends-note">
+            This one can&apos;t be sent to a friend. You can send the photos and videos a grown-up
+            put in your own library.
+          </p>
+        )}
+
+        {mediaId && !loading && loadError && (
           <p className="sasa-friends-note is-error" role="alert">
             {loadError}
           </p>
         )}
 
-        {!loading && !loadError && friends.length === 0 && (
+        {mediaId && !loading && !loadError && friends.length === 0 && (
           <p className="sasa-friends-note">
             You don&apos;t have any approved friends yet. Add a friend on the Friends page — a
             grown-up on both sides says yes first.
           </p>
         )}
 
-        {!loading && !loadError && friends.length > 0 && pickable.length === 0 && (
+        {mediaId && !loading && !loadError && friends.length > 0 && pickable.length === 0 && (
           <p className="sasa-friends-note">
             You&apos;ve already sent this to all of your friends. A grown-up is checking it.
           </p>
         )}
 
-        {pickable.length > 0 && (
+        {mediaId && pickable.length > 0 && (
           <>
             <ul className="sasa-friendpick">
               {pickable.map((f) => {
@@ -154,12 +176,8 @@ export default function ShareToFriend({
                       aria-pressed={picked}
                       onClick={() => toggle(f.id)}
                     >
-                      <span className="sasa-friendpick-avatar">
-                        {f.child.avatar_url ? (
-                          <img src={f.child.avatar_url} alt="" />
-                        ) : (
-                          f.child.display_name.charAt(0).toUpperCase()
-                        )}
+                      <span className="sasa-friendpick-avatarwrap">
+                        <FriendAvatar child={f.child} variant="pick" />
                         {picked && (
                           <span className="sasa-friendpick-tick" aria-hidden="true">
                             <Check size={14} />
@@ -185,6 +203,17 @@ export default function ShareToFriend({
               {chosen.size > 1 ? `Send to ${chosen.size} friends` : "Send"}
             </button>
           </>
+        )}
+
+        {/* What this child has already asked for, so a second tap is never
+            needed to find out. Only this session's sends are known: the API
+            has no "shares I sent" listing, so nothing is claimed about
+            earlier ones — the server's duplicate check answers those. */}
+        {alreadySent.length > 0 && (
+          <p className="sasa-friends-note">
+            <Clock size={14} aria-hidden="true" /> Waiting for a grown-up:{" "}
+            {alreadySent.map((f) => f.child.display_name.split(" ")[0]).join(", ")}
+          </p>
         )}
 
         {outcomes.length > 0 && (

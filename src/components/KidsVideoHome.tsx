@@ -39,6 +39,9 @@ import {
 } from "../lib/theme";
 import { useDismiss } from "../hooks/use-dismiss";
 import AppShell from "./layout/AppShell";
+import { getApiAssetUrl } from "../lib/api";
+import { sharedMediaId } from "../lib/media-id";
+import { type SharedMediaItem } from "../lib/friends-api";
 import KidsFriends from "./KidsFriends";
 import KidsSharedWithMe from "./KidsSharedWithMe";
 import ShareToFriend from "./ShareToFriend";
@@ -71,6 +74,11 @@ export type KidsVideoItem = {
   description?: string;
   /** The backend's own media key (a uuid for assigned media). See SASA_FEED_ID_V19. */
   mediaId?: string;
+  /* SASA_KID_SHARE_V35 — true only for media a grown-up assigned to THIS
+   * child. The server will only accept a share for an item the child is
+   * actually assigned, so offering it on a public-library card produced a
+   * "Not found" the child could not act on. */
+  shareable?: boolean;
 };
 
 export type KidsHomeTab = KidsSectionId;
@@ -372,8 +380,10 @@ export default function KidsVideoHome({
   const childToken =
     typeof window !== "undefined" ? localStorage.getItem("sasa-child-token") : null;
 
-  /* The item a child chose to share, held while the sheet is open. */
-  const [sharing, setSharing] = useState<{ id: string; title: string } | null>(null);
+  /* The item a child chose to share, held while the sheet is open. `id` is
+   * null for something that cannot be shared, so the sheet can say why
+   * instead of the button doing nothing. */
+  const [sharing, setSharing] = useState<{ id: string | null; title: string } | null>(null);
 
   const [currentTab, setCurrentTab] = useState<KidsHomeTab>(activeTabProp || initialTab);
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -689,6 +699,35 @@ export default function KidsVideoHome({
     onOpenVideo(video);
   };
 
+  /* SASA_FRIENDS_V32 — a shared item was rendered as a button labelled "Open
+   * …" that had no handler, so tapping a friend's video did nothing. The
+   * player speaks KidsVideoItem, so translate the share into one and open it
+   * the same way any other card opens.
+   *
+   * `content_url` is the short-lived signed URL the server minted for THIS
+   * child, so it is used as-is and never cached anywhere: the moment a parent
+   * revokes the share the next request stops authorising. Shares carry no
+   * YouTube items — the server only shares stored media — so the source is
+   * always a photo or an upload. */
+  const openSharedItem = (item: SharedMediaItem) => {
+    const isPhoto = item.media_type === "photo";
+    const asset = getApiAssetUrl(item.content_url);
+
+    openVideo({
+      id: sharedMediaId(item.id),
+      title: item.title,
+      duration: isPhoto ? "Photo" : "Video",
+      category: item.category?.trim() || "",
+      image: isPhoto ? asset : getApiAssetUrl(item.thumbnail_url) || mediaThumbnailFallback,
+      sourceType: isPhoto ? "photo" : "upload",
+      sourceUrl: asset,
+      // Child-safe attribution, the same display name the card shows.
+      sourceLabel: `Shared by ${item.shared_by.display_name}`,
+      description: item.description?.trim() || undefined,
+      mediaId: item.id,
+    });
+  };
+
   const section = KIDS_SECTIONS[currentTab];
   const showsGrid = GRID_SECTIONS.includes(currentTab);
 
@@ -899,17 +938,6 @@ export default function KidsVideoHome({
           persists through the backend and can upload a cropped photo. A local
           profile has no server-side profile to save to, so it keeps the
           emoji list below. */}
-      {/* SASA_FRIENDS_V32 — the share sheet. Submitting creates a PENDING
-          share; nothing reaches the friend until both grown-ups approve. */}
-      {sharing && childToken && (
-        <ShareToFriend
-          token={childToken}
-          mediaId={sharing.id}
-          mediaTitle={sharing.title}
-          onClose={() => setSharing(null)}
-        />
-      )}
-
       {showAvatarPicker && avatarToken && databaseProfileId && (
         <AvatarChooser
           token={avatarToken}
@@ -1078,8 +1106,8 @@ export default function KidsVideoHome({
       return (
         <>
           <h3 className="sasa-section-heading">Shared with me</h3>
-          <KidsSharedWithMe token={childToken} kind="video" />
-          <KidsSharedWithMe token={childToken} kind="photo" />
+          <KidsSharedWithMe token={childToken} kind="video" onOpen={openSharedItem} />
+          <KidsSharedWithMe token={childToken} kind="photo" onOpen={openSharedItem} />
           <h3 className="sasa-section-heading">Saved by me</h3>
           {renderGrid()}
         </>
@@ -1088,7 +1116,7 @@ export default function KidsVideoHome({
     if (currentTab === "profile") return renderProfile();
     if (currentTab === "friends") {
       return childToken ? (
-        <KidsFriends token={childToken} />
+        <KidsFriends token={childToken} onOpenShared={openSharedItem} />
       ) : (
         <p className="sasa-friends-note">
           Ask a grown-up to open your profile so you can use Friends.
@@ -1284,6 +1312,21 @@ export default function KidsVideoHome({
 
       {isGuestAccount && showFreeModal && (
         <FreeAccountDialog onClose={() => setShowFreeModal(false)} />
+      )}
+
+      {/* SASA_KID_SHARE_V35 — the share sheet lives at the top level of the
+          shell, not inside renderProfile(). It used to be rendered from the
+          Profile branch, so tapping Share on a card in Home, Search or
+          Library set the state and mounted nothing at all: the button looked
+          like it did nothing. Submitting creates a PENDING share; nothing
+          reaches the friend until both grown-ups approve. */}
+      {sharing && childToken && (
+        <ShareToFriend
+          token={childToken}
+          mediaId={sharing.id}
+          mediaTitle={sharing.title}
+          onClose={() => setSharing(null)}
+        />
       )}
     </AppShell>
   );

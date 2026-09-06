@@ -106,21 +106,36 @@ export function setActiveThemeProfile(profileId: string | null | undefined): voi
   }
 }
 
+function isThemeId(value: string | null): value is AppThemeId {
+  return Boolean(value) && appThemes.some((t) => t.id === value);
+}
+
+/* SASA_KID_THEMES_V35 — a child who has not chosen gets the default, NOT
+ * whatever the last child on this device chose.
+ *
+ * The previous version fell back to the shared key whenever the per-child key
+ * was missing, which is exactly the sibling-inherits-a-theme case the
+ * per-child key was added to prevent: the first time a second child opened
+ * the app they saw their sibling's theme. The shared key is now only what it
+ * is actually for — the pre-paint hint in __root.tsx — and is consulted here
+ * only when there is no profile to key on at all. */
 export function getStoredTheme(profileId?: string | null): AppThemeId {
-  // This child's own choice first, then any older shared value so an existing
-  // selection is not lost the first time the per-child key is used.
-  for (const key of [themeKeyFor(profileId), THEME_KEY]) {
-    const saved = safeGet(key);
-    if (saved && appThemes.some((t) => t.id === saved)) return saved as AppThemeId;
+  const id = profileId ?? safeGet(ACTIVE_PROFILE_KEY);
+
+  if (id) {
+    const mine = safeGet(`${THEME_KEY}:${id}`);
+    return isThemeId(mine) ? mine : "daylight";
   }
-  return "daylight";
+
+  const shared = safeGet(THEME_KEY);
+  return isThemeId(shared) ? shared : "daylight";
 }
 
 export function setStoredTheme(themeId: AppThemeId, profileId?: string | null): void {
   try {
     localStorage.setItem(themeKeyFor(profileId), themeId);
-    // Kept so the pre-paint script in index.html has something to read before
-    // it knows which profile is active.
+    // The pre-paint hint in __root.tsx, used only when no active profile is
+    // recorded. Never a source of truth for a child (see getStoredTheme).
     localStorage.setItem(THEME_KEY, themeId);
   } catch {
     /* Ignore: the attribute below still applies for this session. */

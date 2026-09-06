@@ -67,29 +67,40 @@ export default function KidsSharedWithMe({
 
   return (
     <div className="sasa-shared-grid">
-      {items.map((item) => (
-        <article className="sasa-shared-card" key={item.share_id}>
-          <button
-            type="button"
-            className="sasa-shared-thumb"
-            onClick={() => onOpen?.(item)}
-            aria-label={`Open ${item.title}`}
-          >
-            {item.thumbnail_url ? (
-              <img src={getApiAssetUrl(item.thumbnail_url)} alt="" loading="lazy" />
+      {items.map((item) => {
+        const thumb = item.thumbnail_url ? (
+          <img src={getApiAssetUrl(item.thumbnail_url)} alt="" loading="lazy" />
+        ) : (
+          <span className="sasa-shared-placeholder" aria-hidden="true">
+            {kind === "video" ? <Play size={26} /> : <ImageIcon size={26} />}
+          </span>
+        );
+
+        return (
+          <article className="sasa-shared-card" key={item.share_id}>
+            {/* A button only where there is somewhere to go. Rendering one
+                regardless is what made these cards look tappable and do
+                nothing when no handler was passed. */}
+            {onOpen ? (
+              <button
+                type="button"
+                className="sasa-shared-thumb"
+                onClick={() => onOpen(item)}
+                aria-label={`Open ${item.title}`}
+              >
+                {thumb}
+              </button>
             ) : (
-              <span className="sasa-shared-placeholder" aria-hidden="true">
-                {kind === "video" ? <Play size={26} /> : <ImageIcon size={26} />}
-              </span>
+              <div className="sasa-shared-thumb">{thumb}</div>
             )}
-          </button>
-          <div className="sasa-shared-body">
-            <strong>{item.title}</strong>
-            {/* Child-safe attribution: a display name, never an account. */}
-            <span>Shared by {item.shared_by.display_name}</span>
-          </div>
-        </article>
-      ))}
+            <div className="sasa-shared-body">
+              <strong>{item.title}</strong>
+              {/* Child-safe attribution: a display name, never an account. */}
+              <span>Shared by {item.shared_by.display_name}</span>
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }
