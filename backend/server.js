@@ -3557,6 +3557,32 @@ app.post(
           });
         }
 
+        /* A parent who owns both children signs both sides at once — it is
+         * one family, so one act of consent covers both columns truthfully.
+         * Otherwise only this parent's own column is written; approving for
+         * another family remains inexpressible. */
+        if (side === "both") {
+          updated = await pool.query(
+            `UPDATE friendships
+                SET requester_parent_approved_at = coalesce(requester_parent_approved_at, now()),
+                    addressee_parent_approved_at = coalesce(addressee_parent_approved_at, now()),
+                    decided_by = $2, updated_at = now(), status = 'active'
+              WHERE id = $1
+          RETURNING *`,
+            [f.id, req.account.id]
+          );
+
+          await recordAudit(req, "friendship.approve", "friendship", f.id, {
+            side: "both",
+            note: "same parent owns both children"
+          });
+
+          return res.json({
+            status: "ok",
+            friendship: { id: f.id, status: friendshipStatusFrom(updated.rows[0]) }
+          });
+        }
+
         // Writes only this parent's own column. Approving for the other family
         // is not expressible.
         const column =
@@ -3803,6 +3829,35 @@ app.post(
           return res.json({
             status: "ok",
             share: { id: share.id, status: shareStatusFrom(overridden.rows[0]) }
+          });
+        }
+
+        /* Same family on both sides: one act of consent covers both columns,
+         * exactly as for friendships. Without this a parent sharing between
+         * their own children could never complete the approval. */
+        if (isSenderParent && isRecipientParent) {
+          updated = await pool.query(
+            `UPDATE media_shares
+                SET sender_parent_approved_at = coalesce(sender_parent_approved_at, now()),
+                    recipient_parent_approved_at = coalesce(recipient_parent_approved_at, now()),
+                    decided_by = $2, updated_at = now(), status = 'active'
+              WHERE id = $1 AND status = 'pending'
+          RETURNING *`,
+            [share.id, req.account.id]
+          );
+
+          if (!updated.rows[0]) {
+            return res.status(409).json({ status: "error", message: "This share is not pending." });
+          }
+
+          await recordAudit(req, "share.approve", "media_share", share.id, {
+            side: "both",
+            note: "same parent owns both children"
+          });
+
+          return res.json({
+            status: "ok",
+            share: { id: share.id, status: shareStatusFrom(updated.rows[0]) }
           });
         }
 
