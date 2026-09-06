@@ -127,6 +127,17 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        {/* SASA_KID_THEMES_V34 — apply the saved theme BEFORE first paint.
+            The React effect that used to do this runs after mount, so every
+            start flashed the default theme first. Inline and synchronous so
+            the attribute is on <html> before any pixel is drawn; wrapped in
+            try/catch because storage can be unavailable, and silent because a
+            missing theme is not an error. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var p=localStorage.getItem('sasa-active-kid-id');var t=(p&&localStorage.getItem('sasa-app-theme:'+p))||localStorage.getItem('sasa-app-theme');if(t&&/^[a-z]+$/.test(t)){document.documentElement.setAttribute('data-theme',t);document.documentElement.setAttribute('data-app-theme',t);}}catch(e){}`,
+          }}
+        />
       </head>
       <body>
         {children}

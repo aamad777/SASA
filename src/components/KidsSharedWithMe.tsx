@@ -18,10 +18,13 @@ import { getApiAssetUrl } from "@/lib/api";
 export default function KidsSharedWithMe({
   token,
   kind,
+  from,
   onOpen,
 }: {
   token: string;
   kind: "video" | "photo";
+  /** Friend ID, to show only what this one friend shared. */
+  from?: string;
   onOpen?: (item: SharedMediaItem) => void;
 }) {
   const [items, setItems] = useState<SharedMediaItem[]>([]);
@@ -33,7 +36,10 @@ export default function KidsSharedWithMe({
 
     listSharedWithMe(token)
       .then((d) => {
-        if (!cancelled) setItems(d.media.filter((m) => m.media_type === kind));
+        if (cancelled) return;
+        setItems(
+          d.media.filter((m) => m.media_type === kind && (!from || m.shared_by.friend_id === from)),
+        );
       })
       .catch((e: Error) => {
         if (!cancelled) setError(e.message);
@@ -45,7 +51,7 @@ export default function KidsSharedWithMe({
     return () => {
       cancelled = true;
     };
-  }, [token, kind]);
+  }, [token, kind, from]);
 
   if (loading) return <p className="sasa-friends-note">Loading…</p>;
   if (error) return <p className="sasa-friends-note is-error">{error}</p>;
