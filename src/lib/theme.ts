@@ -74,25 +74,58 @@ export const appThemes: AppTheme[] = [
   },
 ];
 
-export function getStoredTheme(): AppThemeId {
+/* SASA_KID_THEMES_V34 — a theme belongs to a child, not to the device.
+ *
+ * One shared key meant a sibling switching profiles inherited whatever the
+ * last child chose. The active profile id is written by the kid shell and
+ * read back here so each child keeps their own.
+ */
+const THEME_KEY = "sasa-app-theme";
+const ACTIVE_PROFILE_KEY = "sasa-active-kid-id";
+
+function themeKeyFor(profileId?: string | null): string {
+  const id = profileId ?? safeGet(ACTIVE_PROFILE_KEY);
+  return id ? `${THEME_KEY}:${id}` : THEME_KEY;
+}
+
+function safeGet(key: string): string | null {
   try {
-    const saved = localStorage.getItem("sasa-app-theme");
-    if (saved && appThemes.some((t) => t.id === saved)) {
-      return saved as AppThemeId;
-    }
+    return localStorage.getItem(key);
   } catch {
-    // Default fallback
+    return null;
+  }
+}
+
+/** Records which child the kid shell is currently showing. */
+export function setActiveThemeProfile(profileId: string | null | undefined): void {
+  try {
+    if (profileId) localStorage.setItem(ACTIVE_PROFILE_KEY, String(profileId));
+    else localStorage.removeItem(ACTIVE_PROFILE_KEY);
+  } catch {
+    /* Storage unavailable — themes simply fall back to the shared key. */
+  }
+}
+
+export function getStoredTheme(profileId?: string | null): AppThemeId {
+  // This child's own choice first, then any older shared value so an existing
+  // selection is not lost the first time the per-child key is used.
+  for (const key of [themeKeyFor(profileId), THEME_KEY]) {
+    const saved = safeGet(key);
+    if (saved && appThemes.some((t) => t.id === saved)) return saved as AppThemeId;
   }
   return "daylight";
 }
 
-export function setStoredTheme(themeId: AppThemeId): void {
+export function setStoredTheme(themeId: AppThemeId, profileId?: string | null): void {
   try {
-    localStorage.setItem("sasa-app-theme", themeId);
-    applyThemeAttribute(themeId);
+    localStorage.setItem(themeKeyFor(profileId), themeId);
+    // Kept so the pre-paint script in index.html has something to read before
+    // it knows which profile is active.
+    localStorage.setItem(THEME_KEY, themeId);
   } catch {
-    // Ignore error
+    /* Ignore: the attribute below still applies for this session. */
   }
+  applyThemeAttribute(themeId);
 }
 
 /**

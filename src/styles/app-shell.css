@@ -885,55 +885,105 @@
 }
 
 /* ── Kid app themes ────────────────────────────────────────────────────
-   The Home theme picker (src/lib/theme.ts) writes `data-app-theme` on
-   <html>. Before this pass the picker set an attribute nothing styled, so
-   choosing a theme did nothing visible. Each theme now retints the shell's
-   surface and accent tokens only — never the media itself — and the two
-   night-time themes switch the shell to its dark token set through
-   AppShell's `tone` prop rather than duplicating them here.
+   SASA_KID_THEMES_V34 — a theme has to be obvious to a child.
+
+   The previous pass only nudged --sasa-page, so choosing a theme moved the
+   background by about five RGB values: measurably different, visually
+   identical, and indistinguishable from a button that does nothing. Each
+   theme now retints the page, the surfaces cards and sheets sit on, the
+   header, the navigation, the lines between things and the brand accent that
+   drives buttons and the active nav item.
+
+   Text colours are set alongside every surface rather than left to the base,
+   so contrast is chosen per theme instead of inherited by luck. Media is
+   never tinted — a photo must look like itself in every theme.
    ------------------------------------------------------------------- */
 
 html[data-app-theme="jungle"] .sasa-shell:not(.is-dark) {
-  --sasa-page: #f1f6f2;
-  --sasa-surface-2: #e8f1ea;
-  --sasa-surface-3: #dbe8de;
-  --sasa-line: #d7e3da;
-  --sasa-line-soft: #e4ede6;
-  --sasa-brand: #14714a;
-  --sasa-brand-strong: #0f5c3c;
-  --sasa-brand-soft: #e0f0e7;
+  --sasa-page: #e6f4ea;
+  --sasa-surface: #ffffff;
+  --sasa-surface-2: #d6ebdd;
+  --sasa-surface-3: #c3e0cd;
+  --sasa-line: #a9d3b8;
+  --sasa-line-soft: #cbe6d4;
+  --sasa-ink: #10321f;
+  --sasa-ink-2: #3c6b50;
+  --sasa-brand: #0f7a45;
+  --sasa-brand-strong: #0a5c33;
+  --sasa-brand-soft: #cdeddb;
 }
 
 html[data-app-theme="magic"] .sasa-shell:not(.is-dark) {
-  --sasa-page: #f8f4fb;
-  --sasa-surface-2: #f1eaf6;
-  --sasa-surface-3: #e7dcef;
-  --sasa-line: #e3d8ea;
-  --sasa-line-soft: #eee6f3;
-  --sasa-brand: #8a2bb0;
-  --sasa-brand-strong: #74228f;
-  --sasa-brand-soft: #f4e6fa;
+  --sasa-page: #f3e9fb;
+  --sasa-surface: #ffffff;
+  --sasa-surface-2: #eadcf5;
+  --sasa-surface-3: #dfc9ef;
+  --sasa-line: #cfaee5;
+  --sasa-line-soft: #e5d3f0;
+  --sasa-ink: #2c123c;
+  --sasa-ink-2: #5d3a72;
+  --sasa-brand: #8118ad;
+  --sasa-brand-strong: #66148a;
+  --sasa-brand-soft: #f0dcfa;
 }
 
 html[data-app-theme="dino"] .sasa-shell:not(.is-dark) {
-  --sasa-page: #f8f6f0;
-  --sasa-surface-2: #f2eee3;
-  --sasa-surface-3: #e8e2d3;
-  --sasa-line: #e4ded0;
-  --sasa-line-soft: #eee9de;
-  --sasa-brand: #a4550f;
-  --sasa-brand-strong: #8a4709;
-  --sasa-brand-soft: #f8ecdd;
+  --sasa-page: #fbf0dd;
+  --sasa-surface: #fffdf8;
+  --sasa-surface-2: #f5e6cd;
+  --sasa-surface-3: #eed9b6;
+  --sasa-line: #ddc296;
+  --sasa-line-soft: #eddcbf;
+  --sasa-ink: #3a2408;
+  --sasa-ink-2: #6d4c1d;
+  --sasa-brand: #b4560a;
+  --sasa-brand-strong: #8f4307;
+  --sasa-brand-soft: #f8e2c6;
 }
 
+/* The two night themes drive the dark shell through AppShell's `tone` prop;
+   these give each of them its own identity rather than one generic dark. */
 html[data-app-theme="space"] .sasa-shell.is-dark {
-  --sasa-page: #0c1020;
-  --sasa-surface: #151a2e;
-  --sasa-surface-2: #1e2440;
-  --sasa-surface-3: #262d4c;
-  --sasa-line: #2a3152;
-  --sasa-line-soft: #212745;
-  --sasa-brand-soft: #232c56;
+  --sasa-page: #070b1c;
+  --sasa-surface: #121935;
+  --sasa-surface-2: #1b2447;
+  --sasa-surface-3: #243059;
+  --sasa-line: #2f3d6b;
+  --sasa-line-soft: #222c53;
+  --sasa-ink: #eef2ff;
+  --sasa-ink-2: #a9b6e8;
+  --sasa-brand: #7c8cff;
+  --sasa-brand-strong: #9aa6ff;
+  --sasa-brand-soft: #24305e;
+}
+
+/* "night" previously had no rule at all: it was a listed option that changed
+   nothing beyond the generic dark shell. It now has its own warm dark set. */
+html[data-app-theme="night"] .sasa-shell.is-dark {
+  --sasa-page: #0d0b14;
+  --sasa-surface: #17141f;
+  --sasa-surface-2: #201c2c;
+  --sasa-surface-3: #2a2438;
+  --sasa-line: #362f47;
+  --sasa-line-soft: #272134;
+  --sasa-ink: #f4f1fa;
+  --sasa-ink-2: #b6accb;
+  --sasa-brand: #b98cff;
+  --sasa-brand-strong: #cba9ff;
+  --sasa-brand-soft: #2d2440;
+}
+
+/* The header and bottom bar read the same tokens, so they move with the
+   theme instead of staying stubbornly white. */
+html[data-app-theme] .sasa-topbar,
+html[data-app-theme] .sasa-tabbar {
+  background: var(--sasa-surface);
+  border-color: var(--sasa-line);
+}
+
+html[data-app-theme] .sasa-rail {
+  background: var(--sasa-surface);
+  border-color: var(--sasa-line);
 }
 
 /* ── Panels and form controls ─────────────────────────────────────── */
@@ -1030,4 +1080,31 @@ html[data-app-theme="space"] .sasa-shell.is-dark {
 .sasa-tabbar.is-standalone a:focus-visible {
   outline: 2px solid var(--sasa-brand);
   outline-offset: 2px;
+}
+
+/* SASA_KID_SHARE_V34 — the share control sits on the thumbnail so a child can
+   see it without opening a menu. 44px hit area, per the mobile spec. */
+.sasa-card {
+  position: relative;
+}
+
+.sasa-card-share {
+  position: absolute;
+  top: 8px;
+  inset-inline-end: 8px;
+  z-index: 2;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(17, 18, 22, 0.66);
+  color: #fff;
+  cursor: pointer;
+}
+
+.sasa-card-share:hover,
+.sasa-card-share:focus-visible {
+  background: rgba(17, 18, 22, 0.82);
 }

@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, Loader2, UserPlus, Users, X } from "lucide-react";
+import { Check, ChevronLeft, Copy, Loader2, UserPlus, Users, X } from "lucide-react";
 import {
   cancelFriendRequest,
   getMyFriendId,
@@ -17,6 +17,7 @@ import {
   type Friend,
   type SafeChild,
 } from "@/lib/friends-api";
+import KidsSharedWithMe from "./KidsSharedWithMe";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Waiting for grown-ups",
@@ -50,6 +51,7 @@ export default function KidsFriends({ token }: { token: string }) {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
+  const [openFriend, setOpenFriend] = useState<Friend | null>(null);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [found, setFound] = useState<SafeChild | null>(null);
@@ -128,6 +130,37 @@ export default function KidsFriends({ token }: { token: string }) {
   const active = friends.filter((f) => f.status === "active");
   const pending = friends.filter((f) => f.status === "pending");
   const other = friends.filter((f) => !["active", "pending"].includes(f.status));
+
+  /* A child-safe friend page: face, first name, and what they have shared.
+   * Deliberately nothing else — no Friend ID of theirs to pass around, no
+   * parent, no contact details, and no way to type at each other. */
+  if (openFriend) {
+    return (
+      <div className="sasa-friends">
+        <button type="button" className="sasa-btn" onClick={() => setOpenFriend(null)}>
+          <ChevronLeft size={18} /> Back to friends
+        </button>
+
+        <section className="sasa-friends-card sasa-friendpage-head">
+          <span className="sasa-friendgrid-avatar is-lg">
+            {openFriend.child.avatar_url ? (
+              <img src={openFriend.child.avatar_url} alt="" />
+            ) : (
+              openFriend.child.display_name.charAt(0).toUpperCase()
+            )}
+          </span>
+          <h2>{openFriend.child.display_name.split(" ")[0]}</h2>
+          <StatusChip status={openFriend.status} />
+        </section>
+
+        <section className="sasa-friends-card">
+          <h2>Shared with you</h2>
+          <KidsSharedWithMe token={token} kind="video" from={openFriend.child.friend_id} />
+          <KidsSharedWithMe token={token} kind="photo" from={openFriend.child.friend_id} />
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="sasa-friends">
@@ -231,18 +264,29 @@ export default function KidsFriends({ token }: { token: string }) {
           <p className="sasa-friends-note">Loading…</p>
         ) : active.length === 0 ? (
           <p className="sasa-friends-note">
-            No friends yet. Share your Friend ID with someone you know.
+            No friends yet. Share your Friend ID with someone you know, then ask a grown-up to say
+            yes.
           </p>
         ) : (
-          <ul className="sasa-friend-list">
+          /* Big circles and first names: a child recognises a face far faster
+             than a row of text. Tapping one opens their page. */
+          <ul className="sasa-friendgrid">
             {active.map((f) => (
-              <li key={f.id} className="sasa-friend-row">
-                <Avatar child={f.child} />
-                <div className="sasa-friend-name">
-                  <strong>{f.child.display_name}</strong>
-                  <span>{f.child.friend_id}</span>
-                </div>
-                <StatusChip status={f.status} />
+              <li key={f.id}>
+                <button
+                  type="button"
+                  className="sasa-friendgrid-btn"
+                  onClick={() => setOpenFriend(f)}
+                >
+                  <span className="sasa-friendgrid-avatar">
+                    {f.child.avatar_url ? (
+                      <img src={f.child.avatar_url} alt="" />
+                    ) : (
+                      f.child.display_name.charAt(0).toUpperCase()
+                    )}
+                  </span>
+                  <span className="sasa-friendgrid-name">{f.child.display_name.split(" ")[0]}</span>
+                </button>
               </li>
             ))}
           </ul>

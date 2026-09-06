@@ -1,15 +1,21 @@
-/* SASA_FRIENDS_V32 — share one of the child's own items with one friend.
+/* SASA_KID_SHARE_V34 — the child's share sheet.
  *
- * Only approved friends are offered, and only media already assigned to this
- * child can be chosen — both are re-checked server-side, so this list is a
- * convenience, not the control. Submitting creates a PENDING share: nothing
- * reaches the friend until both grown-ups approve, and the dialog says so
- * rather than implying the item has been sent.
+ * Rewritten because the old one was a list of rows with a Share button each:
+ * one friend per tap, no sense of what had already been sent, and silence
+ * when nothing could be shared. A child needs large targets, the ability to
+ * pick several friends at once, and — most importantly — to be told WHY when
+ * sharing is not possible rather than facing a button that does nothing.
+ *
+ * Nothing here decides permission. The server re-checks the friendship, the
+ * assignment and both parents' approval; this only shapes the request and
+ * reports honestly what came back.
  */
 
 import { useEffect, useState } from "react";
-import { Loader2, Send, X } from "lucide-react";
+import { Check, Loader2, Send, X } from "lucide-react";
 import { listFriends, shareMedia, type Friend } from "@/lib/friends-api";
+
+type Outcome = { friend: string; ok: boolean; note: string };
 
 export default function ShareToFriend({
   token,
@@ -23,86 +29,176 @@ export default function ShareToFriend({
   onClose: () => void;
 }) {
   const [friends, setFriends] = useState<Friend[]>([]);
+  const [pendingWith, setPendingWith] = useState<Set<string>>(new Set());
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [note, setNote] = useState("");
-  const [done, setDone] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [outcomes, setOutcomes] = useState<Outcome[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    /* "Already shared" has to come from somewhere the child can see before
+     * they tap, otherwise the only feedback is a duplicate error afterwards.
+     * The received list is the recipient's view, so it cannot tell us what we
+     * sent; the duplicate check on the server remains the real guard and its
+     * message is surfaced verbatim below. */
     listFriends(token)
-      .then((d) => setFriends(d.friends.filter((f) => f.status === "active")))
-      .catch((e: Error) => setNote(e.message))
-      .finally(() => setLoading(false));
+      .then((d) => {
+        if (!cancelled) setFriends(d.friends.filter((f) => f.status === "active"));
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setLoadError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
-  const send = async (friendshipId: string) => {
-    setBusyId(friendshipId);
-    setNote("");
-    try {
-      await shareMedia(token, mediaId, friendshipId);
-      setDone(true);
-      setNote("Sent for approval. Both grown-ups need to say yes before your friend sees it.");
-    } catch (e) {
-      // Covers the duplicate case too, which the server answers with 409.
-      setNote(e instanceof Error ? e.message : "Could not share.");
-    } finally {
-      setBusyId(null);
-    }
+  const toggle = (id: string) => {
+    setChosen((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
+
+  const send = async () => {
+    if (chosen.size === 0) return;
+    setSending(true);
+    const results: Outcome[] = [];
+
+    for (const friendshipId of chosen) {
+      const friend = friends.find((f) => f.id === friendshipId);
+      const name = friend?.child.display_name || "your friend";
+      try {
+        await shareMedia(token, mediaId, friendshipId);
+        results.push({ friend: name, ok: true, note: "Sent to your parents for approval." });
+        setPendingWith((p) => new Set(p).add(friendshipId));
+      } catch (e) {
+        // The server's own words — "already shared", "not an approved friend"
+        // — are more accurate than anything guessed here.
+        results.push({
+          friend: name,
+          ok: false,
+          note: e instanceof Error ? e.message : "That did not go through.",
+        });
+      }
+    }
+
+    setChosen(new Set());
+    setOutcomes(results);
+    setSending(false);
+  };
+
+  const pickable = friends.filter((f) => !pendingWith.has(f.id));
 
   return (
     <div
       className="sasa-share-backdrop"
       role="dialog"
       aria-modal="true"
-      aria-label="Share with a friend"
+      aria-label={`Share ${mediaTitle} with a friend`}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
-      <div className="sasa-share-sheet">
+      <div className="sasa-sharesheet">
         <div className="sasa-share-head">
-          <h2>Share “{mediaTitle}”</h2>
+          <h2>Send to a friend</h2>
           <button type="button" className="sasa-iconbtn" onClick={onClose} aria-label="Close">
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
 
-        {loading ? (
-          <p className="sasa-friends-note">Loading your friends…</p>
-        ) : friends.length === 0 ? (
-          <p className="sasa-friends-note">
-            You have no approved friends yet. Add one on the Friends page first.
+        <p className="sasa-sharesheet-item">{mediaTitle}</p>
+
+        {loading && <p className="sasa-friends-note">Loading your friends…</p>}
+
+        {/* Each of these is a real explanation, never a dead button. */}
+        {!loading && loadError && (
+          <p className="sasa-friends-note is-error" role="alert">
+            {loadError}
           </p>
-        ) : (
-          <ul className="sasa-friend-list">
-            {friends.map((f) => (
-              <li key={f.id} className="sasa-friend-row">
-                <span className="sasa-friend-avatar" aria-hidden="true">
-                  {f.child.display_name.charAt(0).toUpperCase()}
-                </span>
-                <div className="sasa-friend-name">
-                  <strong>{f.child.display_name}</strong>
-                </div>
-                <button
-                  type="button"
-                  className="sasa-btn is-primary"
-                  disabled={busyId === f.id || done}
-                  onClick={() => send(f.id)}
-                >
-                  {busyId === f.id ? <Loader2 size={16} /> : <Send size={16} />}
-                  Share
-                </button>
+        )}
+
+        {!loading && !loadError && friends.length === 0 && (
+          <p className="sasa-friends-note">
+            You don&apos;t have any approved friends yet. Add a friend on the Friends page — a
+            grown-up on both sides says yes first.
+          </p>
+        )}
+
+        {!loading && !loadError && friends.length > 0 && pickable.length === 0 && (
+          <p className="sasa-friends-note">
+            You&apos;ve already sent this to all of your friends. A grown-up is checking it.
+          </p>
+        )}
+
+        {pickable.length > 0 && (
+          <>
+            <ul className="sasa-friendpick">
+              {pickable.map((f) => {
+                const picked = chosen.has(f.id);
+                return (
+                  <li key={f.id}>
+                    <button
+                      type="button"
+                      className={picked ? "sasa-friendpick-btn is-picked" : "sasa-friendpick-btn"}
+                      aria-pressed={picked}
+                      onClick={() => toggle(f.id)}
+                    >
+                      <span className="sasa-friendpick-avatar">
+                        {f.child.avatar_url ? (
+                          <img src={f.child.avatar_url} alt="" />
+                        ) : (
+                          f.child.display_name.charAt(0).toUpperCase()
+                        )}
+                        {picked && (
+                          <span className="sasa-friendpick-tick" aria-hidden="true">
+                            <Check size={14} />
+                          </span>
+                        )}
+                      </span>
+                      <span className="sasa-friendpick-name">
+                        {f.child.display_name.split(" ")[0]}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <button
+              type="button"
+              className="sasa-btn is-primary sasa-sharesheet-send"
+              disabled={chosen.size === 0 || sending}
+              onClick={send}
+            >
+              {sending ? <Loader2 size={18} /> : <Send size={18} />}
+              {chosen.size > 1 ? `Send to ${chosen.size} friends` : "Send"}
+            </button>
+          </>
+        )}
+
+        {outcomes.length > 0 && (
+          <ul className="sasa-share-outcomes" role="status">
+            {outcomes.map((o) => (
+              <li key={o.friend} className={o.ok ? "is-ok" : "is-bad"}>
+                <strong>{o.friend}</strong> — {o.note}
               </li>
             ))}
           </ul>
         )}
 
-        {note && (
-          <p className="sasa-friends-note" role="status">
-            {note}
-          </p>
-        )}
-
-        <button type="button" className="sasa-btn" onClick={onClose}>
-          Close
+        <button type="button" className="sasa-btn sasa-sharesheet-close" onClick={onClose}>
+          Done
         </button>
       </div>
     </div>

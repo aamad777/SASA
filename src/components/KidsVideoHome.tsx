@@ -31,6 +31,7 @@ import {
 import {
   appThemes,
   applyThemeAttribute,
+  setActiveThemeProfile,
   getStoredTheme,
   isNightTheme,
   setStoredTheme,
@@ -396,6 +397,19 @@ export default function KidsVideoHome({
   }, [currentTheme]);
 
   // Kid Profile Customization State
+  /* SASA_KID_THEMES_V34 — themes belong to a child, so switching profile must
+   * switch theme. The initial useState ran before the active profile was
+   * known, which meant a sibling briefly inherited the previous child's
+   * choice; re-reading here settles it against the right child. */
+  useEffect(() => {
+    const id = profileId === undefined || profileId === null ? null : String(profileId);
+    setActiveThemeProfile(id);
+
+    const theirs = getStoredTheme(id);
+    setCurrentTheme(theirs);
+    applyThemeAttribute(theirs);
+  }, [profileId]);
+
   const [activeEmoji, setActiveEmoji] = useState<string>(() => {
     return localStorage.getItem("sasa-active-kid-emoji") || profileEmoji;
   });
@@ -663,7 +677,11 @@ export default function KidsVideoHome({
   const handleSelectTheme = (themeId: AppThemeId) => {
     playPopSound();
     setCurrentTheme(themeId);
-    setStoredTheme(themeId);
+    // Stored against this child, not the device.
+    setStoredTheme(
+      themeId,
+      profileId === undefined || profileId === null ? null : String(profileId),
+    );
   };
 
   const openVideo = (video: KidsVideoItem) => {

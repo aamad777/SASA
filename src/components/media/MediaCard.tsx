@@ -85,6 +85,25 @@ export function MediaCard({ item, saved, onOpen, onToggleSave, onShareToFriend }
         </span>
       </button>
 
+      {/* SASA_KID_SHARE_V34 — was hidden in the overflow menu next to a
+          different "Share" (the OS sheet), so children never found it. It is
+          now a visible control on the card, and only on items that really can
+          be shared. */}
+      {onShareToFriend && item.mediaId && (
+        <button
+          type="button"
+          className="sasa-card-share"
+          onClick={(event) => {
+            event.stopPropagation();
+            onShareToFriend(item.mediaId as string, item.title);
+          }}
+          aria-label={`Share ${item.title} with a friend`}
+          title="Share with a friend"
+        >
+          <Users size={18} />
+        </button>
+      )}
+
       <div className="sasa-card-body">
         <span className="sasa-card-source" aria-hidden="true">
           <SourceIcon item={item} />
@@ -124,20 +143,6 @@ export function MediaCard({ item, saved, onOpen, onToggleSave, onShareToFriend }
                 <Heart size={17} fill={saved ? "currentColor" : "none"} />
                 {saved ? "Remove from library" : "Save to library"}
               </button>
-
-              {onShareToFriend && item.mediaId && (
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    onShareToFriend(item.mediaId as string, item.title);
-                    setMenuOpen(false);
-                  }}
-                >
-                  <Users size={17} />
-                  Share with a friend
-                </button>
-              )}
 
               <button type="button" role="menuitem" onClick={handleShare}>
                 <Share2 size={17} />
