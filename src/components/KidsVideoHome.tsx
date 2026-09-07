@@ -1106,7 +1106,15 @@ export default function KidsVideoHome({
       return (
         <>
           <h3 className="sasa-section-heading">Shared with me</h3>
-          <KidsSharedWithMe token={childToken} kind="video" onOpen={openSharedItem} />
+          {/* SASA_DIRECT_SHARING_V36 — videos and photos are two lists under
+              one heading, and each carried its own "nothing yet" message, so an
+              empty section said it twice. The photo list speaks for both. */}
+          <KidsSharedWithMe
+            token={childToken}
+            kind="video"
+            onOpen={openSharedItem}
+            silentWhenEmpty
+          />
           <KidsSharedWithMe token={childToken} kind="photo" onOpen={openSharedItem} />
           <h3 className="sasa-section-heading">Saved by me</h3>
           {renderGrid()}
