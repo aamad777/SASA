@@ -1,19 +1,21 @@
-/* SASA_FRIENDS_V32 — "Shared with me" for the child's Videos and Photos.
+/* SASA_DIRECT_SHARING_V36 — "Shared with me" for the child's Videos and Photos.
  *
- * Only fully approved shares reach this list: the server filters on both
- * parents having approved, the friendship still being active, and the sender
- * still holding the item. Nothing pending, rejected or revoked is returned, so
- * there is no client-side filtering to get wrong.
+ * A friend's send arrives here immediately, because both parents agreed to
+ * that when they approved the friendship. The server still filters the list on
+ * the friendship being active and — for an item the friend actually holds —
+ * their assignment still existing, so nothing revoked, removed or blocked is
+ * ever returned and there is no client-side filtering to get wrong.
  *
  * Every URL here is a short-lived signed one minted for this child and
- * re-authorised on each request, so playback stops the moment a parent
- * revokes the share or ends the friendship.
+ * re-authorised on each request, so playback stops the moment a parent revokes
+ * the share or ends the friendship.
  */
 
 import { useEffect, useState } from "react";
 import { Image as ImageIcon, Play } from "lucide-react";
 import { listSharedWithMe, type SharedMediaItem } from "@/lib/friends-api";
 import { getApiAssetUrl } from "@/lib/api";
+import FriendAvatar from "./FriendAvatar";
 
 export default function KidsSharedWithMe({
   token,
@@ -59,8 +61,8 @@ export default function KidsSharedWithMe({
   if (items.length === 0) {
     return (
       <p className="sasa-friends-note">
-        Nothing shared with you yet. When a friend shares a {kind}, it appears here after both
-        grown-ups say yes.
+        Nothing shared with you yet. When a friend sends you a {kind}, it turns up here straight
+        away.
       </p>
     );
   }
@@ -95,8 +97,14 @@ export default function KidsSharedWithMe({
             )}
             <div className="sasa-shared-body">
               <strong>{item.title}</strong>
-              {/* Child-safe attribution: a display name, never an account. */}
-              <span>Shared by {item.shared_by.display_name}</span>
+              {/* Child-safe attribution: a face and a display name, never an
+                  account, an email or an id. */}
+              <span className="sasa-shared-by">
+                <FriendAvatar child={item.shared_by} variant="row" />
+                {item.is_recommendation
+                  ? `${item.shared_by.display_name} thinks you'll like this`
+                  : `Shared by ${item.shared_by.display_name}`}
+              </span>
             </div>
           </article>
         );

@@ -2829,8 +2829,9 @@ export default function ParentDashboard({
             <section className="parent-section">
               <h2 className="parent-section-title">Friends &amp; Sharing</h2>
               <p className="parent-section-sub">
-                Both families must approve a friendship, and both must approve every shared photo or
-                video before it appears.
+                Both families approve a friendship once. After that these children can send each
+                other photos and videos directly — and you can see everything they send, take any
+                item back, or switch sharing off.
               </p>
               <ParentFriendsPanel token={parentToken} />
             </section>

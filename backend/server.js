@@ -9,12 +9,17 @@ import rateLimit from "express-rate-limit";
 import { removeThumbnailFile } from "./thumbnails.js";
 import { startThumbnailWorker } from "./thumbnail-worker.js";
 import {
+  FRIENDSHIP_ACTIVE_SQL,
   FRIEND_ID_PATTERN,
+  SENDER_STILL_HOLDS_SQL,
+  SHARE_AUTHORISED_SQL,
   activeShareForChild,
   childProfileForAccount,
+  directSharingAllowed,
   findFriendship,
   friendshipStatusFrom,
   normaliseFriendId,
+  parentOwnsProfile,
   parentSideOfFriendship,
   safeChildShape,
   shareStatusFrom
@@ -3129,6 +3134,20 @@ const friendActionLimiter = rateLimit({
   message: { error: "Too many requests. Try again in a few minutes." }
 });
 
+/* SASA_DIRECT_SHARING_V36 — sending is its own budget.
+ *
+ * A share used to cost two adults' attention, which was its own rate limit.
+ * Now that it is immediate, the ceiling has to be explicit: generous enough
+ * that a child sending a handful of holiday photos to two friends never meets
+ * it, low enough that a tap-loop cannot fill a friend's list. */
+const shareSendLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 60,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { error: "That's a lot of sending! Try again in a few minutes." }
+});
+
 /** Identical answer for "does not exist" and "not yours". */
 function notFound(res) {
   return res.status(404).json({ status: "error", message: "Not found" });
@@ -3284,11 +3303,14 @@ app.get("/api/friends", ...requireSession, async (req, res) => {
 
     const { rows } = await pool.query(
       `SELECT f.*,
-              p.id AS other_id, p.display_name, p.avatar_url, p.friend_id
+              p.id AS other_id, p.display_name, p.avatar_url, p.friend_id,
+              p.direct_sharing_enabled AS other_sharing_enabled,
+              me.direct_sharing_enabled AS my_sharing_enabled
          FROM friendships f
          JOIN profiles p
            ON p.id = CASE WHEN f.requester_profile_id = $1
                           THEN f.addressee_profile_id ELSE f.requester_profile_id END
+         JOIN profiles me ON me.id = $1
         WHERE (f.requester_profile_id = $1 OR f.addressee_profile_id = $1)
           AND f.status <> 'removed'
         ORDER BY f.created_at DESC`,
@@ -3298,17 +3320,33 @@ app.get("/api/friends", ...requireSession, async (req, res) => {
     res.set("Cache-Control", "private, no-store");
     res.json({
       status: "ok",
-      friends: rows.map((r) => ({
-        id: r.id,
-        status: friendshipStatusFrom(r),
-        direction: r.requester_profile_id === me.id ? "outgoing" : "incoming",
-        child: safeChildShape({
-          id: r.other_id,
-          display_name: r.display_name,
-          avatar_url: r.avatar_url,
-          friend_id: r.friend_id
-        })
-      }))
+      friends: rows.map((r) => {
+        /* SASA_DIRECT_SHARING_V36 — whether this friend can be sent to, and
+         * why not, decided by the same function the send endpoint uses.
+         *
+         * The client needs this to avoid the thing being fixed: a Share button
+         * that is present, tappable, and then fails. With a reason per friend
+         * it can say what a grown-up would need to change instead. */
+        const permission = directSharingAllowed(
+          r,
+          { direct_sharing_enabled: r.my_sharing_enabled },
+          { direct_sharing_enabled: r.other_sharing_enabled }
+        );
+
+        return {
+          id: r.id,
+          status: friendshipStatusFrom(r),
+          direction: r.requester_profile_id === me.id ? "outgoing" : "incoming",
+          can_share: permission.allowed,
+          share_blocked_reason: permission.reason,
+          child: safeChildShape({
+            id: r.other_id,
+            display_name: r.display_name,
+            avatar_url: r.avatar_url,
+            friend_id: r.friend_id
+          })
+        };
+      })
     });
   } catch (error) {
     console.error("Friends list error:", error);
@@ -3364,10 +3402,14 @@ app.get("/api/parent/friends-overview", ...requireSession, async (req, res) => {
 
     const friendships = await pool.query(
       `SELECT f.*,
+              rp.id AS requester_id,
               rp.display_name AS requester_name, rp.avatar_url AS requester_avatar,
               rp.friend_id AS requester_friend_id, rp.created_by_parent AS requester_parent,
+              rp.direct_sharing_enabled AS requester_sharing_enabled,
+              ap.id AS addressee_id,
               ap.display_name AS addressee_name, ap.avatar_url AS addressee_avatar,
-              ap.friend_id AS addressee_friend_id, ap.created_by_parent AS addressee_parent
+              ap.friend_id AS addressee_friend_id, ap.created_by_parent AS addressee_parent,
+              ap.direct_sharing_enabled AS addressee_sharing_enabled
          FROM friendships f
          JOIN profiles rp ON rp.id = f.requester_profile_id
          JOIN profiles ap ON ap.id = f.addressee_profile_id
@@ -3408,13 +3450,37 @@ app.get("/api/parent/friends-overview", ...requireSession, async (req, res) => {
             : null;
       const status = friendshipStatusFrom(r);
 
+      /* SASA_DIRECT_SHARING_V36 — the two controls this parent now holds over
+       * an active friendship, reported separately because they answer
+       * different questions: "is this child allowed to share at all" and "is
+       * this particular friend switched off". */
+      const myChildSharingEnabled =
+        mySide === "requester" ? r.requester_sharing_enabled : r.addressee_sharing_enabled;
+      const mySideDisabledAt =
+        mySide === "requester" ? r.requester_sharing_disabled_at : r.addressee_sharing_disabled_at;
+      const otherSideDisabledAt =
+        mySide === "requester" ? r.addressee_sharing_disabled_at : r.requester_sharing_disabled_at;
+
       return {
         id: r.id,
         status,
         my_child: mySide === "requester" ? r.requester_name : r.addressee_name,
+        my_child_profile_id: mySide === "requester" ? r.requester_id : r.addressee_id,
         other_child: mySide === "requester" ? r.addressee_name : r.requester_name,
         other_friend_id: mySide === "requester" ? r.addressee_friend_id : r.requester_friend_id,
         direction: mySide === "requester" ? "outgoing" : "incoming",
+        /* Whether things can move along this friendship right now, and which
+         * switch is holding it. The other family's switch is reported as a
+         * plain fact without naming who: this parent cannot change it, and
+         * needs to know it is not their own setting that is in the way. */
+        sharing_active:
+          status === "active" &&
+          Boolean(myChildSharingEnabled) &&
+          !mySideDisabledAt &&
+          !otherSideDisabledAt,
+        my_child_sharing_enabled: Boolean(myChildSharingEnabled),
+        sharing_off_by_me: Boolean(mySideDisabledAt),
+        sharing_off_by_other_family: Boolean(otherSideDisabledAt),
         awaiting_me: status === "pending" && mySide !== null && !myApproval,
         awaiting_other:
           status === "pending" &&
@@ -3443,6 +3509,7 @@ app.get("/api/parent/friends-overview", ...requireSession, async (req, res) => {
             ? r.recipient_parent_approved_at
             : null;
       const status = shareStatusFrom(r);
+      const isDirect = r.approval_mode === "direct";
 
       return {
         id: r.id,
@@ -3452,7 +3519,15 @@ app.get("/api/parent/friends-overview", ...requireSession, async (req, res) => {
         from_child: r.sender_name,
         to_child: r.recipient_name,
         direction: mySide === "sender" ? "outgoing" : "incoming",
-        awaiting_me: status === "pending" && mySide !== null && !myApproval,
+        /* SASA_DIRECT_SHARING_V36 — a direct share is not waiting for anybody.
+         * The parent's job on it is oversight, not gatekeeping, so it reports
+         * as revocable instead of as work to be done. Only the older
+         * 'per_share' rows can still be awaiting an approval. */
+        direct: isDirect,
+        awaiting_me: !isDirect && status === "pending" && mySide !== null && !myApproval,
+        can_revoke: status === "active" && mySide !== null,
+        is_recommendation: r.is_recommendation === true,
+        shared_at: r.created_at,
         admin_override: r.admin_override_at
           ? { at: r.admin_override_at, reason: r.admin_override_reason, approved_by_me: Boolean(myApproval) }
           : null
@@ -3474,6 +3549,118 @@ app.get("/api/parent/friends-overview", ...requireSession, async (req, res) => {
     res.status(500).json({ status: "error", message: "Unable to load friends and sharing" });
   }
 });
+
+/**
+ * SASA_DIRECT_SHARING_V36 — approving a friendship opts that child into direct
+ * sharing.
+ *
+ * This is the whole point of moving the consent: the parent is told, in the
+ * approval itself, that saying yes lets these children share photos and videos
+ * directly. Enabling it here is that sentence being true.
+ *
+ * A parent who has explicitly set the switch — either way — is not overridden.
+ * `direct_sharing_decided_at` records that they chose, so approving a second
+ * friendship cannot quietly turn back on something they deliberately turned
+ * off.
+ */
+async function enableDirectSharingForParentChildren(profileIds) {
+  if (!profileIds.length) return;
+
+  await pool.query(
+    `UPDATE profiles
+        SET direct_sharing_enabled = true
+      WHERE id = ANY($1::uuid[])
+        AND is_parent = false
+        AND direct_sharing_decided_at IS NULL`,
+    [profileIds]
+  );
+}
+
+/* SASA_DIRECT_SHARING_V36 — registered BEFORE /:id/:action below.
+ *
+ * That route takes any third segment as an action name and answers 404 for one
+ * it does not recognise, so with the order reversed every call to this endpoint
+ * was swallowed by it and the switch silently did nothing. Specific paths first.
+ */
+app.post(
+  "/api/parent/friendships/:id/sharing",
+  friendActionLimiter,
+  ...requireSession,
+  async (req, res) => {
+    try {
+      if (req.account.role !== "parent" && req.account.role !== "admin") {
+        return res.status(403).json({ status: "error", message: "Parent session required" });
+      }
+
+      if (typeof req.body?.enabled !== "boolean") {
+        return res.status(400).json({ status: "error", message: "enabled must be true or false" });
+      }
+
+      const { rows } = await pool.query(`SELECT * FROM friendships WHERE id = $1 LIMIT 1`, [
+        req.params.id
+      ]);
+      const f = rows[0];
+      if (!f) return notFound(res);
+
+      const side = await parentSideOfFriendship(pool, req.account, f);
+      if (!side) return notFound(res);
+
+      /* An administrator with no child in this friendship has no side to write.
+       * They can already block the friendship outright, which is the honest
+       * tool for the job; silently writing a family's column would misattribute
+       * the decision. */
+      if (side === "admin") {
+        return res.status(403).json({
+          status: "error",
+          message: "Only a parent of one of these children can change this."
+        });
+      }
+
+      const value = req.body.enabled ? null : "now()";
+      const columns =
+        side === "both"
+          ? ["requester_sharing_disabled_at", "addressee_sharing_disabled_at"]
+          : side === "requester"
+            ? ["requester_sharing_disabled_at"]
+            : ["addressee_sharing_disabled_at"];
+
+      const assignments = columns.map((c) => `${c} = ${value === null ? "NULL" : "now()"}`).join(", ");
+
+      const updated = await pool.query(
+        `UPDATE friendships SET ${assignments}, updated_at = now() WHERE id = $1 RETURNING *`,
+        [f.id]
+      );
+
+      await recordAudit(req, "friendship.sharing", "friendship", f.id, {
+        enabled: req.body.enabled,
+        side
+      });
+
+      const row = updated.rows[0];
+      res.json({
+        status: "ok",
+        friendship: {
+          id: row.id,
+          sharing_off_by_me: Boolean(
+            side === "requester" || side === "both"
+              ? row.requester_sharing_disabled_at
+              : row.addressee_sharing_disabled_at
+          ),
+          sharing_off_by_other_family: Boolean(
+            side === "requester"
+              ? row.addressee_sharing_disabled_at
+              : side === "addressee"
+                ? row.requester_sharing_disabled_at
+                : false
+          )
+        }
+      });
+    } catch (error) {
+      console.error("Friendship sharing toggle error:", error);
+      res.status(500).json({ status: "error", message: "Could not change that setting" });
+    }
+  }
+);
 
 /* ── Parent decisions on a friendship ──────────────────────────────────── */
 app.post(
@@ -3572,9 +3759,15 @@ app.post(
             [f.id, req.account.id]
           );
 
+          await enableDirectSharingForParentChildren([
+            f.requester_profile_id,
+            f.addressee_profile_id
+          ]);
+
           await recordAudit(req, "friendship.approve", "friendship", f.id, {
             side: "both",
-            note: "same parent owns both children"
+            note: "same parent owns both children",
+            direct_sharing: "enabled for both children"
           });
 
           return res.json({
@@ -3598,6 +3791,13 @@ app.post(
         RETURNING *`,
           [f.id, req.account.id]
         );
+
+        /* Only this parent's own child. The other family opts in when they
+         * approve their side, so neither child is enabled by a decision their
+         * own parent did not make. */
+        await enableDirectSharingForParentChildren([
+          side === "addressee" ? f.addressee_profile_id : f.requester_profile_id
+        ]);
 
         // Promote to active only when both columns are now set.
         const row = updated.rows[0];
@@ -3651,7 +3851,7 @@ app.post(
 );
 
 /* ── Child shares one item with one approved friend ────────────────────── */
-app.post("/api/shares", friendActionLimiter, ...requireSession, async (req, res) => {
+app.post("/api/shares", shareSendLimiter, ...requireSession, async (req, res) => {
   try {
     const me = await requireChild(req, res);
     if (!me) return;
@@ -3663,20 +3863,37 @@ app.post("/api/shares", friendActionLimiter, ...requireSession, async (req, res)
       return notFound(res);
     }
 
-    /* The child may only share something already assigned to them. This is the
-     * check that stops a child sharing another family's media by pasting an
-     * id: assignment is verified against their own profile. */
-    const assigned = await pool.query(
-      `SELECT m.id, m.title, m.visibility
+    /* Two ways a child may legitimately send something.
+     *
+     * Assigned media is theirs to pass on, and sharing it grants the friend a
+     * private permission. Public published media needs no permission at all,
+     * so sending it is a recommendation: a row so the friend gets an entry and
+     * a parent can see and revoke it, but no private grant is minted for
+     * something the whole app can already watch. */
+    const candidate = await pool.query(
+      `SELECT m.id, m.title, m.media_type, m.visibility, m.publication_status,
+              EXISTS (
+                SELECT 1 FROM media_child_access mca
+                 WHERE mca.media_id = m.id AND mca.child_profile_id = $2
+              ) AS assigned_to_me
          FROM media_files m
-         JOIN media_child_access mca ON mca.media_id = m.id
-        WHERE m.id = $1 AND mca.child_profile_id = $2
+        WHERE m.id = $1
         LIMIT 1`,
       [mediaId, me.id]
     );
 
-    const media = assigned.rows[0];
+    const media = candidate.rows[0];
     if (!media) return notFound(res);
+
+    const isPublic = media.visibility === "public" && media.publication_status === "published";
+
+    /* Not assigned and not public means the child is naming an id they have no
+     * relationship with. Answered as not-found, like every other "not yours". */
+    if (!media.assigned_to_me && !isPublic) return notFound(res);
+
+    // A recommendation only when the child does not hold it themselves; an
+    // assigned item that also happens to be public is still a real share.
+    const isRecommendation = !media.assigned_to_me && isPublic;
 
     const fr = await pool.query(`SELECT * FROM friendships WHERE id = $1 LIMIT 1`, [friendshipId]);
     const friendship = fr.rows[0];
@@ -3688,58 +3905,173 @@ app.post("/api/shares", friendActionLimiter, ...requireSession, async (req, res)
       return notFound(res);
     }
 
-    // Only an active friendship may carry a share.
-    if (friendshipStatusFrom(friendship) !== "active") {
-      return res.status(403).json({
-        status: "error",
-        message: "You can only share with an approved friend."
-      });
-    }
-
     const recipientId =
       friendship.requester_profile_id === me.id
         ? friendship.addressee_profile_id
         : friendship.requester_profile_id;
+
+    const people = await pool.query(
+      `SELECT id, display_name, avatar_url, friend_id, direct_sharing_enabled
+         FROM profiles WHERE id = ANY($1::uuid[])`,
+      [[me.id, recipientId]]
+    );
+    const senderProfile = people.rows.find((r) => r.id === me.id);
+    const recipientProfile = people.rows.find((r) => r.id === recipientId);
+    if (!recipientProfile) return notFound(res);
+
+    /* SASA_DIRECT_SHARING_V36 — the whole permission decision, server-side.
+     * The client shows a Share button only where this would succeed, but that
+     * is a courtesy; this is the check that counts. */
+    const permission = directSharingAllowed(friendship, senderProfile, recipientProfile);
+
+    if (!permission.allowed) {
+      const message =
+        permission.reason === "friendship_not_active"
+          ? "You can only send things to an approved friend."
+          : permission.reason === "sharing_off_for_friend"
+            ? `A grown-up turned off sharing with ${recipientProfile.display_name}.`
+            : permission.reason === "sharing_off_for_them"
+              ? `${recipientProfile.display_name} can't receive things right now.`
+              : "A grown-up turned off sharing for you.";
+
+      return res.status(403).json({ status: "error", code: permission.reason, message });
+    }
 
     const existing = await pool.query(
       `SELECT id, status FROM media_shares WHERE media_id = $1 AND recipient_profile_id = $2 LIMIT 1`,
       [mediaId, recipientId]
     );
 
+    /* A revoked share is not re-sendable by the child. A grown-up took it
+     * away; letting the child put it straight back would make the parent
+     * control meaningless, and a child re-tapping Send is the likeliest way
+     * that happens. */
+    if (existing.rows[0]?.status === "revoked") {
+      return res.status(409).json({
+        status: "error",
+        code: "revoked",
+        message: `A grown-up took this back, so it can't be sent to ${recipientProfile.display_name} again.`
+      });
+    }
+
     if (existing.rows[0] && ["pending", "active"].includes(existing.rows[0].status)) {
       return res.status(409).json({
         status: "error",
-        message: "You have already shared this with that friend."
+        code: "duplicate",
+        message: `${recipientProfile.display_name} already has this one.`
       });
     }
 
     const upserted = await pool.query(
       `INSERT INTO media_shares
-         (media_id, friendship_id, sender_profile_id, recipient_profile_id)
-       VALUES ($1, $2, $3, $4)
+         (media_id, friendship_id, sender_profile_id, recipient_profile_id,
+          status, approval_mode, is_recommendation)
+       VALUES ($1, $2, $3, $4, 'active', 'direct', $5)
        ON CONFLICT (media_id, recipient_profile_id) DO UPDATE
-         SET status = 'pending',
+         SET status = 'active',
+             approval_mode = 'direct',
+             is_recommendation = EXCLUDED.is_recommendation,
              friendship_id = EXCLUDED.friendship_id,
              sender_profile_id = EXCLUDED.sender_profile_id,
-             sender_parent_approved_at = NULL,
-             recipient_parent_approved_at = NULL,
              rejected_at = NULL, revoked_at = NULL, decided_by = NULL,
              updated_at = now()
     RETURNING *`,
-      [mediaId, friendshipId, me.id, recipientId]
+      [mediaId, friendshipId, me.id, recipientId, isRecommendation]
     );
 
-    await recordAudit(req, "share.requested", "media_share", upserted.rows[0].id, {
-      media_title: media.title
+    await recordAudit(req, "share.sent", "media_share", upserted.rows[0].id, {
+      media_title: media.title,
+      recommendation: isRecommendation
     });
 
-    // Nothing is visible to the recipient yet; both parents must approve.
-    res.status(201).json({ status: "ok", share: { id: upserted.rows[0].id, status: "pending" } });
+    /* The recipient can see it now. The name comes back so the child is told
+     * "Sent to Hatem" rather than a generic acknowledgement — it is the only
+     * confirmation they get that it went to the friend they meant. */
+    res.status(201).json({
+      status: "ok",
+      share: {
+        id: upserted.rows[0].id,
+        status: "active",
+        is_recommendation: isRecommendation,
+        sent_to: recipientProfile.display_name
+      }
+    });
   } catch (error) {
     console.error("Share create error:", error);
-    res.status(500).json({ status: "error", message: "Could not share" });
+    res.status(500).json({ status: "error", message: "Could not send" });
   }
 });
+
+/* ── Parent: the direct-sharing switches ───────────────────────────────── */
+
+/**
+ * "Allow direct sharing with approved friends", per child.
+ *
+ * Turning it off stops new shares at once. It deliberately does NOT remove
+ * what the child has already sent or received: deleting a friend's photos
+ * because a setting changed would be a surprise, and the parent has a separate,
+ * explicit control for that — revoking a share. The distinction is the one
+ * thing to keep straight about this endpoint.
+ */
+app.patch(
+  "/api/parent/children/:profileId/direct-sharing",
+  friendActionLimiter,
+  ...requireSession,
+  async (req, res) => {
+    try {
+      if (req.account.role !== "parent" && req.account.role !== "admin") {
+        return res.status(403).json({ status: "error", message: "Parent session required" });
+      }
+
+      if (!(await parentOwnsProfile(pool, req.account, req.params.profileId))) {
+        return notFound(res);
+      }
+
+      if (typeof req.body?.enabled !== "boolean") {
+        return res.status(400).json({ status: "error", message: "enabled must be true or false" });
+      }
+
+      const enabled = req.body.enabled;
+
+      /* decided_at is stamped whichever way it goes: an explicit choice must
+       * survive the next friendship approval, including an explicit "yes". */
+      const { rows } = await pool.query(
+        `UPDATE profiles
+            SET direct_sharing_enabled = $2,
+                direct_sharing_decided_at = now()
+          WHERE id = $1 AND is_parent = false
+      RETURNING id, display_name, direct_sharing_enabled`,
+        [req.params.profileId, enabled]
+      );
+
+      if (!rows[0]) return notFound(res);
+
+      await recordAudit(req, "child.direct_sharing", "profile", req.params.profileId, { enabled });
+
+      res.json({
+        status: "ok",
+        child: {
+          id: rows[0].id,
+          display_name: rows[0].display_name,
+          direct_sharing_enabled: rows[0].direct_sharing_enabled
+        }
+      });
+    } catch (error) {
+      console.error("Direct sharing toggle error:", error);
+      res.status(500).json({ status: "error", message: "Could not change that setting" });
+    }
+  }
+);
+
+/**
+ * Sharing on or off for one friendship.
+ *
+ * Each family owns its own column, so switching off is attributable and can
+ * only be undone by the family that did it. Either column being set blocks new
+ * shares in both directions — a channel one family has closed is closed, and
+ * making it one-way would let a child keep sending into a home that had said
+ * no.
+ */
 
 /* ── Parent decisions on a share ───────────────────────────────────────── */
 app.post(
@@ -3772,6 +4104,19 @@ app.post(
 
       if (!isSenderParent && !isRecipientParent && req.account.role !== "admin") {
         return notFound(res);
+      }
+
+      /* SASA_DIRECT_SHARING_V36 — a direct share was never waiting to be let
+       * through, so approving or rejecting it is not a thing that can happen.
+       * Revoking is. Answered explicitly rather than silently succeeding,
+       * which would leave a parent believing they had gatekept something. */
+      if (share.approval_mode === "direct" && action !== "revoke") {
+        return res.status(409).json({
+          status: "error",
+          code: "already_shared",
+          message:
+            "This was shared directly, because you approved the friendship. You can take it back with Revoke."
+        });
       }
 
       let updated;
@@ -3908,40 +4253,102 @@ app.post(
   }
 );
 
+/* ── What THIS child has sent ──────────────────────────────────────────── */
+/*
+ * SASA_KID_SHARE_V35 — the counterpart to /shares/received.
+ *
+ * Without this a child could only learn they had already sent something by
+ * tapping Send again and reading the duplicate error, and any sense of
+ * "waiting for a grown-up" vanished on refresh. The share sheet had to either
+ * stay silent or invent a local record of the child's own requests, and a
+ * local record drifts the moment a parent decides something.
+ *
+ * Deliberately narrow. It answers only for the acting child's OWN outgoing
+ * shares, taken from the session rather than any parameter, and it carries no
+ * content URL: this is a list of requests and their state, not a second way to
+ * reach media. The recipient is described with safeChildShape, which is the
+ * same name and picture the child already sees on their Friends page — no
+ * account, no parent, no storage path.
+ */
+app.get("/api/shares/sent", ...requireSession, async (req, res) => {
+  try {
+    const me = await requireChild(req, res);
+    if (!me) return;
+
+    const { rows } = await pool.query(
+      `SELECT s.id AS share_id, s.status, s.friendship_id, s.created_at, s.updated_at,
+              s.sender_parent_approved_at, s.recipient_parent_approved_at,
+              -- shareStatusFrom() reads approval_mode first; without it a
+              -- direct share would fall through to the old two-approval rule
+              -- and report itself as still waiting for a parent.
+              s.approval_mode, s.is_recommendation,
+              s.admin_override_at, s.rejected_at, s.revoked_at,
+              m.id AS media_id, m.media_type, m.title,
+              rp.id AS recipient_id, rp.display_name AS recipient_name,
+              rp.avatar_url AS recipient_avatar, rp.friend_id AS recipient_friend_id
+         FROM media_shares s
+         JOIN media_files m ON m.id = s.media_id
+         JOIN profiles rp ON rp.id = s.recipient_profile_id
+        WHERE s.sender_profile_id = $1
+        ORDER BY s.updated_at DESC`,
+      [me.id]
+    );
+
+    res.set("Cache-Control", "private, no-store");
+    res.json({
+      status: "ok",
+      shares: rows.map((row) => ({
+        share_id: row.share_id,
+        media_id: row.media_id,
+        media_type: row.media_type,
+        title: row.title,
+        friendship_id: row.friendship_id,
+        /* Derived exactly like every other status in this file, so a share
+         * cannot read "waiting" here and "approved" on the parent's screen. */
+        status: shareStatusFrom(row),
+        is_recommendation: row.is_recommendation === true,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        shared_with: safeChildShape({
+          id: row.recipient_id,
+          display_name: row.recipient_name,
+          avatar_url: row.recipient_avatar,
+          friend_id: row.recipient_friend_id
+        })
+      }))
+    });
+  } catch (error) {
+    console.error("Shares-sent error:", error);
+    res.status(500).json({ status: "error", message: "Unable to load what you sent" });
+  }
+});
+
 /* ── What has been shared with this child ──────────────────────────────── */
 app.get("/api/shares/received", ...requireSession, async (req, res) => {
   try {
     const me = await requireChild(req, res);
     if (!me) return;
 
-    /* Only fully approved shares on still-active friendships, and only while
-     * the sender still holds the item. The same conditions the media route
-     * re-checks, so a listing can never show something that would then refuse
-     * to play. */
+    /* Authorised shares on still-active friendships, and — for a real share
+     * rather than a recommendation — only while the sender still holds the
+     * item. Built from the same SQL fragments the media delivery route uses,
+     * so a listing can never show something that would then refuse to play. */
     const { rows } = await pool.query(
       `SELECT m.id, m.media_type, m.title, m.description, m.category,
               m.public_url, m.thumbnail_url, m.file_path, m.mime_type, m.size_bytes,
               m.visibility, m.publication_status, m.created_at,
               sp.display_name AS shared_by_name, sp.avatar_url AS shared_by_avatar,
               sp.friend_id AS shared_by_friend_id, sp.id AS shared_by_id,
-              s.id AS share_id
+              s.id AS share_id, s.is_recommendation
          FROM media_shares s
          JOIN friendships f ON f.id = s.friendship_id
          JOIN media_files m ON m.id = s.media_id
          JOIN profiles sp ON sp.id = s.sender_profile_id
         WHERE s.recipient_profile_id = $1
           AND s.status = 'active'
-          -- Same rule as activeShareForChild / bothSidesSatisfied.
-          AND (
-                (s.sender_parent_approved_at IS NOT NULL AND s.recipient_parent_approved_at IS NOT NULL)
-             OR (s.admin_override_at IS NOT NULL
-                 AND (s.sender_parent_approved_at IS NOT NULL) <> (s.recipient_parent_approved_at IS NOT NULL))
-              )
-          AND f.status = 'active'
-          AND EXISTS (
-            SELECT 1 FROM media_child_access mca
-             WHERE mca.media_id = s.media_id AND mca.child_profile_id = s.sender_profile_id
-          )
+          AND ${SHARE_AUTHORISED_SQL}
+          AND ${FRIENDSHIP_ACTIVE_SQL}
+          AND ${SENDER_STILL_HOLDS_SQL}
         ORDER BY s.updated_at DESC`,
       [me.id]
     );
@@ -3952,6 +4359,9 @@ app.get("/api/shares/received", ...requireSession, async (req, res) => {
       media: rows.map((row) => ({
         ...withAccessUrls(req.account, row),
         share_id: row.share_id,
+        /* A recommendation of something public, rather than an item the friend
+         * handed over. Shown differently: "Sara thinks you'll like this". */
+        is_recommendation: row.is_recommendation === true,
         shared_by: safeChildShape({
           id: row.shared_by_id,
           display_name: row.shared_by_name,

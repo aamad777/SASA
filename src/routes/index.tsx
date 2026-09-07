@@ -188,11 +188,13 @@ function SasaApp() {
               sourceLabel: "SASA library",
               description: item.description || undefined,
               mediaId: item.id,
-              /* SASA_KID_SHARE_V35 — library media is not assigned to this
-               * child, and /api/shares only accepts an item the child is
-               * assigned. Marking it plainly keeps the Share control off a
-               * card where the server would refuse. */
-              shareable: false,
+              /* SASA_DIRECT_SHARING_V36 — published library media is public, so
+               * a child may recommend it to a friend. The server records a
+               * recommendation rather than minting a private permission:
+               * nothing needs granting to watch something the whole app can
+               * already see. It refused this before, which is why the control
+               * used to be hidden here. */
+              shareable: true,
             } satisfies KidsVideoItem;
           }),
         );

@@ -1,12 +1,18 @@
-/* SASA_FRIENDS_V32 — parent-controlled friendships and media sharing.
+/* SASA_DIRECT_SHARING_V36 — parent-approved friendships, then direct sharing.
  *
  * Everything here exists to keep two promises:
  *
  *   - a child is only ever addressable by a Friend ID they chose to give out.
  *     There is no listing, no partial match and no name search, so an ID
  *     cannot be discovered, only received.
- *   - nothing connects and nothing moves without BOTH families agreeing.
- *     A friendship needs one approval per side, and so does every share.
+ *   - nothing connects without BOTH families agreeing. A friendship needs one
+ *     approval per side, and the parents are told in the approval itself that
+ *     it lets these children share photos and videos directly.
+ *
+ * Sharing after that is immediate, and stays under parental control through
+ * reversibility rather than a queue: a parent can see every shared item,
+ * revoke one, switch sharing off for a friend or for their child, and remove
+ * or block the friendship. Each takes effect on the next request.
  *
  * The functions that answer "may this child see this?" are used by the media
  * delivery path as well as the listings, so a share cannot be enjoyed through
@@ -110,8 +116,20 @@ export function friendshipStatusFrom(row) {
     : "pending";
 }
 
+/**
+ * SASA_DIRECT_SHARING_V36 — a share's status.
+ *
+ * A 'direct' share carried its consent from the friendship, so it is active
+ * from the moment it is created. Only the older 'per_share' rows are still
+ * judged by the two-approval rule, which is why the mode is stored rather than
+ * inferred: rows written under the old rules keep being read under them, and
+ * nothing that was waiting for a parent becomes visible by deploying this.
+ */
 export function shareStatusFrom(row) {
   if (row.status === "rejected" || row.status === "revoked") return row.status;
+
+  if (row.approval_mode === "direct") return "active";
+
   return bothSidesSatisfied(
     row.sender_parent_approved_at,
     row.recipient_parent_approved_at,
@@ -119,6 +137,74 @@ export function shareStatusFrom(row) {
   )
     ? "active"
     : "pending";
+}
+
+/**
+ * SQL fragment: the share itself is authorised.
+ *
+ * Written once and used by every path that answers "may this child see this?"
+ * — the listings and the media delivery route both. When these drift, an item
+ * lists but refuses to play, or worse, plays while listed as revoked.
+ */
+export const SHARE_AUTHORISED_SQL = `(
+     s.approval_mode = 'direct'
+  OR (s.sender_parent_approved_at IS NOT NULL AND s.recipient_parent_approved_at IS NOT NULL)
+  OR (s.admin_override_at IS NOT NULL
+      AND (s.sender_parent_approved_at IS NOT NULL) <> (s.recipient_parent_approved_at IS NOT NULL))
+)`;
+
+/** SQL fragment: the friendship behind a share is still active. */
+export const FRIENDSHIP_ACTIVE_SQL = `(
+  f.status = 'active'
+  AND (
+        (f.requester_parent_approved_at IS NOT NULL AND f.addressee_parent_approved_at IS NOT NULL)
+     OR (f.admin_override_at IS NOT NULL
+         AND (f.requester_parent_approved_at IS NOT NULL) <> (f.addressee_parent_approved_at IS NOT NULL))
+      )
+)`;
+
+/**
+ * SQL fragment: the sender still legitimately holds the item.
+ *
+ * A recommendation of public media is exempt: nobody needs to hold a published
+ * item to point at it, and requiring an assignment would make a recommendation
+ * vanish for reasons the children could not understand.
+ */
+export const SENDER_STILL_HOLDS_SQL = `(
+  s.is_recommendation
+  OR EXISTS (
+    SELECT 1 FROM media_child_access mca
+     WHERE mca.media_id = s.media_id
+       AND mca.child_profile_id = s.sender_profile_id
+  )
+)`;
+
+/**
+ * Whether new shares may flow along a friendship right now.
+ *
+ * Checked when a child presses Send, and deliberately NOT when the recipient
+ * reads: turning sharing off stops new items arriving, it does not reach back
+ * and delete what a child was already given. Removing the item is a separate,
+ * explicit act — revoking the share.
+ */
+export function directSharingAllowed(friendship, senderProfile, recipientProfile) {
+  if (friendshipStatusFrom(friendship) !== "active") {
+    return { allowed: false, reason: "friendship_not_active" };
+  }
+
+  if (friendship.requester_sharing_disabled_at || friendship.addressee_sharing_disabled_at) {
+    return { allowed: false, reason: "sharing_off_for_friend" };
+  }
+
+  if (!senderProfile?.direct_sharing_enabled) {
+    return { allowed: false, reason: "sharing_off_for_me" };
+  }
+
+  if (!recipientProfile?.direct_sharing_enabled) {
+    return { allowed: false, reason: "sharing_off_for_them" };
+  }
+
+  return { allowed: true, reason: null };
 }
 
 /**
@@ -137,27 +223,9 @@ export async function activeShareForChild(pool, mediaId, childProfileId) {
       WHERE s.media_id = $1
         AND s.recipient_profile_id = $2
         AND s.status = 'active'
-        -- Both parents, or one parent plus an administrator override. Kept
-        -- identical to bothSidesSatisfied() above: if these two ever disagree,
-        -- an item could list but refuse to play, or worse.
-        AND (
-              (s.sender_parent_approved_at IS NOT NULL AND s.recipient_parent_approved_at IS NOT NULL)
-           OR (s.admin_override_at IS NOT NULL
-               AND (s.sender_parent_approved_at IS NOT NULL) <> (s.recipient_parent_approved_at IS NOT NULL))
-            )
-        AND f.status = 'active'
-        AND (
-              (f.requester_parent_approved_at IS NOT NULL AND f.addressee_parent_approved_at IS NOT NULL)
-           OR (f.admin_override_at IS NOT NULL
-               AND (f.requester_parent_approved_at IS NOT NULL) <> (f.addressee_parent_approved_at IS NOT NULL))
-            )
-        -- The sender must still hold the item themselves. A share cannot
-        -- outlive the assignment it was made from.
-        AND EXISTS (
-          SELECT 1 FROM media_child_access mca
-           WHERE mca.media_id = s.media_id
-             AND mca.child_profile_id = s.sender_profile_id
-        )
+        AND ${SHARE_AUTHORISED_SQL}
+        AND ${FRIENDSHIP_ACTIVE_SQL}
+        AND ${SENDER_STILL_HOLDS_SQL}
       LIMIT 1`,
     [mediaId, childProfileId],
   );

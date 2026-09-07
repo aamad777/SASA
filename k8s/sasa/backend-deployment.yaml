@@ -43,7 +43,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: backend-api
-          image: 192.168.0.101:5050/saratube-backend:564099e97f030733d7fa2f9585a4ec04041c59fb
+          image: 192.168.0.101:5050/saratube-backend:751ea589195fc131afd81898c859eb75e73c9fd2
           imagePullPolicy: Always
           ports:
             - containerPort: 4000
