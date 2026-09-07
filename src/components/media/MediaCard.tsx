@@ -59,7 +59,7 @@ export function MediaCard({ item, saved, onOpen, onToggleSave, onShareToFriend }
 
     if (outcome === "shared" || outcome === "cancelled") return;
 
-    setShareNote(outcome === "copied" ? "Link copied" : "Sharing isn’t available here");
+    setShareNote(outcome === "copied" ? "Link copied" : "Copying isn’t available here");
     window.setTimeout(() => setShareNote(""), 2400);
   };
 
@@ -103,6 +103,9 @@ export function MediaCard({ item, saved, onOpen, onToggleSave, onShareToFriend }
           title="Share with a friend"
         >
           <Users size={18} />
+          {/* An icon alone did not read as "share": the word is what a child
+              and a testing parent both look for. */}
+          <span className="sasa-card-sharelabel">Share</span>
         </button>
       )}
 
@@ -146,9 +149,12 @@ export function MediaCard({ item, saved, onOpen, onToggleSave, onShareToFriend }
                 {saved ? "Remove from library" : "Save to library"}
               </button>
 
+              {/* SASA_SHARE_LABEL_V37 — this said "Share", competing with the
+                  card's own share-to-a-friend control and winning, because it
+                  is the one with a word next to it. Named for what it does. */}
               <button type="button" role="menuitem" onClick={handleShare}>
                 <Share2 size={17} />
-                Share
+                Copy link
               </button>
             </div>
           )}

@@ -106,7 +106,7 @@ export default function KidsSharedWithMe({
               {/* Child-safe attribution: a face and a display name, never an
                   account, an email or an id. */}
               <span className="sasa-shared-by">
-                <FriendAvatar child={item.shared_by} variant="row" />
+                <FriendAvatar child={item.shared_by} variant="row" token={token} />
                 {item.is_recommendation
                   ? `${item.shared_by.display_name} thinks you'll like this`
                   : `Shared by ${item.shared_by.display_name}`}

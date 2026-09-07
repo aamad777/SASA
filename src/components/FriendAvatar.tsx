@@ -19,9 +19,14 @@
 
 import { useEffect, useState } from "react";
 import type { SafeChild } from "@/lib/friends-api";
+import { useAuthorisedImage } from "@/hooks/use-authorised-image";
 
 type Props = {
   child: SafeChild;
+  /* SASA_AVATAR_FIX_V37 — the child-scoped token. With it the friend's real
+   * face is fetched from the session-protected route; without it the initial
+   * below is all that can honestly be shown. */
+  token?: string | null;
   /** Extra classes, e.g. "is-lg" for the friend page's larger circle. */
   className?: string;
   /** Which circle style to use — they differ in size and context. */
@@ -34,25 +39,21 @@ const BASE_CLASS: Record<NonNullable<Props["variant"]>, string> = {
   pick: "sasa-friendpick-avatar",
 };
 
-export default function FriendAvatar({ child, className, variant = "grid" }: Props) {
+export default function FriendAvatar({ child, className, variant = "grid", token }: Props) {
   const [failed, setFailed] = useState(false);
+  const src = useAuthorisedImage(child.avatar_url, token);
 
   // A different friend gets a fresh chance to load their own picture.
   useEffect(() => setFailed(false), [child.avatar_url]);
 
   const initial = (child.display_name || "?").charAt(0).toUpperCase();
-  const showImage = Boolean(child.avatar_url) && !failed;
+  const showImage = Boolean(src) && !failed;
   const classes = [BASE_CLASS[variant], className].filter(Boolean).join(" ");
 
   return (
     <span className={classes} aria-hidden="true">
       {showImage ? (
-        <img
-          src={child.avatar_url as string}
-          alt=""
-          loading="lazy"
-          onError={() => setFailed(true)}
-        />
+        <img src={src as string} alt="" loading="lazy" onError={() => setFailed(true)} />
       ) : (
         initial
       )}

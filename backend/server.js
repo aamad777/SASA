@@ -1800,6 +1800,45 @@ async function canManageAvatar(req, profileId) {
   return resolveChildAccess(req, profileId);
 }
 
+/**
+ * SASA_AVATAR_FIX_V37 — who may SEE a child's avatar.
+ *
+ * Managing it (upload, preset) stays with the child themselves, their parent
+ * and an administrator: canManageAvatar above, unchanged.
+ *
+ * Seeing it needs one more case. The Friends screens show a friend's face, and
+ * that face is the whole point of them for a child who cannot yet read names
+ * quickly. Until now an approved friend was answered 404 exactly like a
+ * stranger, so every friend rendered as a grey initial.
+ *
+ * The extra grant is deliberately the narrowest thing that fixes it:
+ *   - only a CHILD session, never a parent reaching into another family;
+ *   - only where a friendship between those two children is ACTIVE, which
+ *     means both parents approved it;
+ *   - read only. This is not wired into the upload route, so a friend can
+ *     look at a face and can never change one.
+ *
+ * What is served is the processed file — a 512x512 WebP with EXIF and GPS
+ * already stripped by makeAvatar() — so a friend never receives the original
+ * photo or anything derived from its metadata.
+ */
+async function canViewAvatar(req, profileId) {
+  const manage = await resolveChildAccess(req, profileId);
+  if (manage.allowed) return manage;
+
+  if (req.account?.role !== "child" || !manage.profile) return { allowed: false, profile: manage.profile };
+
+  const me = await childProfileForAccount(pool, req.account);
+  if (!me || me.id === manage.profile.id) return { allowed: false, profile: manage.profile };
+
+  const friendship = await findFriendship(pool, me.id, manage.profile.id);
+  if (friendship && friendshipStatusFrom(friendship) === "active") {
+    return { allowed: true, profile: manage.profile };
+  }
+
+  return { allowed: false, profile: manage.profile };
+}
+
 app.post(
   "/api/profiles/:id/avatar",
   avatarLimiter,
@@ -1914,7 +1953,7 @@ app.post(
  */
 app.get("/api/profiles/:id/avatar", ...requireSession, async (req, res) => {
   try {
-    const check = await canManageAvatar(req, req.params.id);
+    const check = await canViewAvatar(req, req.params.id);
 
     if (!check.allowed) return res.status(404).json({ error: "Profile not found" });
 
