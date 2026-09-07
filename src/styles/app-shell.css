@@ -368,6 +368,32 @@
   object-fit: cover;
 }
 
+/* SASA_AVATAR_FIX_V37 — a visible "change my photo" affordance.
+   The circle must stop clipping so the badge can sit on its edge, so the
+   image takes over the rounding that .sasa-avatar's overflow was providing. */
+.sasa-avatar-edit {
+  position: relative;
+  overflow: visible;
+}
+
+.sasa-avatar-edit img {
+  border-radius: 999px;
+}
+
+.sasa-avatar-camera {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--sasa-surface);
+  border-radius: 999px;
+  background: var(--sasa-brand);
+  color: var(--sasa-brand-ink, #fff);
+}
+
 .sasa-avatar.is-lg {
   width: 44px;
   height: 44px;
@@ -1095,20 +1121,31 @@ html[data-app-theme] .sasa-rail {
   position: relative;
 }
 
+/* SASA_SHARE_LABEL_V37 — a pill with the word "Share" on it. As a bare
+   two-people glyph it was routinely missed in favour of the overflow menu's
+   "Share", which was the OS/clipboard action. Still 44px tall. */
 .sasa-card-share {
   position: absolute;
   top: 8px;
   inset-inline-end: 8px;
   z-index: 2;
-  display: inline-grid;
-  place-items: center;
-  width: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 44px;
   height: 44px;
+  padding-inline: 12px;
   border: 0;
   border-radius: 999px;
-  background: rgba(17, 18, 22, 0.66);
+  background: rgba(17, 18, 22, 0.72);
   color: #fff;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
+}
+
+.sasa-card-sharelabel {
+  line-height: 1;
 }
 
 .sasa-card-share:hover,

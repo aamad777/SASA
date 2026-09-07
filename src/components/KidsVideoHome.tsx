@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
+  Camera,
   Check,
   Crown,
   Edit3,
@@ -38,6 +39,7 @@ import {
   type AppThemeId,
 } from "../lib/theme";
 import { useDismiss } from "../hooks/use-dismiss";
+import { useAuthorisedImage } from "../hooks/use-authorised-image";
 import AppShell from "./layout/AppShell";
 import { getApiAssetUrl } from "../lib/api";
 import { sharedMediaId } from "../lib/media-id";
@@ -445,6 +447,15 @@ export default function KidsVideoHome({
     }
   }, [profileId, profileImage, profileImageStorageKey]);
 
+  /* SASA_AVATAR_FIX_V37 — `activeImage` is usually /api/profiles/<id>/avatar,
+   * which is behind requireSession. Handed straight to an <img> it answered
+   * 401 and rendered broken, which is why an uploaded photo never appeared.
+   * Resolved once here, so the header, the bottom bar and the profile page
+   * all show the same real face. Falls back to the emoji when there is no
+   * uploaded avatar, or when fetching it fails. */
+  const resolvedAvatar = useAuthorisedImage(activeImage, childToken || avatarToken);
+  const displayImage = resolvedAvatar || undefined;
+
   /* The browser tab carries the same name as the wordmark, so a parent with
    * several tabs open can tell whose session is whose. */
   useEffect(() => {
@@ -461,6 +472,18 @@ export default function KidsVideoHome({
       setActiveEmoji(profileEmoji);
     }
   }, [profileName, profileEmoji]);
+
+  /* SASA_AVATAR_FIX_V37 — the chooser used to be handed `avatarToken`, which
+   * is the PARENT's token, and only appeared when a parent was signed in. A
+   * child on their own therefore had no way to change their photo at all.
+   * The server already allows a child to manage their own avatar
+   * (resolveChildAccess: role "child" AND profile.user_id = account.id), so
+   * the child's own token is preferred and the parent's is the fallback for a
+   * parent editing a child they own. */
+  const avatarProfileId =
+    databaseProfileId ||
+    (typeof profileId === "string" && /^[0-9a-fA-F-]{36}$/.test(profileId) ? profileId : null);
+  const avatarUploadToken = childToken || avatarToken || null;
 
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
   const [tempName, setTempName] = useState<string>(activeName);
@@ -878,18 +901,24 @@ export default function KidsVideoHome({
   const renderProfile = () => (
     <div style={{ display: "grid", gap: 16, maxWidth: 720, paddingBlock: 8 }}>
       <section className="sasa-panel" style={{ gap: 14 }}>
+        {/* SASA_AVATAR_FIX_V37 — the avatar was tappable but said so nowhere,
+            so "change my photo" was an invisible affordance. The camera badge
+            is the control; the whole circle stays tappable with it. */}
         <button
           type="button"
-          className="sasa-avatar is-lg"
+          className="sasa-avatar is-lg sasa-avatar-edit"
           style={{ width: 64, height: 64, fontSize: 30 }}
           onClick={() => {
             playPopSound();
             setShowAvatarPicker((value) => !value);
           }}
           aria-expanded={showAvatarPicker}
-          aria-label="Change avatar"
+          aria-label="Change your photo"
         >
-          {activeImage ? <img src={activeImage} alt="" /> : activeEmoji}
+          {displayImage ? <img src={displayImage} alt="" /> : activeEmoji}
+          <span className="sasa-avatar-camera" aria-hidden="true">
+            <Camera size={13} />
+          </span>
         </button>
 
         <div className="sasa-panel-text">
@@ -938,10 +967,10 @@ export default function KidsVideoHome({
           persists through the backend and can upload a cropped photo. A local
           profile has no server-side profile to save to, so it keeps the
           emoji list below. */}
-      {showAvatarPicker && avatarToken && databaseProfileId && (
+      {showAvatarPicker && avatarUploadToken && avatarProfileId && (
         <AvatarChooser
-          token={avatarToken}
-          profileId={databaseProfileId}
+          token={avatarUploadToken}
+          profileId={avatarProfileId}
           profileName={profileName}
           presets={KID_AVATARS}
           currentEmoji={activeEmoji}
@@ -953,7 +982,7 @@ export default function KidsVideoHome({
         />
       )}
 
-      {showAvatarPicker && !(avatarToken && databaseProfileId) && (
+      {showAvatarPicker && !(avatarUploadToken && avatarProfileId) && (
         <section
           style={{
             display: "grid",
@@ -1255,7 +1284,7 @@ export default function KidsVideoHome({
       isAdmin={isAdmin}
       profileLabel="You"
       profileEmoji={activeEmoji}
-      profileImage={activeImage}
+      profileImage={displayImage}
       headerActions={
         <>
           <button
@@ -1277,7 +1306,7 @@ export default function KidsVideoHome({
           name={activeName}
           subtitle={isGuestAccount ? "Guest profile" : "Kid profile"}
           avatarEmoji={activeEmoji}
-          avatarImage={activeImage}
+          avatarImage={displayImage}
           items={accountItems}
         />
       }

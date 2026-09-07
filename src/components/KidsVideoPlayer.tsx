@@ -578,7 +578,7 @@ export default function KidsVideoPlayer({
 
     if (outcome === "shared" || outcome === "cancelled") return;
 
-    setShareNote(outcome === "copied" ? "Link copied" : "Sharing isn’t available here");
+    setShareNote(outcome === "copied" ? "Link copied" : "Copying isn’t available here");
     window.setTimeout(() => setShareNote(""), 2600);
   };
 
@@ -1003,30 +1003,40 @@ export default function KidsVideoPlayer({
                 <span className="sasa-watch-actionlabel">{saved ? "Saved" : "Save"}</span>
               </button>
 
-              <button
-                type="button"
-                className="sasa-btn"
-                onClick={handleShare}
-                aria-label={`Share ${video.title}`}
-              >
-                <Share2 size={18} />
-                <span className="sasa-watch-actionlabel">Share</span>
-              </button>
+              {/* SASA_SHARE_LABEL_V37 — these two were the other way round, and
+                  that is the whole reported "sharing is not working".
+                  "Share" invoked navigator.share / clipboard, and the button
+                  that actually sends to a friend was labelled "Friend". A
+                  child — or a parent testing on a phone — taps the one that
+                  says Share, gets "Link copied" or "Sharing isn't available
+                  here", and nothing reaches the friend.
 
+                  Share now means what it says. The OS/clipboard action is
+                  still available, named for what it really does. */}
               {childToken && (
                 <button
                   type="button"
-                  className="sasa-btn"
+                  className="sasa-btn is-primary"
                   onClick={() => {
                     playPopSound();
                     setShowShareToFriend(true);
                   }}
-                  aria-label={`Send ${video.title} to a friend`}
+                  aria-label={`Share ${video.title} with a friend`}
                 >
                   <Users size={18} />
-                  <span className="sasa-watch-actionlabel">Friend</span>
+                  <span className="sasa-watch-actionlabel">Share</span>
                 </button>
               )}
+
+              <button
+                type="button"
+                className="sasa-btn"
+                onClick={handleShare}
+                aria-label={`Copy a link to ${video.title}`}
+              >
+                <Share2 size={18} />
+                <span className="sasa-watch-actionlabel">Copy link</span>
+              </button>
 
               <button
                 type="button"

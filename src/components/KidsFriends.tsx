@@ -167,7 +167,7 @@ export default function KidsFriends({
         </button>
 
         <section className="sasa-friends-card sasa-friendpage-head">
-          <FriendAvatar child={openFriend.child} className="is-lg" />
+          <FriendAvatar child={openFriend.child} className="is-lg" token={token} />
           <h2>{firstName(openFriend.child.display_name)}</h2>
           <StatusChip status={openFriend.status} />
         </section>
@@ -229,7 +229,7 @@ export default function KidsFriends({
                   className="sasa-friendgrid-btn"
                   onClick={() => setOpenFriend(f)}
                 >
-                  <FriendAvatar child={f.child} />
+                  <FriendAvatar child={f.child} token={token} />
                   <span className="sasa-friendgrid-name">{firstName(f.child.display_name)}</span>
                 </button>
               </li>
@@ -253,7 +253,7 @@ export default function KidsFriends({
           <ul className="sasa-friend-list">
             {pending.map((f) => (
               <li key={f.id} className="sasa-friend-row">
-                <FriendAvatar child={f.child} variant="row" />
+                <FriendAvatar child={f.child} variant="row" token={token} />
                 <div className="sasa-friend-name">
                   <strong>{firstName(f.child.display_name)}</strong>
                   <StatusChip status={f.status} />
@@ -276,7 +276,7 @@ export default function KidsFriends({
           <ul className="sasa-friend-list">
             {rejected.map((f) => (
               <li key={f.id} className="sasa-friend-row">
-                <FriendAvatar child={f.child} variant="row" />
+                <FriendAvatar child={f.child} variant="row" token={token} />
                 <div className="sasa-friend-name">
                   <strong>{firstName(f.child.display_name)}</strong>
                 </div>
@@ -289,6 +289,7 @@ export default function KidsFriends({
 
       {addOpen && (
         <AddFriendSheet
+          token={token}
           onClose={closeAdd}
           friendId={friendId}
           loadingId={loading}
@@ -314,6 +315,7 @@ export default function KidsFriends({
  * a phone, and shares the share-sheet's chrome rather than inventing more.
  */
 function AddFriendSheet({
+  token,
   onClose,
   friendId,
   loadingId,
@@ -328,6 +330,7 @@ function AddFriendSheet({
   sent,
   onRequest,
 }: {
+  token: string;
   onClose: () => void;
   friendId: string | null;
   loadingId: boolean;
@@ -430,7 +433,7 @@ function AddFriendSheet({
 
         {found && (
           <div className="sasa-friend-row">
-            <FriendAvatar child={found} />
+            <FriendAvatar child={found} token={token} />
             {/* Name only. The ID they typed is already on screen, and nothing
                 else about another child is safe to show here. */}
             <div className="sasa-friend-name">

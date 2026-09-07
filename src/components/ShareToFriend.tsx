@@ -248,7 +248,7 @@ export default function ShareToFriend({
                           onClick={() => setPicked(f.id)}
                         >
                           <span className="sasa-friendpick-avatarwrap">
-                            <FriendAvatar child={f.child} variant="pick" />
+                            <FriendAvatar child={f.child} variant="pick" token={token} />
                             {isPicked && (
                               <span className="sasa-friendpick-tick" aria-hidden="true">
                                 <Check size={14} />

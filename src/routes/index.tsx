@@ -690,13 +690,26 @@ function SasaApp() {
           setProfile(null);
         }}
         onSelectChild={(child) => {
-          const savedImage =
-            child.avatar_url || localStorage.getItem(`sasa-child-image-${child.id}`) || undefined;
+          /* SASA_AVATAR_FIX_V37 — `child.avatar_url` is the STORAGE PATH the
+           * server keeps, e.g. "/avatars/<uuid>.webp", or an "emoji:<char>"
+           * preset. It was being handed straight to an <img>, and avatars are
+           * deliberately kept off the public /uploads mount, so that path is
+           * not served by anything: every uploaded child photo 404'd. The one
+           * address that serves the bytes is the authorised route, so that is
+           * what the profile carries; useAuthorisedImage() fetches it with the
+           * session token. An emoji preset is not an image at all. */
+          const stored = child.avatar_url || "";
+          const hasUploadedAvatar = Boolean(stored) && !stored.startsWith("emoji:");
+          const savedImage = hasUploadedAvatar
+            ? profileAvatarUrl(child.id)
+            : localStorage.getItem(`sasa-child-image-${child.id}`) || undefined;
 
           setProfile({
             id: child.id,
             name: child.display_name,
-            emoji: getDatabaseProfileEmoji(child.id),
+            emoji: stored.startsWith("emoji:")
+              ? stored.slice("emoji:".length)
+              : getDatabaseProfileEmoji(child.id),
             color: getDatabaseProfileColor(child.id),
             image: savedImage,
           });
@@ -823,7 +836,15 @@ function SasaApp() {
                       ...current,
                       ...(avatarUrl.startsWith("emoji:")
                         ? { emoji: avatarUrl.slice("emoji:".length), image: undefined }
-                        : { image: profileAvatarUrl(String(current.id)) }),
+                        : {
+                            /* SASA_AVATAR_FIX_V37 — the authorised avatar URL
+                             * is the same string before and after a save, so
+                             * useAuthorisedImage() saw no change, never
+                             * re-fetched, and kept showing the OLD photo until
+                             * a reload. The nonce is what makes "appears
+                             * immediately" true; the server ignores it. */
+                            image: `${profileAvatarUrl(String(current.id))}?v=${Date.now()}`,
+                          }),
                     }
                   : current,
               );
