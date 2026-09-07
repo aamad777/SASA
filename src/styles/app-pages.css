@@ -2402,6 +2402,40 @@
   background: #fffbeb;
 }
 
+/* SASA_DIRECT_SHARING_V36 — what a parent is agreeing to, and which switch is
+   currently holding sharing. Both sit inside an existing .sasa-pfriends-text
+   column, so they only need type treatment. */
+.sasa-pfriends-consent {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--sasa-ink-2);
+}
+
+.sasa-pfriends-sharing {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sasa-ink-2);
+}
+
+.sasa-pfriends-sharing.is-on {
+  color: #15803d;
+}
+
+/* SASA_DIRECT_SHARING_V36 — the sender's face beside their name on a shared
+   card. Sized down from the friend-row circle it reuses so it sits on one line
+   with the label. */
+.sasa-shared-by {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sasa-shared-by .sasa-friend-avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+}
+
 /* SASA_KID_SHARE_V34 — the share sheet. Large round targets a child can hit,
    wrapping so four friends fit at 360px without a sideways scroll. */
 .sasa-sharesheet {
@@ -2534,6 +2568,67 @@
 .sasa-share-outcomes li.is-bad {
   background: #fee2e2;
   color: #7f1d1d;
+}
+
+/* SASA_DIRECT_SHARING_V36 — the two states the two-tap flow added: the
+   confirmation that replaces the picker, and the "add a friend first"
+   explanation that replaces a sheet with nothing in it. Reuses the existing
+   sharesheet tokens rather than introducing a second visual language. */
+.sasa-share-sent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: #dcfce7;
+  color: #14532d;
+  font-size: 18px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.sasa-share-sent-tick {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #fff;
+}
+
+.sasa-share-empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 18px 14px;
+  border: 1px dashed var(--sasa-line);
+  border-radius: 14px;
+  text-align: center;
+  color: var(--sasa-ink-2);
+}
+
+.sasa-share-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.sasa-share-empty strong {
+  color: var(--sasa-ink);
+}
+
+/* The Send button's in-flight spinner. Reuses the sasa-spin keyframes already
+   defined for .sasa-spinner above rather than declaring a second copy. */
+.sasa-spin {
+  animation: sasa-spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sasa-spin {
+    animation: none;
+  }
 }
 
 /* SASA_KID_FRIENDS_V34 — friends as faces, not rows. Wraps so four fit at

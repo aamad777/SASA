@@ -1318,8 +1318,9 @@ export default function KidsVideoHome({
           shell, not inside renderProfile(). It used to be rendered from the
           Profile branch, so tapping Share on a card in Home, Search or
           Library set the state and mounted nothing at all: the button looked
-          like it did nothing. Submitting creates a PENDING share; nothing
-          reaches the friend until both grown-ups approve. */}
+          like it did nothing. SASA_DIRECT_SHARING_V36 — Send now lands with
+          the friend immediately; the approval happened once, on the
+          friendship. */}
       {sharing && childToken && (
         <ShareToFriend
           token={childToken}

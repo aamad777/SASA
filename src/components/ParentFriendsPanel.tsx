@@ -1,4 +1,14 @@
-/* SASA_FRIENDS_V32 — the parent's Friends & Sharing panel.
+/* SASA_DIRECT_SHARING_V36 — the parent's Friends & Sharing panel.
+ *
+ * Approval happens once, on the friendship, and the wording says what it
+ * grants. After that the children share directly and this panel is about
+ * oversight rather than gatekeeping: every shared item is listed, any of it
+ * can be revoked, sharing can be switched off for one friend or for a child
+ * entirely, and the friendship can be removed or blocked.
+ *
+ * The one thing to keep straight: switching sharing off stops NEW items. It
+ * does not reach back and delete what a friend already has — revoking a share
+ * does that, and it is a separate button for exactly that reason.
  *
  * Every control here performs a real decision; nothing is decorative. The
  * pending count comes from the server's own `awaiting_me` flag rather than
@@ -7,11 +17,13 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Loader2, Ban, Trash2, X } from "lucide-react";
+import { Check, Loader2, Ban, Share2, Trash2, X, XCircle } from "lucide-react";
 import {
   decideFriendship,
   decideShare,
   getParentFriendsOverview,
+  setChildDirectSharing,
+  setFriendshipSharing,
   type ParentFriendship,
   type ParentShare,
 } from "@/lib/friends-api";
@@ -186,6 +198,13 @@ export default function ParentFriendsPanel({ token }: { token: string }) {
       <section className="sasa-pfriends-card">
         <h3>Needs your approval ({pendingFriendships.length + pendingShares.length})</h3>
 
+        {pendingShares.length > 0 && (
+          <p className="sasa-friends-note">
+            These items were sent under the old rules, when every share needed both parents.
+            Approving the friendship is what grants sharing now.
+          </p>
+        )}
+
         {pendingFriendships.length === 0 && pendingShares.length === 0 ? (
           <p className="sasa-friends-note">Nothing waiting for you.</p>
         ) : (
@@ -198,6 +217,12 @@ export default function ParentFriendsPanel({ token }: { token: string }) {
                   </strong>
                   <span>
                     Friend request ({f.direction}) · {f.other_friend_id}
+                  </span>
+                  {/* The consent that used to be collected per share is
+                      collected here instead, so it has to say so. */}
+                  <span className="sasa-pfriends-consent">
+                    Approving this friendship allows these children to share photos and videos
+                    directly. You can switch sharing off or take any item back at any time.
                   </span>
                 </div>
                 <div className="sasa-pfriends-actions">
@@ -287,9 +312,80 @@ export default function ParentFriendsPanel({ token }: { token: string }) {
                     {f.status}
                     {f.awaiting_other ? " · waiting for the other family" : ""}
                   </span>
+
+                  {/* Why sharing is or is not flowing, naming the switch that
+                      decides it — a parent who cannot see which one is off has
+                      no way to fix it. */}
+                  {f.status === "active" && (
+                    <span
+                      className={
+                        f.sharing_active ? "sasa-pfriends-sharing is-on" : "sasa-pfriends-sharing"
+                      }
+                    >
+                      {f.sharing_active
+                        ? "Direct sharing is on"
+                        : f.sharing_off_by_me
+                          ? "You turned off sharing with this friend"
+                          : f.sharing_off_by_other_family
+                            ? "The other family turned off sharing"
+                            : !f.my_child_sharing_enabled
+                              ? `Direct sharing is off for ${f.my_child}`
+                              : "Direct sharing is off"}
+                    </span>
+                  )}
+
                   {f.admin_override && <OverrideNote override={f.admin_override} />}
                 </div>
                 <div className="sasa-pfriends-actions">
+                  {/* Sharing with THIS friend. Off stops new items; it does not
+                      remove what has already been sent. */}
+                  {f.status === "active" && (
+                    <button
+                      type="button"
+                      className="sasa-btn"
+                      disabled={busy === f.id}
+                      onClick={() =>
+                        act(() => setFriendshipSharing(token, f.id, f.sharing_off_by_me), f.id)
+                      }
+                    >
+                      {f.sharing_off_by_me ? (
+                        <>
+                          <Share2 size={15} /> Allow sharing
+                        </>
+                      ) : (
+                        <>
+                          <XCircle size={15} /> Stop sharing
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {/* The per-child switch, reachable from the friendship the
+                      parent is looking at rather than only from a settings
+                      screen somewhere else. */}
+                  {f.status === "active" && (
+                    <button
+                      type="button"
+                      className="sasa-btn"
+                      disabled={busy === f.id}
+                      onClick={() =>
+                        act(
+                          () =>
+                            setChildDirectSharing(
+                              token,
+                              f.my_child_profile_id,
+                              !f.my_child_sharing_enabled,
+                            ),
+                          f.id,
+                        )
+                      }
+                    >
+                      {f.my_child_sharing_enabled
+                        ? `Turn off for ${f.my_child}`
+                        : `Allow ${f.my_child} to share`}
+                    </button>
+                  )}
+
                   {f.status === "active" && (
                     <button
                       type="button"
@@ -319,6 +415,10 @@ export default function ParentFriendsPanel({ token }: { token: string }) {
 
       <section className="sasa-pfriends-card">
         <h3>Shared media</h3>
+        <p className="sasa-friends-note">
+          Everything the children have sent each other. Revoke removes an item from the friend
+          straight away.
+        </p>
         {shares.length === 0 ? (
           <p className="sasa-friends-note">Nothing shared yet.</p>
         ) : (
@@ -329,11 +429,15 @@ export default function ParentFriendsPanel({ token }: { token: string }) {
                   <strong>{s.title}</strong>
                   <span>
                     {s.status} · {s.from_child} → {s.to_child}
+                    {s.is_recommendation ? " · recommended (public)" : ""}
                   </span>
+                  {!s.direct && s.status === "pending" && (
+                    <span className="sasa-pfriends-sharing">Waiting under the old rules</span>
+                  )}
                   {s.admin_override && <OverrideNote override={s.admin_override} />}
                 </div>
                 <div className="sasa-pfriends-actions">
-                  {s.status === "active" && (
+                  {s.can_revoke && (
                     <button
                       type="button"
                       className="sasa-btn"
