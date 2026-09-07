@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, ChevronLeft, Copy, Loader2, Search, UserPlus, Users, X } from "lucide-react";
+import { Check, ChevronLeft, Copy, Inbox, Loader2, Search, UserPlus, Users, X } from "lucide-react";
 import {
   cancelFriendRequest,
   getMyFriendId,
@@ -179,6 +179,7 @@ export default function KidsFriends({
             kind="video"
             from={openFriend.child.friend_id}
             onOpen={onOpenShared}
+            silentWhenEmpty
           />
           <KidsSharedWithMe
             token={token}
@@ -236,6 +237,23 @@ export default function KidsFriends({
           </ul>
         )}
       </section>
+
+      {/* SASA_DIRECT_SHARING_V36 — everything friends have sent, in one place.
+          It used to live only inside a friend's own page, so a child had to
+          guess who had sent them something before they could find it. Now that
+          a send arrives immediately, the arrival has to be somewhere a child
+          will actually look. */}
+      {active.length > 0 && (
+        <section className="sasa-friends-card">
+          <h2>
+            <Inbox size={18} /> Shared with me
+          </h2>
+          <KidsSharedWithMe token={token} kind="video" onOpen={onOpenShared} silentWhenEmpty />
+          {/* The photo list carries the empty message for both, so "nothing
+              yet" is said once rather than twice. */}
+          <KidsSharedWithMe token={token} kind="photo" onOpen={onOpenShared} />
+        </section>
+      )}
 
       {error && (
         <p className="sasa-friends-note is-error" role="alert">

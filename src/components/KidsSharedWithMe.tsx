@@ -22,12 +22,17 @@ export default function KidsSharedWithMe({
   kind,
   from,
   onOpen,
+  silentWhenEmpty = false,
 }: {
   token: string;
   kind: "video" | "photo";
   /** Friend ID, to show only what this one friend shared. */
   from?: string;
   onOpen?: (item: SharedMediaItem) => void;
+  /** Renders nothing at all when there is nothing to show. Set on all but one
+   *  instance where videos and photos are listed side by side, so a child is
+   *  not told twice that nothing has arrived. */
+  silentWhenEmpty?: boolean;
 }) {
   const [items, setItems] = useState<SharedMediaItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,10 +60,11 @@ export default function KidsSharedWithMe({
     };
   }, [token, kind, from]);
 
-  if (loading) return <p className="sasa-friends-note">Loading…</p>;
+  if (loading) return silentWhenEmpty ? null : <p className="sasa-friends-note">Loading…</p>;
   if (error) return <p className="sasa-friends-note is-error">{error}</p>;
 
   if (items.length === 0) {
+    if (silentWhenEmpty) return null;
     return (
       <p className="sasa-friends-note">
         Nothing shared with you yet. When a friend sends you a {kind}, it turns up here straight
