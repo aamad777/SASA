@@ -12,7 +12,8 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useAndroidBackFullscreen } from "@/hooks/use-android-back";
 import { motion, useReducedMotion } from "motion/react";
 
 type MediaItem = {
@@ -316,6 +317,22 @@ export default function YouTubeStyleMediaPlayer({
 
     revealControls();
   };
+
+  /* SASA_ANDROID_BACK_V39 — Back must leave full screen, not leave SASA.
+   *
+   * Tier 2 of the chain in use-android-back.ts. Registered only while full
+   * screen is actually active, at a lower priority than sheets, so a sheet
+   * opened over the player still wins however the mount order fell out.
+   *
+   * Leaving full screen also clears the screen lock through the
+   * fullscreenchange handler above, so this doubles as the way out of a locked
+   * screen on a device with no keyboard. */
+  useAndroidBackFullscreen(
+    fullscreen,
+    useCallback(() => {
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    }, []),
+  );
 
   const toggleFullscreen = async () => {
     const shell = shellRef.current;
