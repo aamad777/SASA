@@ -1363,6 +1363,7 @@ export default function KidsVideoHome({
           token={childToken}
           mediaId={sharing.id}
           mediaTitle={sharing.title}
+          onOpenFriends={() => goToSection("friends")}
           onClose={() => setSharing(null)}
         />
       )}

@@ -1222,6 +1222,7 @@ export default function KidsVideoPlayer({
              so for anything else rather than failing on Send. */
           mediaId={video.shareable && video.mediaId ? video.mediaId : null}
           mediaTitle={video.title}
+          onOpenFriends={() => onOpenHomeTab("friends")}
           onClose={() => setShowShareToFriend(false)}
         />
       )}

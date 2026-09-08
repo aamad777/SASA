@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Loader2, Send, UserPlus, X } from "lucide-react";
+import { Check, Clock, Loader2, Send, UserPlus, Users, X } from "lucide-react";
 import { listFriends, listSentShares, shareMedia, type Friend } from "@/lib/friends-api";
 import FriendAvatar from "./FriendAvatar";
 
@@ -26,6 +26,7 @@ type Sent = { name: string; recommendation: boolean };
 export default function ShareToFriend({
   token,
   mediaId,
+  onOpenFriends,
   mediaTitle,
   onClose,
 }: {
@@ -35,6 +36,9 @@ export default function ShareToFriend({
   mediaId: string | null;
   mediaTitle: string;
   onClose: () => void;
+  /* SASA_SHARE_EMPTY_V38 — a way out of the sheet to the Friends page. A child
+   * told "waiting for grown-ups" needs somewhere to go and check. */
+  onOpenFriends?: () => void;
 }) {
   const [friends, setFriends] = useState<Friend[]>([]);
   /** friendshipId -> status of THIS item, from the server, so it survives a
@@ -56,7 +60,19 @@ export default function ShareToFriend({
     Promise.all([listFriends(token), listSentShares(token).catch(() => ({ shares: [] }))])
       .then(([friendList, sentList]) => {
         if (cancelled) return;
-        setFriends(friendList.friends.filter((f) => f.status === "active"));
+        /* SASA_SHARE_EMPTY_V38 — this used to keep only "active" friends, so a
+         * child waiting on parent approval had friends.length === 0 and was
+         * told "Add a friend first" — the exact thing they had already done.
+         * Reported from a real device as "child share still not working", and
+         * fairly so: the sheet was blaming the child for the grown-ups.
+         *
+         * Anything the child has actually established is kept, and can_share /
+         * share_blocked_reason (which the server already sends) say what is
+         * really standing in the way. Rejected, blocked and removed are left
+         * out — those are not friends waiting on anything. */
+        setFriends(
+          friendList.friends.filter((f) => f.status === "active" || f.status === "pending"),
+        );
         setAlreadySent(
           Object.fromEntries(
             sentList.shares
@@ -96,8 +112,14 @@ export default function ShareToFriend({
       holding: friends.filter((f) => has(f.id)),
       // A grown-up took this exact item back; it cannot be sent again.
       revoked: friends.filter((f) => alreadySent[f.id] === "revoked"),
+      // Both parents have not approved the friendship yet.
+      awaitingApproval: friends.filter(
+        (f) => !f.can_share && !has(f.id) && f.share_blocked_reason === "friendship_not_active",
+      ),
       // Sharing is switched off somewhere along the line.
-      blocked: friends.filter((f) => !f.can_share && !has(f.id)),
+      blocked: friends.filter(
+        (f) => !f.can_share && !has(f.id) && f.share_blocked_reason !== "friendship_not_active",
+      ),
     };
   }, [friends, alreadySent]);
 
@@ -216,11 +238,60 @@ export default function ShareToFriend({
               </div>
             )}
 
+            {/* A child who HAS added someone sees them here, greyed out and not
+                selectable, plus who is being waited on and where to check.
+                They are not sent back to add a friend they already added. */}
+            {mediaId && !loading && !loadError && groups.awaitingApproval.length > 0 && (
+              <div className="sasa-share-waiting">
+                <ul className="sasa-friendpick">
+                  {groups.awaitingApproval.map((f) => (
+                    <li key={f.id}>
+                      {/* Deliberately not a button: it cannot be chosen yet, and
+                          a disabled control that looks pickable is what made the
+                          old sheet feel broken. */}
+                      <span className="sasa-friendpick-btn is-waiting" aria-disabled="true">
+                        <span className="sasa-friendpick-avatarwrap">
+                          <FriendAvatar child={f.child} variant="pick" token={token} />
+                          <span className="sasa-friendpick-tick is-waiting" aria-hidden="true">
+                            <Clock size={13} />
+                          </span>
+                        </span>
+                        <span className="sasa-friendpick-name">
+                          {f.child.display_name.split(" ")[0]}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="sasa-friends-note">
+                  <Clock size={14} aria-hidden="true" /> Waiting for grown-ups to say yes to{" "}
+                  {firstNames(groups.awaitingApproval)}. Then you can send this straight away.
+                </p>
+                {onOpenFriends && (
+                  <button
+                    type="button"
+                    className="sasa-btn"
+                    onClick={() => {
+                      onOpenFriends();
+                      onClose();
+                    }}
+                  >
+                    <Users size={16} /> Go to Friends
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* The generic fallback, only where nothing more specific has already
+                been said. It used to fire alongside the waiting-for-grown-ups
+                block and flatly contradict it: there is nothing to "turn back
+                on" for a friendship nobody has approved yet. */}
             {mediaId &&
               !loading &&
               !loadError &&
               friends.length > 0 &&
-              groups.pickable.length === 0 && (
+              groups.pickable.length === 0 &&
+              groups.awaitingApproval.length === 0 && (
                 <p className="sasa-friends-note">
                   {groups.holding.length > 0
                     ? "All of your friends already have this one."
