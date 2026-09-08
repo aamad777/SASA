@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { useVisibleViewportHeight } from "../hooks/use-visible-viewport-height";
+import { useAndroidBackRoot } from "../hooks/use-android-back";
 
 function NotFoundComponent() {
   return (
@@ -161,6 +162,12 @@ function RootComponent() {
   // keyboard-aware dialog (Add Kid Profile, PIN dialogs) without each one
   // re-registering a visualViewport listener.
   useVisibleViewportHeight();
+
+  /* SASA_ANDROID_BACK_V40 — installs the one `backButton` listener for the
+   * whole app. It has to exist even with nothing open: Capacitor's own
+   * no-listener path goes back if it can and otherwise does nothing at all,
+   * so without this Back is simply dead at the app's root. */
+  useAndroidBackRoot();
 
   return (
     <QueryClientProvider client={queryClient}>
