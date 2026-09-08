@@ -26,6 +26,7 @@ import {
   type SharedMediaItem,
 } from "@/lib/friends-api";
 import FriendAvatar from "./FriendAvatar";
+import { useAndroidBack } from "@/hooks/use-android-back";
 import KidsSharedWithMe from "./KidsSharedWithMe";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -347,7 +348,11 @@ function AddFriendSheet({
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Escape, and Android's Back button, reach the WebView as the same key.
+  /* Escape on a keyboard; SASA_ANDROID_BACK_V39 for Android's hardware Back,
+   * which is a Capacitor `backButton` event and not the same key at all —
+   * the comment here previously said it was, and it was wrong. */
+  useAndroidBack(true, onClose);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();

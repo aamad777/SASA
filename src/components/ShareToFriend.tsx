@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Clock, Loader2, Send, UserPlus, Users, X } from "lucide-react";
 import { listFriends, listSentShares, shareMedia, type Friend } from "@/lib/friends-api";
 import FriendAvatar from "./FriendAvatar";
+import { useAndroidBack } from "@/hooks/use-android-back";
 
 /** What the recipient's own list will call it, so the wording matches. */
 type Sent = { name: string; recommendation: boolean };
@@ -93,8 +94,13 @@ export default function ShareToFriend({
     };
   }, [token, mediaId]);
 
-  /* Escape closes the sheet, and Android's Back reaches the WebView as the
-   * same key. Without it the only way out on a phone is the small X. */
+  /* Escape closes the sheet on a keyboard, and SASA_ANDROID_BACK_V39 handles
+   * Android's hardware Back — which does NOT arrive as an Escape keypress, as
+   * the comment here used to claim. Inside the WebView it is a Capacitor
+   * `backButton` event, and with nothing listening it navigated the WebView
+   * back or closed SASA entirely while this sheet was open. */
+  useAndroidBack(true, onClose);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();

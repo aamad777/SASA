@@ -2,6 +2,7 @@ import { Check, ImagePlus, Minus, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useScrollLock } from "@/hooks/use-scroll-lock";
 import { setProfileAvatarPreset, uploadProfileAvatar, type AvatarCrop } from "@/lib/api";
+import { useAndroidBack } from "@/hooks/use-android-back";
 
 type Props = {
   token: string;
@@ -45,6 +46,27 @@ export function AvatarChooser({
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [busy, setBusy] = useState(false);
+
+  /* SASA_ANDROID_BACK_V39 — this dialog had no keyboard or Back exit at all,
+   * only a tap on the backdrop, so on a phone Back closed the whole app while
+   * a child was choosing a picture. `busy` is respected the same way the
+   * backdrop already does: an upload in flight is not interrupted, because
+   * abandoning it half-way is how you lose the avatar you already had. */
+  useAndroidBack(
+    true,
+    useCallback(() => {
+      if (!busy) onClose();
+    }, [busy, onClose]),
+  );
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [busy, onClose]);
+
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
   const dragRef = useRef<{ x: number; y: number } | null>(null);

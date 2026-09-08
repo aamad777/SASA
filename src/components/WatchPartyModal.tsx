@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAndroidBack } from "@/hooks/use-android-back";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Users,
@@ -57,6 +58,12 @@ export default function WatchPartyModal({
     activeBuddy || (availableBuddies.length > 0 ? availableBuddies[0] : null),
   );
   const [inviteSent, setInviteSent] = useState(false);
+
+  /* SASA_ANDROID_BACK_V39 — this dialog had no Back handling, so Android's
+   * Back closed SASA instead of the party sheet. Registered before the early
+   * return below, because hooks cannot sit after it, and gated on `isOpen` so
+   * Back keeps its normal meaning while the sheet is shut. */
+  useAndroidBack(isOpen, onClose);
 
   if (!isOpen) return null;
 
