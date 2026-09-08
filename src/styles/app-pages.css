@@ -2517,6 +2517,23 @@
   place-items: center;
 }
 
+/* SASA_SHARE_EMPTY_V38 — a friend whose friendship is still awaiting parent
+   approval: present and recognisable, plainly not choosable yet. */
+.sasa-share-waiting {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+
+.sasa-friendpick-btn.is-waiting {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.sasa-friendpick-tick.is-waiting {
+  background: var(--sasa-ink-3, #79808a);
+}
+
 .sasa-friendpick-tick {
   position: absolute;
   right: -2px;
