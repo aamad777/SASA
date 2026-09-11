@@ -59,7 +59,7 @@ spec:
             # genuinely cross-origin call is allowed rather than silently
             # rejected. The backend splits this on commas.
             - name: FRONTEND_ORIGIN
-              value: https://sasa.khader-ai.online,https://sara.khader-ai.online
+              value: https://sasa.khader-ai.online,https://sara.khader-ai.online,https://sasa-jordan.khader-ai.online
             - name: DB_HOST
               value: saratube-postgres
             - name: DB_PORT
